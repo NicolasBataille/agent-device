@@ -32,10 +32,10 @@ For Node, Xcode, Android SDK, macOS, and iOS device prerequisites, see [Installa
 Install the skill when your agent runtime supports skills:
 
 ```bash
-npx skills add callstackincubator/agent-device
+npx skills add callstack/agent-device
 ```
 
-The bundled [agent-device skill](https://github.com/callstackincubator/agent-device/blob/main/skills/agent-device/SKILL.md) is the canonical router for skill-aware clients. It intentionally points agents back to installed CLI help instead of duplicating the command manual.
+The bundled [agent-device skill](https://github.com/callstack/agent-device/blob/main/skills/agent-device/SKILL.md) is the canonical router for skill-aware clients. It intentionally points agents back to installed CLI help instead of duplicating the command manual.
 
 ## Recommended agent rule
 
@@ -81,7 +81,7 @@ No global install variant. Pin a user- or project-selected package version for u
 }
 ```
 
-Registry metadata uses MCP name `io.github.callstackincubator/agent-device`, npm package `agent-device`, stdio transport, `mcpName` package verification, `server.json`, `glama.json`, and `smithery.yaml`. Glama lists the server at [callstackincubator/agent-device](https://glama.ai/mcp/servers/callstackincubator/agent-device).
+Registry metadata uses MCP name `io.github.callstackincubator/agent-device`, npm package `agent-device`, stdio transport, `mcpName` package verification, `server.json`, `glama.json`, and `smithery.yaml`. Glama lists the server at [callstack/agent-device](https://glama.ai/mcp/servers/callstack/agent-device).
 
 ## Cursor
 

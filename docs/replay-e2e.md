@@ -55,8 +55,8 @@ agent-device test ./maestro-flows --maestro --platform android --artifacts-dir .
 
 Maestro compatibility translates supported YAML commands into Agent Device replay actions. It is intended for common mobile flows, not full Maestro parity. Unsupported Maestro syntax fails loudly with the command or field name and a line number when available. If a missing command matters for your flows, use the compatibility tracker to check current support and share demand:
 
-- Supported and unsupported capabilities: [https://github.com/callstackincubator/agent-device/issues/558](https://github.com/callstackincubator/agent-device/issues/558)
-- New focused compatibility request: [https://github.com/callstackincubator/agent-device/issues/new](https://github.com/callstackincubator/agent-device/issues/new)
+- Supported and unsupported capabilities: [https://github.com/callstack/agent-device/issues/558](https://github.com/callstack/agent-device/issues/558)
+- New focused compatibility request: [https://github.com/callstack/agent-device/issues/new](https://github.com/callstack/agent-device/issues/new)
 
 Currently supported areas include app launch with Apple-platform launch arguments and Android/iOS simulator `clearState`, `runFlow` file/inline with `when.platform`, `when.visible`, `when.notVisible`, and limited `when.true` boolean/platform expressions, `onFlowStart` and `onFlowComplete` hooks, deterministic `repeat.times`, `tapOn` including `optional`, `index`, `childOf`, `label`, and absolute/percentage point taps, `doubleTapOn` and `longPressOn`, `inputText`, focused-field `eraseText`, and `pasteText`, `openLink`, visibility assertions and `extendedWaitUntil`, `scroll` and `scrollUntilVisible`, absolute/percentage `swipe` and `swipe.label`, screenshots, keyboard dismiss, basic `pressKey`, `back`, animation waits, and `stopApp`, and ordered trusted `runScript` file/env scripts with `http.post`, `json`, and `output` variables. `runScript` is supported only as an ordered Maestro compatibility step for trusted file/env scripts; it can make network requests, and is not a native `.ad` command or security sandbox. Script execution uses Node `vm` only for compatibility isolation, not for security; the script timeout bounds synchronous execution, while `http.post` requests are bounded by the helper process timeout. Output keys cannot contain `.` because exported variables are addressed as `output.<key>`.
 
@@ -249,4 +249,4 @@ Use `replay -u` locally during maintenance, review the rewritten `.ad` lines, th
 - Replay file parse error:
   - Validate quoting in `.ad` lines (unclosed quotes are rejected).
 - Maestro compatibility flow fails on unsupported syntax:
-  - Check the linked command or field in [https://github.com/callstackincubator/agent-device/issues/558](https://github.com/callstackincubator/agent-device/issues/558). If it is important to your suite, comment there or open a focused issue with a small flow snippet.
+  - Check the linked command or field in [https://github.com/callstack/agent-device/issues/558](https://github.com/callstack/agent-device/issues/558). If it is important to your suite, comment there or open a focused issue with a small flow snippet.

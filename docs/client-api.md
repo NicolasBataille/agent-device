@@ -146,7 +146,7 @@ import {
 
 const helperVersion = '<agent-device version>';
 const manifestUrl =
-  `https://github.com/callstackincubator/agent-device/releases/download/v${helperVersion}/` +
+  `https://github.com/callstack/agent-device/releases/download/v${helperVersion}/` +
   `agent-device-android-snapshot-helper-${helperVersion}.manifest.json`;
 
 const artifact = await prepareAndroidSnapshotHelperArtifactFromManifestUrl({
