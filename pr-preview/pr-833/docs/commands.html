@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-833/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-833/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-833/static/js/22.4a78634b86.js"></script>
-<script defer src="/agent-device/pr-preview/pr-833/static/js/index.e8bcd5b0bc.js"></script>
+<script defer src="/agent-device/pr-preview/pr-833/static/js/index.e03255d3ef.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -112,8 +112,8 @@ non-simulator targets.</li>
 <ul>
 <li>Web automation uses a managed, pinned <code>agent-browser</code> backend as an implementation detail.</li>
 <li>Run <code>web setup</code> before first use and in CI bootstrap steps. Normal <code>--platform web</code> commands do not install the backend implicitly.</li>
-<li>Runtime web commands resolve the backend from <code>AGENT_DEVICE_AGENT_BROWSER_BIN</code>, then the managed state-dir install, then a compatible <code>agent-browser</code> on <code>PATH</code>.</li>
-<li><code>web status</code> shows the effective state dir, managed install path, and active backend source.</li>
+<li>Runtime web commands resolve the backend only from the managed install in the effective agent-device state dir.</li>
+<li><code>web status</code> shows the effective state dir and managed install path.</li>
 <li><code>web doctor</code> verifies the managed backend after setup.</li>
 <li>The managed install respects <code>--state-dir</code> and <code>AGENT_DEVICE_STATE_DIR</code>.</li>
 <li>Web automation requires Node 24+.</li>

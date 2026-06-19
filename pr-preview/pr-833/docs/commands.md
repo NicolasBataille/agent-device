@@ -111,8 +111,8 @@ agent-device close --platform web
 
 - Web automation uses a managed, pinned `agent-browser` backend as an implementation detail.
 - Run `web setup` before first use and in CI bootstrap steps. Normal `--platform web` commands do not install the backend implicitly.
-- Runtime web commands resolve the backend from `AGENT_DEVICE_AGENT_BROWSER_BIN`, then the managed state-dir install, then a compatible `agent-browser` on `PATH`.
-- `web status` shows the effective state dir, managed install path, and active backend source.
+- Runtime web commands resolve the backend only from the managed install in the effective agent-device state dir.
+- `web status` shows the effective state dir and managed install path.
 - `web doctor` verifies the managed backend after setup.
 - The managed install respects `--state-dir` and `AGENT_DEVICE_STATE_DIR`.
 - Web automation requires Node 24+.
