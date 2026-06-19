@@ -1047,7 +1047,6 @@ agent-device metro reload
 
 ```bash
 agent-device web setup
-agent-device web status
 agent-device web doctor
 agent-device open "https://example.com" --platform web
 agent-device snapshot -i --platform web
@@ -1057,7 +1056,7 @@ agent-device close --platform web
 - Web automation uses a managed, pinned `agent-browser` backend as an implementation detail.
 - Run `web setup` before first use and in CI bootstrap steps. Normal `--platform web` commands do not install the backend implicitly.
 - Runtime web commands resolve the backend only from the managed install in the effective agent-device state dir.
-- `web status` shows the effective state dir and managed install path.
+- `web setup` is idempotent and reuses the pinned backend when it is already installed.
 - `web doctor` verifies the managed backend after setup.
 - The managed install respects `--state-dir` and `AGENT_DEVICE_STATE_DIR`.
 - Web automation requires Node 24+.
