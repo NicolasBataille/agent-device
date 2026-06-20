@@ -14,6 +14,7 @@ agent-device help react-native
 agent-device help react-devtools
 agent-device help remote
 agent-device help macos
+agent-device help web
 agent-device help dogfood
 ```
 
@@ -96,6 +97,24 @@ agent-device reinstall MyApp /path/to/app-debug.apk --platform android --serial 
 agent-device open com.example.myapp --platform android --serial emulator-5554 --session my-session --relaunch
 agent-device metro reload
 ```
+
+## Web Automation
+
+```bash
+agent-device web setup
+agent-device web doctor
+agent-device open "https://example.com" --platform web
+agent-device snapshot -i --platform web
+agent-device close --platform web
+```
+
+- Web automation uses a managed, pinned `agent-browser` backend as an implementation detail.
+- Run `web setup` before first use and in CI bootstrap steps. Normal `--platform web` commands do not install the backend implicitly.
+- Runtime web commands resolve the backend only from the managed install in the effective agent-device state dir.
+- `web setup` is idempotent and reuses the pinned backend when it is already installed.
+- `web doctor` verifies the managed backend after setup.
+- The managed install respects `--state-dir` and `AGENT_DEVICE_STATE_DIR`.
+- Web automation requires Node 24+.
 
 ## Device isolation scopes
 
@@ -700,7 +719,8 @@ agent-device diff screenshot --baseline baseline.png --out diff.png --overlay-re
 agent-device record start               # Start screen recording to auto filename
 agent-device record start session.mp4   # Start recording to explicit path
 agent-device record start session.mp4 --fps 30  # Override iOS device runner FPS
-agent-device record start session.mp4 --quality 7 # Scale recording resolution to 70%
+agent-device record start session.mp4 --max-size 1024 # Downscale longest edge
+agent-device record start session.mp4 --quality high # Higher-quality export (slower)
 agent-device record stop                # Stop active recording
 ```
 
@@ -795,7 +815,9 @@ tail -50 ~/.agent-device/sessions/default/app.log
 
 - `--fps <n>` (1-120) applies to physical iOS device recording as an explicit FPS cap.
 
-- `--quality <5-10>` scales recording resolution from 50% through native resolution without changing FPS. Omitting it preserves the platform's current/native recording resolution.
+- `--max-size <px>` preserves aspect ratio and only downscales when the recording's longest edge is larger than the requested size.
+
+- `--quality <medium|high>` controls recording output quality. Android maps it to `adb shell screenrecord --bit-rate`; Apple targets use it for export/encoding. `medium` is the default; pass `high` for evidence, release notes, or debugging visual artifacts. Legacy numeric values are still accepted for compatibility: `5`-`7` map to `medium`, and `8`-`10` map to `high`.
 
 ## Tracing
 
