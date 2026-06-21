@@ -15,7 +15,6 @@ agent-device help react-devtools
 agent-device help remote
 agent-device help web
 agent-device help macos
-agent-device help web
 agent-device help dogfood
 ```
 
