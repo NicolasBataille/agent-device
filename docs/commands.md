@@ -13,8 +13,8 @@ agent-device help debugging
 agent-device help react-native
 agent-device help react-devtools
 agent-device help remote
-agent-device help macos
 agent-device help web
+agent-device help macos
 agent-device help dogfood
 ```
 
@@ -26,7 +26,7 @@ For MCP-aware clients that support direct tools, run:
 agent-device mcp
 ```
 
-The MCP server exposes direct structured tools for installed commands. Tools use structured input contracts through `AgentDeviceClient`; local-only workflows stay CLI-only rather than subprocess fallbacks. It does not expose generic shell execution over MCP.
+The MCP server exposes direct structured tools for installed commands. Tools use structured input contracts through `AgentDeviceClient`; local-only workflows stay CLI-only rather than subprocess fallbacks. It does not expose generic shell execution over MCP. MCP tools can target `platform: "web"` after `agent-device web setup`, but setup and doctor stay CLI-only.
 
 ## Navigation
 
@@ -100,11 +100,24 @@ agent-device metro reload
 
 ## Web Automation
 
+Minimal `--platform web` support reuses [agent-browser](https://github.com/vercel-labs/agent-browser). `agent-device` owns command/session/replay integration, refs/selectors, and artifact routing; `agent-browser` owns browser launch, page control, screenshots, and browser-specific mechanics.
+
+Use `--platform web` when a browser step belongs inside an `agent-device` session, replay, batch, MCP, or typed-client flow. Use `agent-browser` directly for standalone web automation.
+
+Set up and verify the managed web backend before relying on web sessions:
+
 ```bash
 agent-device web setup
 agent-device web doctor
 agent-device open "https://example.com" --platform web
 agent-device snapshot -i --platform web
+agent-device get text @e2 --platform web
+agent-device is visible 'label="Welcome"' --platform web
+agent-device find text "Welcome" exists --platform web
+agent-device click @e12 --platform web
+agent-device fill @e13 "test@example.com" --platform web
+agent-device wait text "Welcome" --platform web
+agent-device screenshot ./artifacts/web-home.png --platform web
 agent-device close --platform web
 ```
 
@@ -115,6 +128,8 @@ agent-device close --platform web
 - `web doctor` verifies the managed backend after setup.
 - The managed install respects `--state-dir` and `AGENT_DEVICE_STATE_DIR`.
 - Web automation requires Node 24+.
+- Supported through `agent-device`: URL open, snapshot refs, `get text/attrs`, `is visible/exists/text`, `find text/selector`, click/press, fill/type, wait, screenshot, close, and replay scripts composed from those commands.
+- Out of scope for `agent-device` web support: tab/window/devtools control, network interception, cookies/storage, downloads/uploads, arbitrary page scripting, multi-page orchestration, and raw browser diagnostics. Use `agent-browser` directly for those browser-specific workflows.
 
 ## Device isolation scopes
 
