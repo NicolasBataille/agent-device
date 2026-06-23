@@ -2672,6 +2672,26 @@ agent-device devices \
   --daemon-auth-token <token>
 ```
 
+For repeated use, put the remote client settings in a remote config profile:
+
+```json
+{
+  "daemonBaseUrl": "https://example.trycloudflare.com/agent-device",
+  "daemonAuthToken": "<token>",
+  "platform": "ios"
+}
+```
+
+Then pass that profile to each command:
+
+```bash
+agent-device devices --remote-config ./agent-device.remote.json
+agent-device open settings --remote-config ./agent-device.remote.json
+agent-device snapshot --remote-config ./agent-device.remote.json
+```
+
+Remote config profiles are JSON files. Do not commit a profile that contains a live `daemonAuthToken`.
+
 ## What Is Exposed
 
 The proxy allows only the daemon HTTP contract: `/health`, `/rpc`, `/upload`, and `/artifacts/*`, with the same routes also available under `/agent-device/*`. Health checks are unauthenticated; command, upload, and artifact routes require the bearer token.
