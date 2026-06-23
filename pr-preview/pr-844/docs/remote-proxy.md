@@ -33,7 +33,7 @@ export AGENT_DEVICE_DAEMON_BASE_URL="https://example.trycloudflare.com/agent-dev
 export AGENT_DEVICE_DAEMON_AUTH_TOKEN="<token>"
 
 agent-device devices --platform ios
-agent-device open settings --platform ios
+agent-device open MyApp --platform ios
 agent-device snapshot --platform ios
 ```
 
@@ -58,7 +58,7 @@ With `agent-device.json` in the working directory, normal commands pick up those
 
 ```bash
 agent-device devices
-agent-device open settings
+agent-device open MyApp
 agent-device snapshot
 ```
 
