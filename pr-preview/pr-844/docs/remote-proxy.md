@@ -45,7 +45,7 @@ agent-device devices \
   --daemon-auth-token <token>
 ```
 
-For repeated use, put the remote client settings in a remote config profile:
+For repeated use, put the remote client settings in normal CLI config:
 
 ```json
 {
@@ -55,15 +55,15 @@ For repeated use, put the remote client settings in a remote config profile:
 }
 ```
 
-Then pass that profile to each command:
+With `agent-device.json` in the working directory, normal commands pick up those defaults:
 
 ```bash
-agent-device devices --remote-config ./agent-device.remote.json
-agent-device open settings --remote-config ./agent-device.remote.json
-agent-device snapshot --remote-config ./agent-device.remote.json
+agent-device devices
+agent-device open settings
+agent-device snapshot
 ```
 
-Remote config profiles are JSON files. Do not commit a profile that contains a live `daemonAuthToken`.
+Do not commit a config file that contains a live `daemonAuthToken`.
 
 ## What Is Exposed
 
