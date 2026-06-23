@@ -50,8 +50,7 @@ For repeated use, put the remote client settings in normal CLI config:
 ```json
 {
   "daemonBaseUrl": "https://example.trycloudflare.com/agent-device",
-  "daemonAuthToken": "<token>",
-  "platform": "ios"
+  "daemonAuthToken": "<token>"
 }
 ```
 
