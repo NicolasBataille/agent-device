@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/static/js/22.4a78634b86.js"></script>
-<script defer src="/agent-device/static/js/index.1b8c8fffab.js"></script>
+<script defer src="/agent-device/static/js/index.504cf41c12.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -59,6 +59,7 @@
 <ul>
 <li><code>cdp</code> dynamically runs a pinned CDP helper through npm; the first run may download the pinned package, and later runs can reuse the npm cache.</li>
 <li>Every argument after <code>cdp</code> is passed to the CDP helper. Put <code>agent-device</code> global flags before <code>cdp</code> when you need the outer CLI to consume them.</li>
+<li>In remote bridge sessions, run <code>connect</code> first and omit <code>--url</code> for <code>target list</code> or <code>target select</code>; <code>agent-device</code> derives the Metro CDP URL from the prepared remote runtime.</li>
 <li>Start with <code>memory usage sample --gc</code> for a quick JS heap growth signal. Use snapshot diff and <code>leak-triplet</code> for proof that objects stayed retained after cleanup.</li>
 <li>Until <code>cdp</code> has a compact leak report command, synthesize one from <code>memory usage diff</code>, <code>memory snapshot diff</code>, <code>memory snapshot leak-triplet</code>, and <code>memory snapshot retainers</code>.</li>
 <li>Keep raw heap snapshots and allocation exports as artifacts. Default answers should summarize heap deltas, top retained classes/shapes, leak-triplet rows that stayed high after cleanup, and shortest useful retaining paths.</li>
