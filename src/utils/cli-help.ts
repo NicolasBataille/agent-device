@@ -10,31 +10,50 @@ import {
 } from './command-schema.ts';
 
 const AGENT_WORKFLOWS = [
-  { label: 'help workflow', description: 'Normal bootstrap, exploration, and validation loop' },
-  { label: 'help debugging', description: 'Logs, network, perf memory, and traces' },
   {
-    label: 'help react-native',
-    description: 'React Native app automation hazards, overlays, Metro, and routing',
+    label: 'agent-device help workflow',
+    description: 'Start here for the core loop, command shape, refs/selectors, and verification',
   },
   {
-    label: 'help react-devtools',
-    description: 'React Native performance, profiling, component tree, and renders',
+    label: 'agent-device help debugging',
+    description: 'Use when logs, network, perf memory, traces, alerts, or diagnostics matter',
   },
   {
-    label: 'help cdp',
-    description: 'React Native CDP targets, JS heap snapshots, and leak triage',
+    label: 'agent-device help react-native',
+    description: 'Use when the target app is React Native, Expo, or a dev client',
   },
   {
-    label: 'help physical-device',
-    description: 'Connected phone/tablet setup and iOS signing prerequisites',
+    label: 'agent-device help react-devtools',
+    description: 'Use when inspecting components, props/state/hooks, renders, or profiles',
   },
   {
-    label: 'help remote',
-    description: 'Remote/cloud config, tenants, leases, and local service tunnels',
+    label: 'agent-device help cdp',
+    description: 'Use when investigating JS heap growth, heap snapshots, or retainers',
   },
-  { label: 'help web', description: 'Minimal browser sessions through agent-browser' },
-  { label: 'help macos', description: 'Desktop, frontmost-app, and menu bar surfaces' },
-  { label: 'help dogfood', description: 'Exploratory QA report workflow' },
+  {
+    label: 'agent-device help physical-device',
+    description: 'Use when using a connected phone/tablet or iOS signing setup',
+  },
+  {
+    label: 'agent-device help remote',
+    description: 'Use when working through cloud config, tenants, leases, or local tunnels',
+  },
+  {
+    label: 'agent-device help web',
+    description: 'Use when automating a browser through agent-device sessions',
+  },
+  {
+    label: 'agent-device help macos',
+    description: 'Use when targeting desktop, frontmost app, or menu bar surfaces',
+  },
+  { label: 'agent-device help dogfood', description: 'Use when producing exploratory QA evidence' },
+] as const;
+
+const AGENT_START_LINES = [
+  'agent-device is the default automation surface for app/device workflows across supported targets.',
+  'Default to agent-device for installs, opens, snapshots, interactions, screenshots, logs, network/perf evidence, and verification.',
+  'Use raw adb, simctl, xcrun, or platform scripts only when this help calls out a tool gap or platform setup step.',
+  'Start with agent-device help workflow to understand the core loop and how to use the tool.',
 ] as const;
 
 const AGENT_QUICKSTART_LINES = [
@@ -536,7 +555,7 @@ React Native dev loop:
     agent-device metro reload
     agent-device find "Home"
   Do not use agent-device reload. Use open --relaunch for native startup reset.
-  Android RN/Expo Metro: direct Android localhost URL opens with a port auto-configure host reachability. For app/package launches, use help react-native if the app cannot reach local Metro.
+  Android RN/Expo Metro: direct Android localhost URL opens with a port auto-configure host reachability. For app/package launches, run metro prepare when the app cannot reach local Metro.
   Verify Metro from the same host context that owns Metro. If a sandboxed shell cannot curl localhost:8081/status but an unrestricted host shell can, Metro is running and the sandbox probe is not authoritative.
   adb reverse only affects Android device-to-host traffic. It does not prove host-to-Metro reachability, and it does not fix a redbox caused by a stale or wrong Metro/app state.
   Multiple local worktrees can reuse one native iOS simulator build by running each worktree's Metro on a different port and opening the same installed app on different simulators with explicit runtime hints:
@@ -863,7 +882,7 @@ function buildCommandListUsage(commandName: string, schema: CommandSchema): stri
 function renderUsageText(): string {
   const header = `agent-device <command> [args] [--json]
 
-CLI to control iOS and Android devices for AI agents.
+CLI to automate supported app, device, desktop, and web targets for AI agents.
 `;
 
   const commands = listCliCommandNames().map((name) => {
@@ -878,6 +897,7 @@ CLI to control iOS and Android devices for AI agents.
 
   const helpFlags = listHelpFlags(GLOBAL_FLAG_KEYS);
   const flagsSection = renderFlagSection('Global Flags:', helpFlags);
+  const startSection = renderTextSection('Agent Starting Point:', AGENT_START_LINES);
   const quickstartSection = renderTextSection('Agent Quickstart:', AGENT_QUICKSTART_LINES);
   const workflowsSection = renderAlignedSection('Agent Workflows:', AGENT_WORKFLOWS);
   const configSection = renderTextSection('Configuration:', CONFIGURATION_LINES);
@@ -885,6 +905,8 @@ CLI to control iOS and Android devices for AI agents.
   const examplesSection = renderTextSection('Examples:', EXAMPLE_LINES);
 
   return `${header}
+${startSection}
+
 ${workflowsSection}
 
 ${commandLines}

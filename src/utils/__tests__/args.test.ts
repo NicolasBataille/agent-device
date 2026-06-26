@@ -1177,9 +1177,34 @@ test('usage includes only global flags in the top-level global flags section', (
 
 test('usage includes agent workflows, config, environment, and examples footers', () => {
   const usageText = usage();
+  assert.match(
+    usageText,
+    /CLI to automate supported app, device, desktop, and web targets for AI agents/,
+  );
   assert.ok(
     usageText.indexOf('Agent Workflows:') < usageText.indexOf('Commands:'),
     'Agent workflows should appear before the command list for agents that only read the top of help.',
+  );
+  assert.ok(
+    usageText.indexOf('Agent Starting Point:') < usageText.indexOf('Agent Workflows:'),
+    'The agent starting point should appear before topic selection.',
+  );
+  assert.match(usageText, /Agent Starting Point:/);
+  assert.match(
+    usageText,
+    /agent-device is the default automation surface for app\/device workflows across supported targets/,
+  );
+  assert.match(
+    usageText,
+    /Default to agent-device for installs, opens, snapshots, interactions, screenshots, logs, network\/perf evidence, and verification/,
+  );
+  assert.match(
+    usageText,
+    /Use raw adb, simctl, xcrun, or platform scripts only when this help calls out a tool gap or platform setup step/,
+  );
+  assert.match(
+    usageText,
+    /Start with agent-device help workflow to understand the core loop and how to use the tool/,
   );
   assert.match(usageText, /Agent Quickstart:/);
   assert.match(usageText, /Default loop: devices\/apps -> open -> snapshot -i/);
@@ -1225,21 +1250,30 @@ test('usage includes agent workflows, config, environment, and examples footers'
   assert.match(usageText, /Full operating guide: agent-device help workflow/);
   assert.match(usageText, /Exploratory QA: agent-device help dogfood/);
   assert.match(usageText, /Agent Workflows:/);
-  assert.match(usageText, /help workflow\s+Normal bootstrap, exploration, and validation loop/);
-  assert.match(usageText, /help debugging\s+Logs, network, perf memory, and traces/);
   assert.match(
     usageText,
-    /help react-devtools\s+React Native performance, profiling, component tree, and renders/,
+    /agent-device help workflow\s+Start here for the core loop, command shape, refs\/selectors, and verification/,
   );
   assert.match(
     usageText,
-    /help physical-device\s+Connected phone\/tablet setup and iOS signing prerequisites/,
+    /agent-device help debugging\s+Use when logs, network, perf memory, traces, alerts, or diagnostics matter/,
   );
   assert.match(
     usageText,
-    /help react-native\s+React Native app automation hazards, overlays, Metro, and routing/,
+    /agent-device help react-devtools\s+Use when inspecting components, props\/state\/hooks, renders, or profiles/,
   );
-  assert.match(usageText, /help web\s+Minimal browser sessions through agent-browser/);
+  assert.match(
+    usageText,
+    /agent-device help physical-device\s+Use when using a connected phone\/tablet or iOS signing setup/,
+  );
+  assert.match(
+    usageText,
+    /agent-device help react-native\s+Use when the target app is React Native, Expo, or a dev client/,
+  );
+  assert.match(
+    usageText,
+    /agent-device help web\s+Use when automating a browser through agent-device sessions/,
+  );
   assert.match(usageText, /Configuration:/);
   assert.match(
     usageText,
@@ -1663,6 +1697,7 @@ test('usageForCommand resolves react-native help topic', () => {
   assert.match(help, /help debugging/);
   assert.match(help, /help react-devtools/);
   assert.match(help, /Help workflow owns the full Expo URL command shapes/);
+  assert.match(help, /For app\/package launches, run metro prepare/);
   assert.match(help, /same host context that owns Metro/);
   assert.match(help, /sandbox probe is not authoritative/);
   assert.match(help, /adb reverse only affects Android device-to-host traffic/);
