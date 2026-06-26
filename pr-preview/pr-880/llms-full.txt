@@ -14,7 +14,7 @@ Use it when an agent needs to inspect and operate a real app, not just reason ab
 
 - **App verification for agents**: run the app, inspect visible UI, act through refs/selectors, and verify expected state.
 - **Token-efficient UI context**: accessibility snapshots give agents structured UI state instead of screenshot-only reasoning.
-- **Runtime evidence**: capture screenshots, recordings, logs, network traffic, audio-level probes, traces, CPU/memory/perf snapshots, and crash-related logs when the happy path breaks.
+- **Runtime evidence**: capture screenshots, recordings, logs, network traffic, audio-level probes for browser and host-rendered simulator/emulator audio, traces, CPU/memory/perf snapshots, and crash-related logs when the happy path breaks.
 - **Replayable checks**: turn stable exploratory sessions into `.ad` replay scripts that can run again without AI.
 - **React Native and Expo workflows**: pair device automation with optional React DevTools profiling for component trees, props/state/hooks, slow renders, and rerenders.
 - **Local devices and app surfaces**: drive simulators, emulators, physical devices, TV targets, desktop apps, and browser sessions through one CLI.
@@ -841,7 +841,7 @@ const audio = await client.observability.audio({
 await client.observability.audio({ platform: 'web', action: 'probe', probeAction: 'stop' });
 ```
 
-Web probes sample HTML media elements. macOS probes use `platform: 'macos'`, sample host system audio through ScreenCaptureKit, and require Screen Recording permission. iOS and Android app audio are not exposed by this command.
+Web probes sample HTML media elements. Host-system probes use `platform: 'macos'`, `platform: 'ios'` for iOS simulators, or `platform: 'android'` for Android emulators on macOS hosts. They sample host system audio through ScreenCaptureKit and require Screen Recording permission. Physical iOS and Android app audio are not exposed by this command.
 
 `client.observability.perf()` returns daemon-shaped JSON so local and remote transports expose the same metrics payload. Pass `{ area: 'metrics' }` for the broad startup/CPU/memory/frame first pass, `{ area: 'frames' }` for a focused frame/jank-health payload, or `{ area: 'memory', action: 'sample' }` for a compact memory-only sample. Use `{ area: 'memory', action: 'snapshot', kind: 'android-hprof', out: 'app.hprof' }` on Android or `{ area: 'memory', action: 'snapshot', kind: 'memgraph', out: 'app.memgraph' }` on supported Apple simulator/macOS app sessions to write large memory artifacts to disk. Android native artifacts use `{ area: 'cpu', subject: 'profile', action: 'start' | 'stop' | 'report', kind: 'simpleperf', out }` and `{ area: 'trace', action: 'start' | 'stop', kind: 'perfetto', out }`; these Android-only commands return artifact paths and compact summaries, not trace/profile contents. Physical iOS device memgraph capture reports unavailable with a reason/hint. heapprofd allocation tracing is deferred until Perfetto plumbing is available. On Android and supported Apple targets, `data.metrics.fps.droppedFramePercent` is the primary frame-smoothness value. Android derives it from the current `adb shell dumpsys gfxinfo <package> framestats` window; connected iOS devices derive it from `xcrun xctrace` Animation Hitches for the active app process. Frame samples include `windowStartedAt`, `windowEndedAt`, and `worstWindows` so agents can correlate dropped-frame clusters with logs, network entries, and their own session actions. A successful Android read resets Android frame stats; `open <app>` resets the Android frame window too, so agents can call `perf({ area: 'frames' })`, perform a transition or gesture, then call it again to inspect that focused window. iOS simulator and macOS app sessions report frame health as unavailable rather than inventing FPS or dropped-frame values.
 
@@ -1223,7 +1223,7 @@ agent-device snapshot -i --platform apple --target desktop
 - Use `frontmost-app`, `desktop`, and `menubar` mainly for `snapshot`, `get`, `is`, and `wait`.
 - If you inspect with `desktop` or `menubar` and then need to click or fill inside one app, open that app in a normal `app` session.
 - macOS also supports `clipboard read|write`, `trigger-app-event`, `logs`, `network dump`, `audio probe`, `alert`, `settings appearance`, and `settings permission <grant|reset> <accessibility|screen-recording|input-monitoring>`.
-- macOS `audio probe start 10 1000 --platform macos` samples host system audio through ScreenCaptureKit. Grant Screen Recording permission before relying on it in a run.
+- `audio probe start 10 1000 --platform macos` samples host system audio through ScreenCaptureKit. The same host-system audio backend is used for iOS simulators and Android emulators on macOS hosts; grant Screen Recording permission before relying on it in a run.
 - In macOS app sessions, `screenshot` captures the target app window bounds rather than the full desktop.
 - Prefer selector or `@ref`-driven interactions on macOS. Window position can shift between runs, so raw x/y point commands are less stable than snapshot-derived targets.
 - Use `click --button secondary` for context menus on macOS, then run `snapshot -i` again.
@@ -2132,7 +2132,7 @@ Use `agent-device` when the task moves past UI automation and you need runtime e
 
 - Session app logs for targeted debugging windows
 - Network inspection from recent HTTP(s) entries in app logs via `network dump`
-- Audio-level probes for browser media elements and macOS system audio
+- Audio-level probes for browser media elements and host-rendered simulator/emulator audio
 - Performance snapshots with `perf metrics` / `perf frames`
 - Apple crash symbolication with `debug symbols`
 - Screenshots, recordings, and replayable repro flows
@@ -2268,11 +2268,13 @@ agent-device audio probe start 10 1000 --platform web
 agent-device audio probe status --platform web
 agent-device audio probe stop --platform web
 agent-device audio probe start 10 1000 --platform macos
+agent-device audio probe start 10 1000 --platform ios
+agent-device audio probe start 10 1000 --platform android
 ```
 
 - `audio probe start [durationSeconds] [bucketMs]` samples live audio while the session keeps running, then exposes compact `rmsDbfs` and `peakDbfs` buckets. The first timing positional is seconds; the second is milliseconds.
 - On web, the probe samples HTML media elements through Web Audio. URL-backed media may be routed through the probe `AudioContext` while observed.
-- On macOS, the probe samples host system audio through ScreenCaptureKit and requires Screen Recording permission. It is system-audio evidence, not app-instrumented audio.
+- On macOS hosts, the probe samples host system audio through ScreenCaptureKit for macOS sessions, iOS simulators, and Android emulators. It requires Screen Recording permission and is system-audio evidence, not app-instrumented audio. Physical iOS and Android devices are not supported.
 - Use `status` to poll partial buckets during a 10-20 second observation window, and `stop` to end the probe early.
 
 ### Performance snapshots

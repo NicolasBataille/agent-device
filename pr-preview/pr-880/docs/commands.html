@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-880/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-880/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-880/static/js/22.4a78634b86.js"></script>
-<script defer src="/agent-device/pr-preview/pr-880/static/js/index.71e3391cd9.js"></script>
+<script defer src="/agent-device/pr-preview/pr-880/static/js/index.386688860c.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -202,7 +202,7 @@ non-simulator targets.</li>
 <li>Use <code>frontmost-app</code>, <code>desktop</code>, and <code>menubar</code> mainly for <code>snapshot</code>, <code>get</code>, <code>is</code>, and <code>wait</code>.</li>
 <li>If you inspect with <code>desktop</code> or <code>menubar</code> and then need to click or fill inside one app, open that app in a normal <code>app</code> session.</li>
 <li>macOS also supports <code>clipboard read|write</code>, <code>trigger-app-event</code>, <code>logs</code>, <code>network dump</code>, <code>audio probe</code>, <code>alert</code>, <code>settings appearance</code>, and <code>settings permission &lt;grant|reset&gt; &lt;accessibility|screen-recording|input-monitoring&gt;</code>.</li>
-<li>macOS <code>audio probe start 10 1000 --platform macos</code> samples host system audio through ScreenCaptureKit. Grant Screen Recording permission before relying on it in a run.</li>
+<li><code>audio probe start 10 1000 --platform macos</code> samples host system audio through ScreenCaptureKit. The same host-system audio backend is used for iOS simulators and Android emulators on macOS hosts; grant Screen Recording permission before relying on it in a run.</li>
 <li>In macOS app sessions, <code>screenshot</code> captures the target app window bounds rather than the full desktop.</li>
 <li>Prefer selector or <code>@ref</code>-driven interactions on macOS. Window position can shift between runs, so raw x/y point commands are less stable than snapshot-derived targets.</li>
 <li>Use <code>click --button secondary</code> for context menus on macOS, then run <code>snapshot -i</code> again.</li>
