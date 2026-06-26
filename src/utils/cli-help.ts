@@ -88,7 +88,6 @@ const AGENT_QUICKSTART_LINES = [
   'Web browser sessions: read help web; first slice is web setup if needed -> web doctor -> open <url> --platform web -> snapshot -i -> click/fill/get/is/find/wait/screenshot -> close.',
   'Verification commands must name the expected text/selector; bare screenshots/snapshots are not enough.',
   'Debug evidence: Session state contains request diagnostics and runner.log; use logs clear --restart/mark/path, trace, and network dump --include headers for app evidence.',
-  'Use agent-device commands in final plans; raw platform tools, pseudo commands, and helper prose are wrong.',
   'Full operating guide: agent-device help workflow. Exploratory QA: agent-device help dogfood.',
 ] as const;
 
