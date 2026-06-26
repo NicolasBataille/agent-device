@@ -21,6 +21,9 @@ export type RemoteConnectionState = {
   runId: string;
   leaseId?: string;
   leaseBackend?: LeaseBackend;
+  leaseProvider?: string;
+  deviceKey?: string;
+  clientId?: string;
   platform?: CliFlags['platform'];
   target?: CliFlags['target'];
   runtime?: SessionRuntimeHints;
@@ -280,6 +283,9 @@ function isRemoteConnectionState(value: unknown): value is RemoteConnectionState
     typeof record.runId === 'string' &&
     (record.leaseId === undefined || typeof record.leaseId === 'string') &&
     (record.leaseBackend === undefined || typeof record.leaseBackend === 'string') &&
+    (record.leaseProvider === undefined || typeof record.leaseProvider === 'string') &&
+    (record.deviceKey === undefined || typeof record.deviceKey === 'string') &&
+    (record.clientId === undefined || typeof record.clientId === 'string') &&
     typeof record.connectedAt === 'string' &&
     typeof record.updatedAt === 'string'
   );
