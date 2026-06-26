@@ -16,6 +16,8 @@ const RUNNER_OWNER_PID = process.pid;
 export const RUNNER_OWNER_START_TIME = readProcessStartTime(process.pid);
 export const RUNNER_OWNER_TOKEN = buildRunnerOwnerToken(RUNNER_OWNER_PID, RUNNER_OWNER_START_TIME);
 
+let runnerLeaseOwnerStateDir: string | undefined;
+
 export type RunnerLease = {
   schemaVersion: 1;
   deviceId: string;
@@ -70,6 +72,10 @@ export function buildRunnerLease(params: {
     jsonPath: params.jsonPath,
     createdAtMs: Date.now(),
   };
+}
+
+export function setRunnerLeaseOwnerStateDir(stateDir: string | undefined): void {
+  runnerLeaseOwnerStateDir = stateDir?.trim() || undefined;
 }
 
 export async function withRunnerLeaseLock<T>(deviceId: string, task: () => Promise<T>): Promise<T> {
@@ -146,14 +152,20 @@ function isSameStateDirRunnerLease(lease: RunnerLease): boolean {
 }
 
 function readCurrentStateDir(): string | undefined {
+  if (runnerLeaseOwnerStateDir) return runnerLeaseOwnerStateDir;
   return process.env.AGENT_DEVICE_STATE_DIR?.trim() || undefined;
 }
 
 function buildBusyRunnerLeaseHint(lease: RunnerLease): string {
   const owner = `PID ${lease.ownerPid}`;
   const stateDir = lease.ownerStateDir ? ` with AGENT_DEVICE_STATE_DIR=${lease.ownerStateDir}` : '';
+  const currentStateDir = readCurrentStateDir();
+  const current =
+    currentStateDir && currentStateDir !== lease.ownerStateDir
+      ? ` Current daemon state dir is ${currentStateDir}.`
+      : '';
   return [
-    `The Mac operator must stop the owning daemon (${owner}${stateDir}) or wait for that run to finish, then retry.`,
+    `The Mac operator must stop the owning daemon (${owner}${stateDir}) or wait for that run to finish, then retry.${current}`,
     'Do not run prepare ios-runner from another daemon/client to recover this; a live foreign runner lease cannot be released by the remote client.',
   ].join(' ');
 }

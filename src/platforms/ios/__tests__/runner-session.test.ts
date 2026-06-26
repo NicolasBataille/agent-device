@@ -110,6 +110,7 @@ import {
   cleanupRunnerLeasesForOwner,
   RUNNER_OWNER_START_TIME,
   RUNNER_OWNER_TOKEN,
+  setRunnerLeaseOwnerStateDir,
   writeRunnerLease,
   type RunnerLease,
 } from '../runner-lease.ts';
@@ -117,6 +118,7 @@ import {
 beforeEach(async () => {
   await abortAllIosRunnerSessions();
   vi.resetAllMocks();
+  setRunnerLeaseOwnerStateDir(undefined);
   process.env.AGENT_DEVICE_IOS_RUNNER_LEASE_DIR = fs.mkdtempSync(
     path.join(os.tmpdir(), 'agent-device-runner-lease-test-'),
   );
@@ -733,6 +735,38 @@ test('runner session startup reclaims live foreign runner lease from same state 
     assert.ok(pkillCalls.length >= 2);
     assert.match(String(pkillCalls[0]?.[1]?.[2] ?? ''), /owner-foreign-same-state/);
   } finally {
+    if (previousStateDir === undefined) delete process.env.AGENT_DEVICE_STATE_DIR;
+    else process.env.AGENT_DEVICE_STATE_DIR = previousStateDir;
+  }
+});
+
+test('runner session startup reclaims same-state live lease from daemon runtime owner state dir', async () => {
+  const device = { ...IOS_SIMULATOR, id: 'runner-session-runtime-state-lease-sim' };
+  const previousStateDir = process.env.AGENT_DEVICE_STATE_DIR;
+  const stateDir = '/tmp/agent-device-runtime-state';
+  delete process.env.AGENT_DEVICE_STATE_DIR;
+  setRunnerLeaseOwnerStateDir(stateDir);
+  writeRunnerLease(
+    makeRunnerLease({
+      deviceId: device.id,
+      ownerToken: 'owner-foreign-runtime-state',
+      ownerPid: process.pid,
+      ownerStartTime: RUNNER_OWNER_START_TIME,
+      ownerStateDir: stateDir,
+      runnerPid: 4_321,
+    }),
+  );
+
+  try {
+    const session = await ensureRunnerSession(device, {});
+
+    assert.equal(session.deviceId, device.id);
+    assert.equal(mockRunCmdBackground.mock.calls.length, 1);
+    const pkillCalls = mockRunAppleToolCommand.mock.calls.filter(isXcodebuildPkillCall);
+    assert.ok(pkillCalls.length >= 2);
+    assert.match(String(pkillCalls[0]?.[1]?.[2] ?? ''), /owner-foreign-runtime-state/);
+  } finally {
+    setRunnerLeaseOwnerStateDir(undefined);
     if (previousStateDir === undefined) delete process.env.AGENT_DEVICE_STATE_DIR;
     else process.env.AGENT_DEVICE_STATE_DIR = previousStateDir;
   }

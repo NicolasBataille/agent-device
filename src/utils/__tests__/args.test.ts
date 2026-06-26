@@ -700,6 +700,16 @@ test('parseArgs recognizes connect lease backend force and no-login flags', () =
   assert.equal(parsed.flags.noLogin, true);
 });
 
+test('parseArgs preserves connect proxy provider positional', () => {
+  const parsed = parseArgs(
+    ['connect', 'proxy', '--daemon-base-url', 'http://host:4310/agent-device'],
+    { strictFlags: true },
+  );
+  assert.equal(parsed.command, 'connect');
+  assert.deepEqual(parsed.positionals, ['proxy']);
+  assert.equal(parsed.flags.daemonBaseUrl, 'http://host:4310/agent-device');
+});
+
 test('parseArgs accepts auth management subcommands', () => {
   const status = parseArgs(['auth', 'status'], { strictFlags: true });
   assert.equal(status.command, 'auth');

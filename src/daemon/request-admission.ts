@@ -62,5 +62,8 @@ export function assertRequestLeaseAdmission(
     runId: leaseScope.runId,
     leaseId: leaseScope.leaseId,
     backend: leaseScope.leaseBackend,
+    leaseProvider: leaseScope.leaseProvider,
+    deviceKey: leaseScope.deviceKey,
+    clientId: leaseScope.clientId,
   });
 }

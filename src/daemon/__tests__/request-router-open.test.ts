@@ -29,12 +29,15 @@ function makeIosDevice(id: string): DeviceInfo {
   };
 }
 
-function createOpenHandler(sessionStore: ReturnType<typeof makeSessionStore>) {
+function createOpenHandler(
+  sessionStore: ReturnType<typeof makeSessionStore>,
+  leaseRegistry = new LeaseRegistry(),
+) {
   return createRequestHandler({
     logPath: path.join(os.tmpdir(), 'daemon.log'),
     token: 'test-token',
     sessionStore,
-    leaseRegistry: new LeaseRegistry(),
+    leaseRegistry,
     trackDownloadableArtifact: () => 'artifact-id',
   });
 }
@@ -201,4 +204,47 @@ test('router allows pre-open requests for different devices to proceed concurren
   expect(firstResponse.ok).toBe(true);
   expect(secondResponse.ok).toBe(true);
   expect(maxActiveEnsures).toBe(2);
+});
+
+test('open rejects mismatched proxy lease metadata before dispatch side effects', async () => {
+  const sessionStore = makeSessionStore('agent-device-router-open-proxy-lease-');
+  const leaseRegistry = new LeaseRegistry();
+  const lease = leaseRegistry.allocateLease({
+    tenantId: 'proxy',
+    runId: 'proxy-client-1',
+    backend: 'ios-instance',
+    provider: 'proxy',
+    clientId: 'client-1',
+    deviceKey: 'ios:mobile:SIM-OTHER',
+    ttlMs: 300_000,
+  });
+  const device = makeIosDevice('SIM-001');
+  mockResolveTargetDevice.mockResolvedValue(device);
+
+  const handler = createOpenHandler(sessionStore, leaseRegistry);
+  const response = await handler({
+    token: 'test-token',
+    session: 'adc-proxy',
+    command: 'open',
+    positionals: ['com.example.App'],
+    flags: { platform: 'ios' },
+    meta: {
+      requestId: 'req-open-proxy-lease',
+      sessionIsolation: 'tenant',
+      tenantId: 'proxy',
+      runId: 'proxy-client-1',
+      leaseId: lease.leaseId,
+      leaseBackend: 'ios-instance',
+      leaseProvider: 'proxy',
+      clientId: 'client-1',
+      deviceKey: 'ios:mobile:SIM-001',
+    },
+  });
+
+  expect(response.ok).toBe(false);
+  if (!response.ok) {
+    expect(response.error.code).toBe('UNAUTHORIZED');
+  }
+  expect(mockDispatch).not.toHaveBeenCalled();
+  expect(sessionStore.get('proxy:adc-proxy')).toBeUndefined();
 });
