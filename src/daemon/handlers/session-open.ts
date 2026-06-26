@@ -43,6 +43,7 @@ import {
   resolveImplicitSessionScope,
   resolvePublicSessionName,
 } from '../session-routing.ts';
+import { buildSessionLeaseFromRequest } from '../lease-context.ts';
 
 const firstSessionOpenLocks = new Map<string, Promise<unknown>>();
 
@@ -279,6 +280,7 @@ async function completeOpenCommand(params: {
     appName,
     saveScript: Boolean(req.flags?.saveScript),
   });
+  nextSession.lease = buildSessionLeaseFromRequest(req) ?? existingSession?.lease;
   if (req.runtime !== undefined) {
     setSessionRuntimeHintsForOpen(sessionStore, sessionName, runtime);
   }
@@ -347,6 +349,7 @@ async function prepareOpenDispatchSession(params: {
     appName,
     saveScript: Boolean(req.flags?.saveScript),
   });
+  provisionalSession.lease = buildSessionLeaseFromRequest(req) ?? existingSession?.lease;
   sessionStore.set(sessionName, provisionalSession);
   const lifecycleResponse = await beforeDispatch(provisionalSession);
   if (lifecycleResponse && !lifecycleResponse.ok) {

@@ -38,6 +38,9 @@ type DaemonRequestMeta = Omit<PublicDaemonRequestMeta, 'installSource' | 'lockPl
   installSource?: DaemonInstallSource;
   lockPlatform?: PlatformSelector;
   leaseBackend?: LeaseBackend;
+  clientId?: string;
+  leaseProvider?: string;
+  deviceKey?: string;
 };
 
 export type DaemonOpenLifecycle = {
@@ -226,6 +229,16 @@ export type SessionState = {
   sessionScope?: {
     kind: 'cwd';
     id: string;
+  };
+  lease?: {
+    leaseId: string;
+    tenantId: string;
+    runId: string;
+    clientId?: string;
+    backend?: LeaseBackend;
+    leaseProvider?: string;
+    deviceKey?: string;
+    expiresAt?: number;
   };
   device: DeviceInfo;
   createdAt: number;

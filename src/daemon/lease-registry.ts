@@ -3,15 +3,20 @@ import { AppError } from '../utils/errors.ts';
 import { normalizeTenantId } from './config.ts';
 import type { LeaseBackend } from '../contracts.ts';
 
-export type SimulatorLease = {
+export type DeviceLease = {
   leaseId: string;
   tenantId: string;
   runId: string;
   backend: LeaseBackend;
+  clientId?: string;
+  leaseProvider?: string;
+  deviceKey?: string;
   createdAt: number;
   heartbeatAt: number;
   expiresAt: number;
 };
+
+export type SimulatorLease = DeviceLease;
 
 export type LeaseRegistryOptions = {
   maxActiveSimulatorLeases?: number;
@@ -76,7 +81,7 @@ function normalizeLeaseBackend(raw: string | undefined): LeaseBackend {
 }
 
 export class LeaseRegistry {
-  private readonly leases = new Map<string, SimulatorLease>();
+  private readonly leases = new Map<string, DeviceLease>();
   private readonly runBindings = new Map<string, string>();
   private readonly maxActiveSimulatorLeases: number;
   private readonly defaultLeaseTtlMs: number;
@@ -100,7 +105,7 @@ export class LeaseRegistry {
     this.now = options.now ?? (() => Date.now());
   }
 
-  allocateLease(request: AllocateLeaseRequest): SimulatorLease {
+  allocateLease(request: AllocateLeaseRequest): DeviceLease {
     const backend = normalizeLeaseBackend(request.backend);
     const tenantId = normalizeTenantId(request.tenantId);
     if (!tenantId) {
@@ -129,7 +134,7 @@ export class LeaseRegistry {
     }
     this.enforceCapacity(backend);
     const now = this.now();
-    const lease: SimulatorLease = {
+    const lease: DeviceLease = {
       leaseId: crypto.randomBytes(16).toString('hex'),
       tenantId,
       runId,
@@ -143,7 +148,7 @@ export class LeaseRegistry {
     return { ...lease };
   }
 
-  heartbeatLease(request: HeartbeatLeaseRequest): SimulatorLease {
+  heartbeatLease(request: HeartbeatLeaseRequest): DeviceLease {
     const leaseId = normalizeLeaseId(request.leaseId);
     if (!leaseId) {
       throw new AppError('INVALID_ARGS', 'Invalid lease id.');
@@ -204,18 +209,25 @@ export class LeaseRegistry {
     }
   }
 
-  listActiveLeases(): SimulatorLease[] {
+  listActiveLeases(): DeviceLease[] {
     this.cleanupExpiredLeases();
     return Array.from(this.leases.values()).map((entry) => ({ ...entry }));
   }
 
-  private cleanupExpiredLeases(): void {
+  consumeExpiredLeases(): DeviceLease[] {
     const now = this.now();
+    const expired: DeviceLease[] = [];
     for (const lease of this.leases.values()) {
       if (lease.expiresAt > now) continue;
       this.leases.delete(lease.leaseId);
       this.runBindings.delete(this.bindingKey(lease.tenantId, lease.runId, lease.backend));
+      expired.push({ ...lease });
     }
+    return expired;
+  }
+
+  private cleanupExpiredLeases(): void {
+    this.consumeExpiredLeases();
   }
 
   private enforceCapacity(backend: LeaseBackend): void {
@@ -246,9 +258,9 @@ export class LeaseRegistry {
     return value;
   }
 
-  private refreshLease(lease: SimulatorLease, ttlMs: number): SimulatorLease {
+  private refreshLease(lease: DeviceLease, ttlMs: number): DeviceLease {
     const now = this.now();
-    const updated: SimulatorLease = {
+    const updated: DeviceLease = {
       ...lease,
       heartbeatAt: now,
       expiresAt: now + ttlMs,
@@ -266,7 +278,7 @@ export class LeaseRegistry {
   }
 
   private assertOptionalScopeMatch(
-    lease: SimulatorLease,
+    lease: DeviceLease,
     tenantRaw: string | undefined,
     runRaw: string | undefined,
   ): void {
