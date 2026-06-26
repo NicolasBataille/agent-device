@@ -207,7 +207,8 @@ export function prepareLockedRequestScope(params: {
     flags: CommandFlags | undefined,
     appBundleId?: string,
     traceLogPath?: string,
-  ): DaemonCommandContext => contextFromRequestFlags(logPath, flags, appBundleId, traceLogPath);
+  ): DaemonCommandContext =>
+    contextFromRequestFlags(logPath, flags, appBundleId, traceLogPath, lockedReq.meta);
 
   return {
     type: 'scope',
@@ -233,10 +234,11 @@ function contextFromRequestFlags(
   flags: CommandFlags | undefined,
   appBundleId?: string,
   traceLogPath?: string,
+  meta?: DaemonRequest['meta'],
 ): DaemonCommandContext {
   const requestId = getDiagnosticsMeta().requestId;
   return {
-    ...contextFromFlagsWithLog(logPath, flags, appBundleId, traceLogPath, requestId),
+    ...contextFromFlagsWithLog(logPath, flags, appBundleId, traceLogPath, requestId, meta),
     requestId,
   };
 }
