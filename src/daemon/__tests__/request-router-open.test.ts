@@ -29,6 +29,17 @@ function makeIosDevice(id: string): DeviceInfo {
   };
 }
 
+function makeWebDevice(id: string): DeviceInfo {
+  return {
+    platform: 'web',
+    id,
+    name: `Browser ${id}`,
+    kind: 'device',
+    target: 'desktop',
+    booted: true,
+  };
+}
+
 function createOpenHandler(
   sessionStore: ReturnType<typeof makeSessionStore>,
   leaseRegistry = new LeaseRegistry(),
@@ -175,6 +186,39 @@ test('close releases the session lease', async () => {
   });
 
   expect(response.ok).toBe(true);
+  expect(sessionStore.get('default')).toBeUndefined();
+  expect(leaseRegistry.listActiveLeases()).toHaveLength(0);
+});
+
+test('close releases the session lease when teardown fails', async () => {
+  const sessionStore = makeSessionStore('agent-device-router-open-');
+  const leaseRegistry = new LeaseRegistry();
+  const lease = leaseRegistry.allocateLease({ tenantId: 'tenant-a', runId: 'run-1' });
+  sessionStore.set('default', {
+    name: 'default',
+    device: makeWebDevice('WEB-CLOSE-FAIL'),
+    createdAt: Date.now(),
+    actions: [],
+    lease: {
+      leaseId: lease.leaseId,
+      tenantId: lease.tenantId,
+      runId: lease.runId,
+      backend: lease.backend,
+      clientId: 'client-a',
+    },
+  });
+  mockDispatch.mockRejectedValueOnce(new Error('platform close failed'));
+  const handler = createOpenHandler(sessionStore, leaseRegistry);
+
+  const response = await handler({
+    token: 'test-token',
+    session: 'default',
+    command: 'close',
+    positionals: [],
+    meta: { requestId: 'req-close-lease-failure' },
+  });
+
+  expect(response.ok).toBe(false);
   expect(sessionStore.get('default')).toBeUndefined();
   expect(leaseRegistry.listActiveLeases()).toHaveLength(0);
 });
