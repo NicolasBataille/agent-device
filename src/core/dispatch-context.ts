@@ -29,6 +29,9 @@ export type CommandFlags = Omit<CliFlags, DaemonExcludedCliFlag> & {
   replayBackend?: string;
   shardCount?: number;
   shardIndex?: number;
+  devicePort?: number;
+  hostPort?: number;
+  portReverseName?: string;
 };
 
 export type DispatchContext = ScreenshotDispatchFlags & {

@@ -23,6 +23,8 @@ type ResolveDeviceFlags = Pick<
   | 'device'
   | 'udid'
   | 'serial'
+  | 'leaseId'
+  | 'leaseProvider'
   | 'iosSimulatorDeviceSet'
   | 'androidDeviceAllowlist'
 >;
@@ -144,6 +146,8 @@ export async function resolveTargetDevice(flags: ResolveDeviceFlags): Promise<De
         deviceName: flags.device,
         udid: flags.udid,
         serial: flags.serial,
+        leaseId: flags.leaseId,
+        leaseProvider: flags.leaseProvider,
       };
       if (selector.target && !selector.platform) {
         throw new AppError(
@@ -269,6 +273,8 @@ function buildResolveTargetDeviceCacheKey(params: {
     device: flags.device,
     udid: flags.udid,
     serial: flags.serial,
+    leaseId: flags.leaseId,
+    leaseProvider: flags.leaseProvider,
     iosSimulatorSetPath,
     androidSerialAllowlist: androidSerialAllowlist
       ? Array.from(androidSerialAllowlist).sort()

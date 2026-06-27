@@ -1,11 +1,17 @@
 import type { DeviceInfo } from '../utils/device.ts';
 import { AppError } from '../utils/errors.ts';
+import { getCloudInteractor, isCloudDevice } from '../cloud/cloud-runtime.ts';
 import type { Interactor, RunnerContext } from './interactor-types.ts';
 
 export async function getInteractor(
   device: DeviceInfo,
   runnerContext: RunnerContext,
 ): Promise<Interactor> {
+  if (isCloudDevice(device)) {
+    const cloudInteractor = getCloudInteractor(device);
+    if (cloudInteractor) return cloudInteractor;
+  }
+
   switch (device.platform) {
     case 'android': {
       const { createAndroidInteractor } = await import('./interactors/android.ts');

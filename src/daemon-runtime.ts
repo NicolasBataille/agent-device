@@ -6,9 +6,17 @@ import { resolveDaemonPaths, resolveDaemonServerMode } from './daemon/config.ts'
 import { createDaemonHttpServer } from './daemon/http-server.ts';
 import { trackDownloadableArtifact } from './daemon/artifact-tracking.ts';
 import { LeaseRegistry } from './daemon/lease-registry.ts';
+import type { DeviceLease } from './daemon/lease-registry.ts';
 import { createRequestHandler } from './daemon/request-router.ts';
 import { teardownSessionResources } from './daemon/session-teardown.ts';
 import { closeDaemonServers } from './daemon/server-shutdown.ts';
+import { createLimrunRuntimeFromEnv } from './cloud/limrun-runtime.ts';
+import {
+  composeCloudDeviceInventoryProvider,
+  composeCloudLeaseProvider,
+  setActiveCloudRuntimes,
+  type CloudDeviceRuntime,
+} from './cloud/cloud-runtime.ts';
 import type { SessionState } from './daemon/types.ts';
 import {
   emitDiagnostic,
@@ -71,12 +79,28 @@ export async function startDaemonRuntime(
 
   cleanupStaleAppLogProcesses(sessionsDir);
 
+  const cloudRuntimes: CloudDeviceRuntime[] = [];
+  const limrunRuntime = createLimrunRuntimeFromEnv(env);
+  if (limrunRuntime) cloudRuntimes.push(limrunRuntime);
+  setActiveCloudRuntimes(cloudRuntimes);
+  const leaseLifecycleProvider = composeCloudLeaseProvider(cloudRuntimes);
+  const releaseExpiredLease = (lease: DeviceLease) => {
+    void leaseLifecycleProvider?.release?.(lease).catch((error) => {
+      stderr.write(
+        `Lease expiry release error (${lease.leaseId}): ${
+          error instanceof Error ? error.message : String(error)
+        }\n`,
+      );
+    });
+  };
+
   const sessionStore = new SessionStore(sessionsDir);
   const leaseRegistry = new LeaseRegistry({
     maxActiveSimulatorLeases: parseIntegerEnv(env.AGENT_DEVICE_MAX_SIMULATOR_LEASES),
     defaultLeaseTtlMs: parseIntegerEnv(env.AGENT_DEVICE_LEASE_TTL_MS),
     minLeaseTtlMs: parseIntegerEnv(env.AGENT_DEVICE_LEASE_MIN_TTL_MS),
     maxLeaseTtlMs: parseIntegerEnv(env.AGENT_DEVICE_LEASE_MAX_TTL_MS),
+    onLeaseExpired: releaseExpiredLease,
   });
   const version = readVersion();
   const token = crypto.randomBytes(24).toString('hex');
@@ -89,6 +113,8 @@ export async function startDaemonRuntime(
     token,
     sessionStore,
     leaseRegistry,
+    leaseLifecycleProvider,
+    deviceInventoryProvider: composeCloudDeviceInventoryProvider(cloudRuntimes),
     trackDownloadableArtifact,
   });
 
@@ -185,6 +211,8 @@ export async function startDaemonRuntime(
   if (!acquireDaemonLock(baseDir, lockPath, lockData)) {
     stderr.write('Daemon lock is held by another process; exiting.\n');
     setRunnerLeaseOwnerStateDir(undefined);
+    setActiveCloudRuntimes([]);
+    await Promise.allSettled(cloudRuntimes.map((runtime) => runtime.shutdown()));
     exit(0);
     return null;
   }
@@ -205,6 +233,8 @@ export async function startDaemonRuntime(
     removeInfo(infoPath);
     releaseDaemonLock(lockPath);
     setRunnerLeaseOwnerStateDir(undefined);
+    setActiveCloudRuntimes([]);
+    await Promise.allSettled(cloudRuntimes.map((runtime) => runtime.shutdown()));
     exit(1);
     return null;
   }
@@ -225,6 +255,8 @@ export async function startDaemonRuntime(
     await teardownDaemonSessions();
     const { stopAllIosRunnerSessions } = await import('./platforms/ios/runner-client.ts');
     await stopAllIosRunnerSessions();
+    await Promise.allSettled(cloudRuntimes.map((runtime) => runtime.shutdown()));
+    setActiveCloudRuntimes([]);
     // Best effort: stop the PNG worker so an in-flight job cannot delay exit.
     await Promise.race([
       terminatePngWorker().catch(() => {}),

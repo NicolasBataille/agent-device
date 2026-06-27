@@ -1,3 +1,4 @@
+import { installCloudInstallablePath } from '../../cloud/cloud-runtime.ts';
 import { isCommandSupportedOnDevice } from '../../core/capabilities.ts';
 import { resolveTargetDevice, type CommandFlags } from '../../core/dispatch.ts';
 import { ensureDeviceReady } from '../device-ready.ts';
@@ -194,8 +195,14 @@ export async function handleInstallFromSourceCommand(params: {
         signal: requestSignal,
       });
       return await completeInstall(prepared, async (retained) => {
-        await installIosInstallablePath(device, prepared.installablePath);
-        if (!prepared.bundleId) {
+        const cloudResult = await installCloudInstallablePath(device, prepared.installablePath, {
+          appIdentifierHint: prepared.bundleId,
+        });
+        if (!cloudResult) {
+          await installIosInstallablePath(device, prepared.installablePath);
+        }
+        const bundleId = cloudResult?.bundleId ?? prepared.bundleId;
+        if (!bundleId) {
           throw new AppError(
             'COMMAND_FAILED',
             'Installed iOS app identity could not be resolved from the artifact',
@@ -203,9 +210,11 @@ export async function handleInstallFromSourceCommand(params: {
         }
         return {
           ...retainedInstallResultFields(retained),
-          bundleId: prepared.bundleId,
-          ...(prepared.appName ? { appName: prepared.appName } : {}),
-          launchTarget: prepared.bundleId,
+          bundleId,
+          ...((cloudResult?.appName ?? prepared.appName)
+            ? { appName: cloudResult?.appName ?? prepared.appName }
+            : {}),
+          launchTarget: cloudResult?.launchTarget ?? bundleId,
         };
       });
     }
@@ -218,11 +227,17 @@ export async function handleInstallFromSourceCommand(params: {
       signal: requestSignal,
     });
     return await completeInstall(prepared, async (retained) => {
-      const packageName = await installAndroidInstallablePathAndResolvePackageName(
-        device,
-        prepared.installablePath,
-        prepared.packageName,
-      );
+      const cloudResult = await installCloudInstallablePath(device, prepared.installablePath, {
+        packageNameHint: prepared.packageName,
+      });
+      let packageName = cloudResult?.packageName;
+      if (!cloudResult) {
+        packageName = await installAndroidInstallablePathAndResolvePackageName(
+          device,
+          prepared.installablePath,
+          prepared.packageName,
+        );
+      }
       if (!packageName) {
         throw new AppError(
           'COMMAND_FAILED',

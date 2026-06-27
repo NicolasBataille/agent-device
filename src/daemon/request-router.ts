@@ -24,6 +24,7 @@ import {
   withDiagnosticsScope,
 } from '../utils/diagnostics.ts';
 import type { LeaseRegistry } from './lease-registry.ts';
+import type { LeaseLifecycleProvider } from './handlers/lease.ts';
 import { dispatchGenericCommand } from './request-generic-dispatch.ts';
 import { runRequestHandlerChain } from './request-handler-chain.ts';
 import {
@@ -45,6 +46,7 @@ export type RequestRouterDeps = {
   token: string;
   sessionStore: SessionStore;
   leaseRegistry: LeaseRegistry;
+  leaseLifecycleProvider?: LeaseLifecycleProvider;
   androidAdbProvider?: AndroidAdbProviderResolver;
   appleRunnerProvider?: AppleRunnerProviderResolver;
   appleToolProvider?: AppleToolProviderResolver;
@@ -76,6 +78,7 @@ export function createRequestHandler(deps: RequestRouterDeps): DaemonInvokeFn {
     trackDownloadableArtifact,
   } = deps;
   const { sessionStore, leaseRegistry } = deps;
+  const { leaseLifecycleProvider } = deps;
 
   async function handleRequest(req: DaemonRequest): Promise<DaemonResponse> {
     const debug = Boolean(req.meta?.debug || req.flags?.verbose);
@@ -166,6 +169,7 @@ export function createRequestHandler(deps: RequestRouterDeps): DaemonInvokeFn {
       logPath: lockedScope.logPath,
       sessionStore,
       leaseRegistry,
+      leaseLifecycleProvider,
       invoke: handleRequest,
       invokeReplayAction: allowReplayActions
         ? createReplayScopedActionInvoker(lockedScope, providerScope)
