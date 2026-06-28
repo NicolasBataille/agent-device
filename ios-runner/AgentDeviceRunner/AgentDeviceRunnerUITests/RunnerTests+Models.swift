@@ -207,6 +207,7 @@ struct DataPayload: Codable {
   let nodes: [SnapshotNode]?
   let truncated: Bool?
   let snapshotQuality: SnapshotQuality?
+  var snapshotTiming: SnapshotTiming?
   let gestureStartUptimeMs: Double?
   let gestureEndUptimeMs: Double?
   let x: Double?
@@ -245,6 +246,7 @@ struct DataPayload: Codable {
     nodes: [SnapshotNode]? = nil,
     truncated: Bool? = nil,
     snapshotQuality: SnapshotQuality? = nil,
+    snapshotTiming: SnapshotTiming? = nil,
     gestureStartUptimeMs: Double? = nil,
     gestureEndUptimeMs: Double? = nil,
     x: Double? = nil,
@@ -282,6 +284,7 @@ struct DataPayload: Codable {
     self.nodes = nodes
     self.truncated = truncated
     self.snapshotQuality = snapshotQuality
+    self.snapshotTiming = snapshotTiming
     self.gestureStartUptimeMs = gestureStartUptimeMs
     self.gestureEndUptimeMs = gestureEndUptimeMs
     self.x = x
@@ -312,6 +315,13 @@ struct DataPayload: Codable {
     self.failedStepIndex = failedStepIndex
     self.sequenceResults = sequenceResults
   }
+}
+
+struct SnapshotTiming: Codable {
+  let totalMs: Double
+  let phases: [String: Double]?
+  let backends: [String: Double]?
+  let selectedBackend: String?
 }
 
 struct ErrorPayload: Codable {

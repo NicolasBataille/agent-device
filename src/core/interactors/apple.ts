@@ -78,6 +78,7 @@ export function createAppleInteractor(
         truncated: result.truncated ?? false,
         backend: 'xctest',
         ...(result.quality ? { quality: result.quality } : {}),
+        ...(result.snapshotTiming ? { snapshotTiming: result.snapshotTiming } : {}),
         // Legacy runners without a quality verdict still surface their message text.
         ...(!result.quality && result.message ? { warnings: [result.message] } : {}),
       };
@@ -142,11 +143,13 @@ function readAppleSnapshotResult(result: Record<string, unknown>): {
   truncated?: boolean;
   message?: string;
   quality?: SnapshotQualityVerdict;
+  snapshotTiming?: unknown;
 } {
   return {
     nodes: Array.isArray(result.nodes) ? (result.nodes as RawSnapshotNode[]) : undefined,
     truncated: typeof result.truncated === 'boolean' ? result.truncated : undefined,
     quality: readSnapshotQualityVerdict(result.snapshotQuality),
+    snapshotTiming: result.snapshotTiming,
     // Legacy runner context for builds that predate the structured verdict.
     message:
       typeof result.message === 'string' && result.message.trim().length > 0

@@ -102,15 +102,21 @@ extension RunnerTests {
   private static let flatInteractiveFallbackBudget: TimeInterval = 1.0
 
   func snapshotFast(app: XCUIApplication, options: SnapshotOptions) throws -> DataPayload {
+    let timing = SnapshotTimingRecorder()
     if let blocking = blockingSystemAlertSnapshot() {
-      return blocking
+      var payload = blocking
+      payload.snapshotTiming = timing.payload()
+      return payload
     }
-    return try runSnapshotCapturePlan(
+    var payload = try runSnapshotCapturePlan(
       Self.regularVisiblePlan,
       app: app,
       options: options,
-      terminal: .sparseWithFatalOnAXFailure
+      terminal: .sparseWithFatalOnAXFailure,
+      timing: timing
     )
+    payload.snapshotTiming = timing.payload()
+    return payload
   }
 
   func recursiveTreeSnapshotPayload(
@@ -246,15 +252,21 @@ extension RunnerTests {
   }
 
   func snapshotRaw(app: XCUIApplication, options: SnapshotOptions) throws -> DataPayload {
+    let timing = SnapshotTimingRecorder()
     if let blocking = blockingSystemAlertSnapshot() {
-      return blocking
+      var payload = blocking
+      payload.snapshotTiming = timing.payload()
+      return payload
     }
-    return try runSnapshotCapturePlan(
+    var payload = try runSnapshotCapturePlan(
       Self.rawDiagnosticPlan,
       app: app,
       options: options,
-      terminal: .throwOnAXFailure
+      terminal: .throwOnAXFailure,
+      timing: timing
     )
+    payload.snapshotTiming = timing.payload()
+    return payload
   }
 
   func rawTreeSnapshotPayload(
@@ -302,7 +314,11 @@ extension RunnerTests {
     return DataPayload(nodes: nodes, truncated: false)
   }
 
-  func snapshotFlatInteractive(app: XCUIApplication, options: SnapshotOptions) -> DataPayload {
+  func snapshotFlatInteractive(
+    app: XCUIApplication,
+    options: SnapshotOptions,
+    timing: SnapshotTimingRecorder? = nil
+  ) -> DataPayload {
     var nodes: [SnapshotNode] = [
       interactiveRootNode(rect: .zero)
     ]
@@ -313,39 +329,45 @@ extension RunnerTests {
     let deadline = options.interactiveOnly
       ? Date().addingTimeInterval(Self.flatInteractiveFallbackBudget)
       : Date.distantFuture
-    let viewport = safeSnapshotViewport(app: app)
+    let viewport = measureSnapshotPhase(timing, "query_sweep_viewport") {
+      safeSnapshotViewport(app: app)
+    }
     var seen = Set<String>()
     var candidates: [SnapshotNode] = []
-    let flatElements = flatInteractiveElements(app: app, deadline: deadline)
-    var truncated = flatElements.truncated
-    for element in flatElements.elements {
-      if Date() >= deadline {
-        NSLog("AGENT_DEVICE_RUNNER_SNAPSHOT_FLAT_FALLBACK_DEADLINE")
-        truncated = true
-        break
-      }
-      guard let node = flatSnapshotNode(
-        element: element,
-        index: 0,
-        parentIndex: 0,
-        viewport: viewport,
-        options: options
-      ) else {
-        continue
-      }
-      let key = "\(node.type)-\(node.label ?? "")-\(node.identifier ?? "")-\(node.value ?? "")-\(node.rect.x)-\(node.rect.y)-\(node.rect.width)-\(node.rect.height)"
-      if seen.contains(key) { continue }
-      seen.insert(key)
-      candidates.append(node)
+    let flatElements = measureSnapshotPhase(timing, "query_sweep_elements") {
+      flatInteractiveElements(app: app, deadline: deadline)
     }
-    candidates.sort { left, right in
-      if left.rect.y != right.rect.y {
-        return left.rect.y < right.rect.y
+    var truncated = flatElements.truncated
+    measureSnapshotPhase(timing, "query_sweep_shape") {
+      for element in flatElements.elements {
+        if Date() >= deadline {
+          NSLog("AGENT_DEVICE_RUNNER_SNAPSHOT_FLAT_FALLBACK_DEADLINE")
+          truncated = true
+          break
+        }
+        guard let node = flatSnapshotNode(
+          element: element,
+          index: 0,
+          parentIndex: 0,
+          viewport: viewport,
+          options: options
+        ) else {
+          continue
+        }
+        let key = "\(node.type)-\(node.label ?? "")-\(node.identifier ?? "")-\(node.value ?? "")-\(node.rect.x)-\(node.rect.y)-\(node.rect.width)-\(node.rect.height)"
+        if seen.contains(key) { continue }
+        seen.insert(key)
+        candidates.append(node)
       }
-      if left.rect.x != right.rect.x {
-        return left.rect.x < right.rect.x
+      candidates.sort { left, right in
+        if left.rect.y != right.rect.y {
+          return left.rect.y < right.rect.y
+        }
+        if left.rect.x != right.rect.x {
+          return left.rect.x < right.rect.x
+        }
+        return left.type < right.type
       }
-      return left.type < right.type
     }
 
     // The synthetic root doubles as the daemon's viewport (find.ts prefers on-screen matches
@@ -560,16 +582,26 @@ extension RunnerTests {
 
   func makeSnapshotTraversalContext(
     app: XCUIApplication,
-    options: SnapshotOptions
+    options: SnapshotOptions,
+    timing: SnapshotTimingRecorder? = nil
   ) throws -> SnapshotTraversalContext? {
-    let viewport = safeSnapshotViewport(app: app)
-    let queryRoot = options.scope.flatMap { findScopeElement(app: app, scope: $0) } ?? app
+    let viewport = measureSnapshotPhase(timing, "viewport") {
+      safeSnapshotViewport(app: app)
+    }
+    let queryRoot = measureSnapshotPhase(timing, "scope_resolve") {
+      options.scope.flatMap { findScopeElement(app: app, scope: $0) } ?? app
+    }
 
-    guard let rootSnapshot = try captureSnapshotRoot(queryRoot) else {
+    let maybeRootSnapshot = try measureSnapshotPhase(timing, "xctest_root_snapshot") {
+      try captureSnapshotRoot(queryRoot)
+    }
+    guard let rootSnapshot = maybeRootSnapshot else {
       return nil
     }
 
-    let (flatSnapshots, snapshotRanges) = flattenedSnapshots(rootSnapshot)
+    let (flatSnapshots, snapshotRanges) = measureSnapshotPhase(timing, "flatten_tree") {
+      flattenedSnapshots(rootSnapshot)
+    }
     return SnapshotTraversalContext(
       queryRoot: queryRoot,
       rootSnapshot: rootSnapshot,

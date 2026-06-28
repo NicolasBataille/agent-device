@@ -3,11 +3,15 @@ import type { Platform } from './utils/device.ts';
 import { isRecord } from './utils/parsing.ts';
 
 const SLOW_SNAPSHOT_P95_WARNING_MS = 1_500;
+const SNAPSHOT_TIMING_SAMPLE_LIMIT = 50;
+const SNAPSHOT_TIMING_PHASE_LIMIT = 24;
+const SNAPSHOT_TIMING_PHASE_KEY_PATTERN = /^[a-z0-9_.-]{1,64}$/;
 
 export type SnapshotTimingSample = {
   durationMs: number;
   backend?: SnapshotBackend;
   platform?: Platform;
+  phases?: Record<string, number>;
 };
 
 export type SnapshotTimingStats = {
@@ -26,7 +30,15 @@ export type SnapshotDiagnosticsState = {
 
 export type SnapshotDiagnosticsSummary = {
   stats: SnapshotTimingStats;
+  phases?: Record<string, SnapshotTimingStats>;
   warning?: string;
+};
+
+export type SnapshotRunnerTiming = {
+  totalMs?: number;
+  phases?: Record<string, number>;
+  backends?: Record<string, number>;
+  selectedBackend?: string;
 };
 
 export function recordSnapshotTiming(
@@ -38,7 +50,11 @@ export function recordSnapshotTiming(
   diagnostics.samples.push({
     ...sample,
     durationMs: Math.max(0, Math.round(sample.durationMs)),
+    ...(sample.phases ? { phases: normalizeTimingPhases(sample.phases) } : {}),
   });
+  if (diagnostics.samples.length > SNAPSHOT_TIMING_SAMPLE_LIMIT) {
+    diagnostics.samples.splice(0, diagnostics.samples.length - SNAPSHOT_TIMING_SAMPLE_LIMIT);
+  }
 }
 
 export function summarizeSnapshotDiagnostics(
@@ -54,8 +70,10 @@ export function summarizeSnapshotTimingSamples(
 ): SnapshotDiagnosticsSummary | undefined {
   if (samples.length === 0) return undefined;
   const stats = buildSnapshotTimingStats(samples);
+  const phases = buildSnapshotPhaseStats(samples);
   return {
     stats,
+    ...(phases ? { phases } : {}),
     ...(stats.p95Ms >= SLOW_SNAPSHOT_P95_WARNING_MS
       ? { warning: formatSlowSnapshotWarning(stats) }
       : {}),
@@ -68,8 +86,10 @@ export function mergeSnapshotDiagnostics(
   const samples = summaries.flatMap((summary) => samplesFromStats(summary?.stats));
   if (samples.length === 0) return undefined;
   const stats = buildSnapshotTimingStats(samples);
+  const phases = mergeSnapshotPhaseStats(summaries);
   return {
     stats,
+    ...(phases ? { phases } : {}),
     ...(stats.p95Ms >= SLOW_SNAPSHOT_P95_WARNING_MS
       ? { warning: formatSlowSnapshotWarning(stats) }
       : {}),
@@ -83,7 +103,30 @@ export function readSnapshotDiagnosticsSummary(
   const stats = readSnapshotTimingStats(value.stats);
   if (!stats) return undefined;
   const warning = typeof value.warning === 'string' ? value.warning : undefined;
-  return { stats, ...(warning ? { warning } : {}) };
+  const phases = readSnapshotPhaseStats(value.phases);
+  return { stats, ...(phases ? { phases } : {}), ...(warning ? { warning } : {}) };
+}
+
+export function readSnapshotRunnerTiming(value: unknown): SnapshotRunnerTiming | undefined {
+  if (!isRecord(value)) return undefined;
+  const totalMs = readTimingNumber(value.totalMs);
+  const phases = normalizeTimingPhases({
+    ...(isRecord(value.phases) ? readTimingNumberRecord(value.phases) : {}),
+    ...(totalMs !== undefined ? { runner_total: totalMs } : {}),
+    ...prefixTimingPhases('backend', isRecord(value.backends) ? value.backends : undefined),
+  });
+  const selectedBackend =
+    typeof value.selectedBackend === 'string' && value.selectedBackend.trim().length > 0
+      ? value.selectedBackend
+      : undefined;
+  if (totalMs === undefined && Object.keys(phases).length === 0 && !selectedBackend) {
+    return undefined;
+  }
+  return {
+    ...(totalMs !== undefined ? { totalMs } : {}),
+    ...(Object.keys(phases).length > 0 ? { phases } : {}),
+    ...(selectedBackend ? { selectedBackend } : {}),
+  };
 }
 
 function buildSnapshotTimingStats(samples: SnapshotTimingSample[]): SnapshotTimingStats {
@@ -97,6 +140,31 @@ function buildSnapshotTimingStats(samples: SnapshotTimingSample[]): SnapshotTimi
     ...singlePlatform(samples),
     ...backendCounts(samples),
   };
+}
+
+function buildSnapshotPhaseStats(
+  samples: SnapshotTimingSample[],
+): Record<string, SnapshotTimingStats> | undefined {
+  const phaseSamples = new Map<string, SnapshotTimingSample[]>();
+  for (const sample of samples) {
+    if (!sample.phases) continue;
+    for (const [phase, durationMs] of Object.entries(sample.phases)) {
+      const current = phaseSamples.get(phase) ?? [];
+      current.push({
+        durationMs,
+        platform: sample.platform,
+        backend: sample.backend,
+      });
+      phaseSamples.set(phase, current);
+    }
+  }
+  if (phaseSamples.size === 0) return undefined;
+  return Object.fromEntries(
+    Array.from(phaseSamples.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .slice(0, SNAPSHOT_TIMING_PHASE_LIMIT)
+      .map(([phase, phaseTimingSamples]) => [phase, buildSnapshotTimingStats(phaseTimingSamples)]),
+  );
 }
 
 function percentileNearestRank(values: number[], percentile: number): number {
@@ -163,6 +231,38 @@ function readBackendCounts(value: Record<string, unknown>): Record<string, numbe
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+function readSnapshotPhaseStats(value: unknown): Record<string, SnapshotTimingStats> | undefined {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value)
+    .filter(([key]) => SNAPSHOT_TIMING_PHASE_KEY_PATTERN.test(key))
+    .slice(0, SNAPSHOT_TIMING_PHASE_LIMIT)
+    .flatMap(([key, stats]) => {
+      const timingStats = readSnapshotTimingStats(stats);
+      return timingStats ? ([[key, timingStats]] as const) : [];
+    });
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function mergeSnapshotPhaseStats(
+  summaries: Array<SnapshotDiagnosticsSummary | undefined>,
+): Record<string, SnapshotTimingStats> | undefined {
+  const phaseSamples = new Map<string, SnapshotTimingSample[]>();
+  for (const summary of summaries) {
+    for (const [phase, stats] of Object.entries(summary?.phases ?? {})) {
+      const current = phaseSamples.get(phase) ?? [];
+      current.push(...samplesFromStats(stats));
+      phaseSamples.set(phase, current);
+    }
+  }
+  if (phaseSamples.size === 0) return undefined;
+  return Object.fromEntries(
+    Array.from(phaseSamples.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .slice(0, SNAPSHOT_TIMING_PHASE_LIMIT)
+      .map(([phase, samples]) => [phase, buildSnapshotTimingStats(samples)]),
+  );
+}
+
 function readOptionalSnapshotTimingStats(
   record: Record<string, unknown>,
 ): Pick<SnapshotTimingStats, 'platform' | 'backends'> {
@@ -190,4 +290,40 @@ function samplesFromStats(stats: SnapshotTimingStats | undefined): SnapshotTimin
     { durationMs: stats.p95Ms, platform },
     { durationMs: stats.maxMs, platform },
   ];
+}
+
+function normalizeTimingPhases(phases: Record<string, number>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(phases)
+      .filter(([key, value]) => {
+        return SNAPSHOT_TIMING_PHASE_KEY_PATTERN.test(key) && Number.isFinite(value);
+      })
+      .slice(0, SNAPSHOT_TIMING_PHASE_LIMIT)
+      .map(([key, value]) => [key, Math.max(0, Math.round(value))]),
+  );
+}
+
+function readTimingNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function readTimingNumberRecord(value: Record<string, unknown>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, number] => {
+      return readTimingNumber(entry[1]) !== undefined;
+    }),
+  );
+}
+
+function prefixTimingPhases(
+  prefix: string,
+  value: Record<string, unknown> | undefined,
+): Record<string, number> {
+  if (!value) return {};
+  return Object.fromEntries(
+    Object.entries(readTimingNumberRecord(value)).map(([key, durationMs]) => [
+      `${prefix}.${key}`,
+      durationMs,
+    ]),
+  );
 }

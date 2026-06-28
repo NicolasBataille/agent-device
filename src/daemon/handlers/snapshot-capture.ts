@@ -47,7 +47,8 @@ import {
   snapshotCaptureAnnotationsFrom,
   type SnapshotCaptureAnnotations,
 } from '../../snapshot-capture-annotations.ts';
-import { recordSnapshotTiming } from '../../snapshot-diagnostics.ts';
+import { readSnapshotRunnerTiming, recordSnapshotTiming } from '../../snapshot-diagnostics.ts';
+import { emitDiagnostic } from '../../utils/diagnostics.ts';
 
 type CaptureSnapshotParams = {
   device: SessionState['device'];
@@ -65,6 +66,7 @@ type SnapshotData = {
   truncated?: boolean;
   backend?: SnapshotBackend;
   quality?: unknown;
+  snapshotTiming?: unknown;
 } & Omit<SnapshotCaptureAnnotations, 'quality'>;
 
 type SnapshotAttempt = {
@@ -311,10 +313,24 @@ async function capturePostActionSnapshotAttempt(
 async function captureSnapshotAttempt(params: CaptureSnapshotParams): Promise<SnapshotAttempt> {
   const startedAt = Date.now();
   const data = await captureSnapshotData(params);
-  recordSnapshotTiming(params.session, {
+  const runnerTiming = readSnapshotRunnerTiming(data.snapshotTiming);
+  const timingSample = {
     durationMs: Date.now() - startedAt,
     backend: data.backend,
     platform: params.device.platform,
+    ...(runnerTiming?.phases ? { phases: runnerTiming.phases } : {}),
+  };
+  recordSnapshotTiming(params.session, timingSample);
+  emitDiagnostic({
+    level: 'debug',
+    phase: 'snapshot_capture_timing',
+    durationMs: timingSample.durationMs,
+    data: {
+      platform: params.device.platform,
+      backend: data.backend,
+      phases: runnerTiming?.phases,
+      runnerSelectedBackend: runnerTiming?.selectedBackend,
+    },
   });
   return {
     data,

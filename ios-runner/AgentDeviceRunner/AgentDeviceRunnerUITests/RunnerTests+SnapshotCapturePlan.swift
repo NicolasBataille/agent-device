@@ -46,6 +46,69 @@ struct SnapshotBackendCapture {
   let effectiveDepth: Int?
 }
 
+final class SnapshotTimingRecorder {
+  private let startedAt = Date()
+  private(set) var phases: [String: Double] = [:]
+  private(set) var backends: [String: Double] = [:]
+  private var selectedBackend: SnapshotBackendKind?
+
+  @discardableResult
+  func measure<T>(_ phase: String, _ work: () throws -> T) rethrows -> T {
+    let started = Date()
+    defer { phases[phase] = roundedElapsedMs(since: started) }
+    return try work()
+  }
+
+  @discardableResult
+  func measureBackend<T>(_ backend: SnapshotBackendKind, _ work: () throws -> T) rethrows -> T {
+    let started = Date()
+    defer { backends[backend.rawValue] = roundedElapsedMs(since: started) }
+    return try work()
+  }
+
+  func selectBackend(_ backend: SnapshotBackendKind) {
+    selectedBackend = backend
+  }
+
+  func payload() -> SnapshotTiming {
+    SnapshotTiming(
+      totalMs: roundedElapsedMs(since: startedAt),
+      phases: phases.isEmpty ? nil : phases,
+      backends: backends.isEmpty ? nil : backends,
+      selectedBackend: selectedBackend?.rawValue
+    )
+  }
+
+  private func roundedElapsedMs(since started: Date) -> Double {
+    let elapsed = Date().timeIntervalSince(started) * 1000
+    return (elapsed * 10).rounded() / 10
+  }
+}
+
+@discardableResult
+func measureSnapshotPhase<T>(
+  _ timing: SnapshotTimingRecorder?,
+  _ phase: String,
+  _ work: () throws -> T
+) rethrows -> T {
+  if let timing {
+    return try timing.measure(phase, work)
+  }
+  return try work()
+}
+
+@discardableResult
+func measureSnapshotBackend<T>(
+  _ timing: SnapshotTimingRecorder?,
+  _ backend: SnapshotBackendKind,
+  _ work: () throws -> T
+) rethrows -> T {
+  if let timing {
+    return try timing.measureBackend(backend, work)
+  }
+  return try work()
+}
+
 extension RunnerTests {
   static let sparseRecoveryTruncatedNodeThreshold = 8
   /// Umbrella wall-clock budget for one capture plan. Individual backends bound themselves,
@@ -69,7 +132,8 @@ extension RunnerTests {
     _ plan: [SnapshotBackendKind],
     app: XCUIApplication,
     options: SnapshotOptions,
-    terminal: SnapshotCaptureTerminalPolicy
+    terminal: SnapshotCaptureTerminalPolicy,
+    timing: SnapshotTimingRecorder? = nil
   ) throws -> DataPayload {
     var best: (kind: SnapshotBackendKind, capture: SnapshotBackendCapture)?
     var firstFailure: (reason: String, code: String)?
@@ -86,7 +150,7 @@ extension RunnerTests {
       }
       let capture: SnapshotBackendCapture
       do {
-        guard let result = try captureWithBackend(kind, app: app, options: options) else {
+        guard let result = try captureWithBackend(kind, app: app, options: options, timing: timing) else {
           continue
         }
         capture = result
@@ -119,6 +183,7 @@ extension RunnerTests {
           firstFailure?.reason ?? "sparse tree"
         )
       }
+      timing?.selectBackend(kind)
       return stampedSnapshotPayload(
         capture,
         backend: kind,
@@ -147,7 +212,10 @@ extension RunnerTests {
     }
 
     let fallbackPayload =
-      best.map { stampedSnapshotPayload($0.capture, backend: $0.kind, state: "sparse", reason: firstFailure) }
+      best.map {
+        timing?.selectBackend($0.kind)
+        return stampedSnapshotPayload($0.capture, backend: $0.kind, state: "sparse", reason: firstFailure)
+      }
       ?? stampedSnapshotPayload(
         SnapshotBackendCapture(payload: sparseTruncatedSnapshotPayload(), effectiveDepth: nil),
         backend: plan.last ?? .recursiveTree,
@@ -160,24 +228,31 @@ extension RunnerTests {
   private func captureWithBackend(
     _ kind: SnapshotBackendKind,
     app: XCUIApplication,
-    options: SnapshotOptions
+    options: SnapshotOptions,
+    timing: SnapshotTimingRecorder?
   ) throws -> SnapshotBackendCapture? {
-    switch kind {
-    case .recursiveTree:
-      guard let context = try makeSnapshotTraversalContext(app: app, options: options) else {
-        return nil
+    try measureSnapshotBackend(timing, kind) {
+      switch kind {
+      case .recursiveTree:
+        guard let context = try makeSnapshotTraversalContext(app: app, options: options, timing: timing) else {
+          return nil
+        }
+        let payload = options.raw
+          ? try measureSnapshotPhase(timing, "raw_tree_shape") {
+              try rawTreeSnapshotPayload(context: context, options: options)
+            }
+          : measureSnapshotPhase(timing, "visible_tree_shape") {
+              recursiveTreeSnapshotPayload(context: context, options: options)
+            }
+        return SnapshotBackendCapture(payload: payload, effectiveDepth: nil)
+      case .querySweep:
+        return SnapshotBackendCapture(
+          payload: snapshotFlatInteractive(app: app, options: options, timing: timing),
+          effectiveDepth: nil
+        )
+      case .privateAX:
+        return privateAXSnapshotCapture(app: app, options: options)
       }
-      let payload = options.raw
-        ? try rawTreeSnapshotPayload(context: context, options: options)
-        : recursiveTreeSnapshotPayload(context: context, options: options)
-      return SnapshotBackendCapture(payload: payload, effectiveDepth: nil)
-    case .querySweep:
-      return SnapshotBackendCapture(
-        payload: snapshotFlatInteractive(app: app, options: options),
-        effectiveDepth: nil
-      )
-    case .privateAX:
-      return privateAXSnapshotCapture(app: app, options: options)
     }
   }
 
