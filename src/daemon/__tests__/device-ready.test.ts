@@ -2,7 +2,10 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import type { DeviceInfo } from '../../utils/device.ts';
-import { setActiveCloudRuntimes, type CloudDeviceRuntime } from '../../cloud/cloud-runtime.ts';
+import {
+  setActiveProviderDeviceRuntimes,
+  type ProviderDeviceRuntime,
+} from '../../provider-device-runtime.ts';
 
 vi.mock('../../utils/exec.ts', () => ({
   runCmd: vi.fn(),
@@ -45,7 +48,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearDeviceReadyCacheForTests();
-  setActiveCloudRuntimes([]);
+  setActiveProviderDeviceRuntimes([]);
   vi.useRealTimers();
 });
 
@@ -63,7 +66,7 @@ test('ensureDeviceReady caches successful simulator readiness checks', async () 
 });
 
 test('ensureDeviceReady skips Limrun-managed devices', async () => {
-  setActiveCloudRuntimes([makeCloudRuntime('limrun:')]);
+  setActiveProviderDeviceRuntimes([makeProviderDeviceRuntime('limrun:')]);
   await ensureDeviceReady({
     ...IOS_SIMULATOR,
     id: 'limrun:ios:lease-a',
@@ -77,7 +80,7 @@ test('ensureDeviceReady skips Limrun-managed devices', async () => {
   expect(mockWaitForAndroidBoot).not.toHaveBeenCalled();
 });
 
-function makeCloudRuntime(idPrefix: string): CloudDeviceRuntime {
+function makeProviderDeviceRuntime(idPrefix: string): ProviderDeviceRuntime {
   return {
     provider: 'limrun',
     leaseLifecycle: {},

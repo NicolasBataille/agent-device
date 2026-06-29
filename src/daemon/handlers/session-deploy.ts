@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { installCloudApp } from '../../cloud/cloud-runtime.ts';
+import { installProviderDeviceApp } from '../../provider-device-runtime.ts';
 import { cleanupUploadedArtifact, prepareUploadedArtifact } from '../artifact-tracking.ts';
 import { isCommandSupportedOnDevice } from '../../core/capabilities.ts';
 import type { DeviceInfo } from '../../utils/device.ts';
@@ -55,21 +55,21 @@ type DeployCommandResult = IosDeployCommandResult | AndroidDeployCommandResult;
 
 export const defaultReinstallOps: ReinstallOps = {
   ios: async (device, app, appPath) => {
-    const cloudResult = await installCloudApp(device, app, appPath, {
+    const providerResult = await installProviderDeviceApp(device, app, appPath, {
       relaunch: true,
       appIdentifierHint: app,
     });
-    if (cloudResult?.bundleId) return { bundleId: cloudResult.bundleId };
+    if (providerResult?.bundleId) return { bundleId: providerResult.bundleId };
 
     const { reinstallIosApp } = await import('../../platforms/ios/apps.ts');
     return await reinstallIosApp(device, app, appPath);
   },
   android: async (device, app, appPath) => {
-    const cloudResult = await installCloudApp(device, app, appPath, {
+    const providerResult = await installProviderDeviceApp(device, app, appPath, {
       relaunch: true,
       packageNameHint: app,
     });
-    if (cloudResult?.packageName) return { package: cloudResult.packageName };
+    if (providerResult?.packageName) return { package: providerResult.packageName };
 
     const { reinstallAndroidApp } = await import('../../platforms/android/app-lifecycle.ts');
     return await reinstallAndroidApp(device, app, appPath);
@@ -78,14 +78,14 @@ export const defaultReinstallOps: ReinstallOps = {
 
 export const defaultInstallOps: InstallOps = {
   ios: async (device, app, appPath) => {
-    const cloudResult = await installCloudApp(device, app, appPath, {
+    const providerResult = await installProviderDeviceApp(device, app, appPath, {
       appIdentifierHint: app,
     });
-    if (cloudResult) {
+    if (providerResult) {
       return {
-        bundleId: cloudResult.bundleId,
-        appName: cloudResult.appName,
-        launchTarget: cloudResult.launchTarget,
+        bundleId: providerResult.bundleId,
+        appName: providerResult.appName,
+        launchTarget: providerResult.launchTarget,
       };
     }
 
@@ -98,14 +98,14 @@ export const defaultInstallOps: InstallOps = {
     };
   },
   android: async (device, _app, appPath) => {
-    const cloudResult = await installCloudApp(device, _app, appPath, {
+    const providerResult = await installProviderDeviceApp(device, _app, appPath, {
       packageNameHint: _app,
     });
-    if (cloudResult) {
+    if (providerResult) {
       return {
-        package: cloudResult.packageName,
-        appName: cloudResult.appName,
-        launchTarget: cloudResult.launchTarget,
+        package: providerResult.packageName,
+        appName: providerResult.appName,
+        launchTarget: providerResult.launchTarget,
       };
     }
 

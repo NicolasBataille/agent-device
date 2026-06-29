@@ -6,6 +6,7 @@ import { afterEach, test, vi } from 'vitest';
 import { LimrunRuntime, readLocalhostUrlPort } from '../cloud/limrun-runtime.ts';
 import type { SimulatorLease } from '../daemon/lease-registry.ts';
 import { runCmd } from '../utils/exec.ts';
+import type { DeviceInfo } from '../utils/device.ts';
 
 const limrunMockState = vi.hoisted(() => {
   const androidTunnelClose = vi.fn();
@@ -91,27 +92,59 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-test('Limrun runtime identifies direct CLI usage to the Limrun API', async () => {
-  const runtime = new LimrunRuntime({
+type AllocateLease = NonNullable<LimrunRuntime['leaseLifecycle']['allocate']>;
+type ReleaseLease = NonNullable<LimrunRuntime['leaseLifecycle']['release']>;
+
+function createLimrunTestRuntime(): LimrunRuntime {
+  return new LimrunRuntime({
     apiKey: 'lim_test_key',
     version: '9.9.9-test',
   });
+}
 
-  const lease: SimulatorLease = {
-    leaseId: 'lease-a',
+function makeLease(
+  backend: SimulatorLease['backend'],
+  leaseId = backend === 'ios-instance' ? 'lease-ios' : 'lease-android',
+): SimulatorLease {
+  return {
+    leaseId,
     tenantId: 'team-a',
     runId: 'run-a',
-    backend: 'ios-instance',
+    backend,
     leaseProvider: 'limrun',
     createdAt: 1,
     heartbeatAt: 1,
     expiresAt: 60_001,
   };
+}
+
+function requireAllocateLease(runtime: LimrunRuntime): AllocateLease {
+  const allocateLease = runtime.leaseLifecycle.allocate;
+  if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
+  return allocateLease;
+}
+
+function requireReleaseLease(runtime: LimrunRuntime): ReleaseLease {
+  const releaseLease = runtime.leaseLifecycle.release;
+  if (!releaseLease) throw new Error('Limrun runtime must provide lease release');
+  return releaseLease;
+}
+
+async function allocateDevice(runtime: LimrunRuntime, lease: SimulatorLease): Promise<DeviceInfo> {
+  const allocated = await requireAllocateLease(runtime)(lease);
+  const device = allocated?.device;
+  if (!device || typeof device !== 'object') {
+    throw new Error('Limrun runtime must return allocated device metadata');
+  }
+  return device as DeviceInfo;
+}
+
+test('Limrun runtime identifies direct CLI usage to the Limrun API', async () => {
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('ios-instance', 'lease-a');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    await allocateLease(lease);
+    await requireAllocateLease(runtime)(lease);
 
     assert.deepEqual(limrunMockState.constructorOptions[0]?.defaultHeaders, {
       'x-agent-device-client': 'agent-device-cli',
@@ -133,32 +166,12 @@ test('Limrun runtime identifies direct CLI usage to the Limrun API', async () =>
 });
 
 test('Limrun Android reverses localhost URL ports through the persistent ADB tunnel', async () => {
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-android',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'android-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('android-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    const allocated = await allocateLease(lease);
-    const device = allocated?.device;
-    if (!device || typeof device !== 'object') {
-      throw new Error('Limrun runtime must return allocated device metadata');
-    }
-    const interactor = runtime.getInteractor(
-      device as Parameters<LimrunRuntime['getInteractor']>[0],
-    );
+    const device = await allocateDevice(runtime, lease);
+    const interactor = runtime.getInteractor(device);
     if (!interactor) throw new Error('Limrun runtime must return an interactor');
 
     await interactor.open('exp://127.0.0.1:8081');
@@ -180,8 +193,7 @@ test('Limrun Android reverses localhost URL ports through the persistent ADB tun
       '-s',
       '127.0.0.1:62001',
       'reverse',
-      '--remove',
-      'tcp:8081',
+      '--remove-all',
     ]);
     assert.deepEqual(vi.mocked(runCmd).mock.calls[2]?.[1], ['disconnect', '127.0.0.1:62001']);
     assert.equal(limrunMockState.androidTunnelClose.mock.calls.length, 1);
@@ -190,43 +202,49 @@ test('Limrun Android reverses localhost URL ports through the persistent ADB tun
   }
 });
 
-test('Limrun Android installs direct local artifacts through Limrun assets', async () => {
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-android',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'android-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+test('Limrun Android ADB command failures include the selected tunnel serial in diagnostics', async () => {
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('android-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    const allocated = await allocateLease(lease);
-    const device = allocated?.device;
-    if (!device || typeof device !== 'object') {
-      throw new Error('Limrun runtime must return allocated device metadata');
-    }
-    assert.deepEqual(
-      (device as Parameters<LimrunRuntime['installApp']>[0]).capabilities?.supportedCommands?.slice(
-        0,
-        3,
-      ),
-      ['install', 'install-from-source', 'reinstall'],
-    );
+    const device = await allocateDevice(runtime, lease);
+    const interactor = runtime.getInteractor(device);
+    if (!interactor) throw new Error('Limrun runtime must return an interactor');
+    vi.mocked(runCmd).mockResolvedValueOnce({
+      stdout: '',
+      stderr: 'launch failed',
+      exitCode: 1,
+    });
 
-    const result = await runtime.installApp(
-      device as Parameters<LimrunRuntime['installApp']>[0],
-      'com.example.android',
-      '/tmp/app-debug.apk',
+    await assert.rejects(
+      () => interactor.open('com.example.android'),
+      (error) => {
+        const details = (error as { details?: Record<string, unknown> }).details;
+        assert.equal(
+          details?.command,
+          'adb -s 127.0.0.1:62001 shell monkey -p com.example.android -c android.intent.category.LAUNCHER 1',
+        );
+        return true;
+      },
     );
+  } finally {
+    await runtime.shutdown();
+  }
+});
+
+test('Limrun Android installs direct local artifacts through Limrun assets', async () => {
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('android-instance');
+
+  try {
+    const device = await allocateDevice(runtime, lease);
+    assert.deepEqual(device.capabilities?.supportedCommands?.slice(0, 3), [
+      'install',
+      'install-from-source',
+      'reinstall',
+    ]);
+
+    const result = await runtime.installApp(device, 'com.example.android', '/tmp/app-debug.apk');
 
     const assetCalls = limrunMockState.assetsGetOrUpload.mock.calls as unknown as Array<
       [Record<string, unknown>]
@@ -252,36 +270,13 @@ test('Limrun iOS installs direct local artifacts through Limrun assets', async (
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-device-limrun-install-'));
   const ipaPath = path.join(tempRoot, 'Demo.ipa');
   fs.writeFileSync(ipaPath, 'demo');
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-ios',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'ios-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('ios-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    const allocated = await allocateLease(lease);
-    const device = allocated?.device;
-    if (!device || typeof device !== 'object') {
-      throw new Error('Limrun runtime must return allocated device metadata');
-    }
+    const device = await allocateDevice(runtime, lease);
 
-    const result = await runtime.installApp(
-      device as Parameters<LimrunRuntime['installApp']>[0],
-      'com.example.ios',
-      ipaPath,
-      { relaunch: true },
-    );
+    const result = await runtime.installApp(device, 'com.example.ios', ipaPath, { relaunch: true });
 
     const assetCalls = limrunMockState.assetsGetOrUpload.mock.calls as unknown as Array<
       [Record<string, unknown>]
@@ -306,25 +301,11 @@ test('Limrun iOS installs direct local artifacts through Limrun assets', async (
 });
 
 test('Limrun Android configures and removes an explicit port reverse', async () => {
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-android',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'android-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('android-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    await allocateLease(lease);
+    await requireAllocateLease(runtime)(lease);
 
     assert.deepEqual(
       await runtime.configurePortReverse({
@@ -371,25 +352,11 @@ test('Limrun deletes iOS instance when post-create validation fails', async () =
     metadata: { id: 'ios-instance-missing-api' },
     status: { token: 'instance-token' },
   } as never);
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-ios',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'ios-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('ios-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    await assert.rejects(() => allocateLease(lease), /did not expose apiUrl/);
+    await assert.rejects(() => requireAllocateLease(runtime)(lease), /did not expose apiUrl/);
     assert.deepEqual(limrunMockState.iosDelete.mock.calls[0], ['ios-instance-missing-api']);
   } finally {
     await runtime.shutdown();
@@ -404,25 +371,11 @@ test('Limrun deletes Android instance when post-create validation fails', async 
       apiUrl: 'https://android.example',
     },
   } as never);
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-android',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'android-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('android-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    if (!allocateLease) throw new Error('Limrun runtime must provide lease allocation');
-    await assert.rejects(() => allocateLease(lease), /did not expose API and ADB/);
+    await assert.rejects(() => requireAllocateLease(runtime)(lease), /did not expose API and ADB/);
     assert.deepEqual(limrunMockState.androidDelete.mock.calls[0], ['android-instance-missing-adb']);
   } finally {
     await runtime.shutdown();
@@ -430,28 +383,12 @@ test('Limrun deletes Android instance when post-create validation fails', async 
 });
 
 test('Limrun keeps session tracked when release fails so release can be retried', async () => {
-  const runtime = new LimrunRuntime({
-    apiKey: 'lim_test_key',
-    version: '9.9.9-test',
-  });
-  const lease: SimulatorLease = {
-    leaseId: 'lease-android',
-    tenantId: 'team-a',
-    runId: 'run-a',
-    backend: 'android-instance',
-    leaseProvider: 'limrun',
-    createdAt: 1,
-    heartbeatAt: 1,
-    expiresAt: 60_001,
-  };
+  const runtime = createLimrunTestRuntime();
+  const lease = makeLease('android-instance');
 
   try {
-    const allocateLease = runtime.leaseLifecycle.allocate;
-    const releaseLease = runtime.leaseLifecycle.release;
-    if (!allocateLease || !releaseLease) {
-      throw new Error('Limrun runtime must provide lease lifecycle hooks');
-    }
-    await allocateLease(lease);
+    const releaseLease = requireReleaseLease(runtime);
+    await requireAllocateLease(runtime)(lease);
     limrunMockState.androidDelete.mockRejectedValueOnce(new Error('temporary delete failure'));
 
     await assert.rejects(() => releaseLease(lease), /temporary delete failure/);

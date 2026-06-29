@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 import {
-  composeCloudDeviceInventoryProvider,
-  composeCloudLeaseProvider,
-  getCloudInteractor,
-  setActiveCloudRuntimes,
-  type CloudDeviceRuntime,
-} from '../cloud/cloud-runtime.ts';
+  createProviderDeviceRuntimeRequestProviders,
+  getProviderDeviceInteractor,
+  installProviderDeviceApp,
+  setActiveProviderDeviceRuntimes,
+  type ProviderDeviceRuntime,
+} from '../provider-device-runtime.ts';
 import type { Interactor } from '../core/interactor-types.ts';
 import type { SimulatorLease } from '../daemon/lease-registry.ts';
 import type { DeviceInfo } from '../utils/device.ts';
 
 afterEach(() => {
-  setActiveCloudRuntimes([]);
+  setActiveProviderDeviceRuntimes([]);
 });
 
-test('cloud runtime registry delegates inventory, leases, and interactors to matching providers', async () => {
+test('provider device runtime registry delegates lifecycle, inventory, interactors, and installs to matching providers', async () => {
   const lease: SimulatorLease = {
     leaseId: 'lease-a',
     tenantId: 'team-a',
@@ -39,33 +39,43 @@ test('cloud runtime registry delegates inventory, leases, and interactors to mat
     leaseResult: undefined,
     devices: null,
     interactor: undefined,
+    installResult: undefined,
   });
   const hitRuntime = makeRuntime({
     provider: 'hit',
     leaseResult: { provider: 'hit' },
     devices: [device],
     interactor,
+    installResult: { bundleId: 'com.example.app' },
   });
 
-  setActiveCloudRuntimes([missRuntime, hitRuntime]);
+  setActiveProviderDeviceRuntimes([missRuntime, hitRuntime]);
+  const requestProviders = createProviderDeviceRuntimeRequestProviders([missRuntime, hitRuntime]);
 
-  const leaseLifecycle = composeCloudLeaseProvider([missRuntime, hitRuntime]);
-  const inventoryProvider = composeCloudDeviceInventoryProvider([missRuntime, hitRuntime]);
-
-  assert.deepEqual(await leaseLifecycle?.allocate?.(lease), { provider: 'hit' });
+  assert.deepEqual(await requestProviders.leaseLifecycleProvider?.allocate?.(lease), {
+    provider: 'hit',
+  });
   assert.deepEqual(
-    await inventoryProvider?.({ platform: 'ios', leaseId: 'lease-a', leaseProvider: 'hit' }),
+    await requestProviders.deviceInventoryProvider?.({
+      platform: 'ios',
+      leaseId: 'lease-a',
+      leaseProvider: 'hit',
+    }),
     [device],
   );
-  assert.equal(getCloudInteractor(device), interactor);
+  assert.equal(getProviderDeviceInteractor(device), interactor);
+  assert.deepEqual(await installProviderDeviceApp(device, 'com.example.app', '/tmp/app.ipa'), {
+    bundleId: 'com.example.app',
+  });
 });
 
 function makeRuntime(options: {
-  provider?: string;
+  provider: string;
   leaseResult: Record<string, unknown> | undefined;
   devices: DeviceInfo[] | null;
   interactor: Interactor | undefined;
-}): CloudDeviceRuntime {
+  installResult: { bundleId: string } | undefined;
+}): ProviderDeviceRuntime {
   return {
     provider: options.provider,
     leaseLifecycle: {
@@ -76,6 +86,7 @@ function makeRuntime(options: {
     deviceInventoryProvider: async () => options.devices,
     ownsDevice: (device) => options.devices?.some((entry) => entry.id === device.id) ?? false,
     getInteractor: () => options.interactor,
+    installApp: async () => options.installResult,
     shutdown: async () => undefined,
   };
 }

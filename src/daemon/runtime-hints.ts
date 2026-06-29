@@ -12,7 +12,7 @@ import {
 } from '../platforms/android/open-target.ts';
 import { buildSimctlArgsForDevice } from '../platforms/ios/simctl.ts';
 import { runXcrun } from '../platforms/ios/tool-provider.ts';
-import { isCloudDevice } from '../cloud/cloud-runtime.ts';
+import { isActiveProviderDevice } from '../provider-device-runtime.ts';
 
 const ANDROID_DEV_PREFS_PATH = 'shared_prefs/ReactNativeDevPrefs.xml';
 const ANDROID_DEBUG_HOST_KEY = 'debug_http_host';
@@ -44,7 +44,7 @@ export async function applyRuntimeHintsToApp(params: {
   runtime: SessionRuntimeHints | undefined;
 }): Promise<void> {
   const { device, appId, runtime } = params;
-  if (isCloudDevice(device)) return;
+  if (isActiveProviderDevice(device)) return;
   if (!appId) return;
   const transport = resolveRuntimeTransportHints(runtime);
   if (!transport) return;

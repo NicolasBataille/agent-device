@@ -1,24 +1,24 @@
-import type { Interactor } from '../core/interactor-types.ts';
-import type { DeviceInventoryProvider } from '../core/dispatch-resolve.ts';
-import type { LeaseLifecycleProvider } from '../daemon/handlers/lease.ts';
-import type { DeviceLease } from '../daemon/lease-registry.ts';
-import type { DeviceInfo } from '../utils/device.ts';
+import type { Interactor } from './core/interactor-types.ts';
+import type { DeviceInventoryProvider } from './core/dispatch-resolve.ts';
+import type { LeaseLifecycleProvider } from './daemon/handlers/lease.ts';
+import type { DeviceLease } from './daemon/lease-registry.ts';
+import type { DeviceInfo } from './utils/device.ts';
 
-export type CloudAppInstallResult = {
+export type ProviderDeviceInstallResult = {
   bundleId?: string;
   packageName?: string;
   appName?: string;
   launchTarget?: string;
 };
 
-export type CloudAppInstallOptions = {
+export type ProviderDeviceInstallOptions = {
   relaunch?: boolean;
   appIdentifierHint?: string;
   packageNameHint?: string;
 };
 
-export type CloudDeviceRuntime = {
-  provider?: string;
+export type ProviderDeviceRuntime = {
+  provider: string;
   leaseLifecycle: LeaseLifecycleProvider;
   deviceInventoryProvider: DeviceInventoryProvider;
   ownsDevice(device: DeviceInfo): boolean;
@@ -27,23 +27,23 @@ export type CloudDeviceRuntime = {
     device: DeviceInfo,
     app: string,
     appPath: string,
-    options?: CloudAppInstallOptions,
-  ): Promise<CloudAppInstallResult | undefined>;
+    options?: ProviderDeviceInstallOptions,
+  ): Promise<ProviderDeviceInstallResult | undefined>;
   installInstallablePath?(
     device: DeviceInfo,
     installablePath: string,
-    options?: CloudAppInstallOptions,
-  ): Promise<CloudAppInstallResult | undefined>;
+    options?: ProviderDeviceInstallOptions,
+  ): Promise<ProviderDeviceInstallResult | undefined>;
   configurePortReverse?(
-    options: CloudPortReverseOptions,
+    options: ProviderPortReverseOptions,
   ): Promise<Record<string, unknown> | undefined>;
   removePortReverse?(
-    options: CloudPortReverseOptions,
+    options: ProviderPortReverseOptions,
   ): Promise<Record<string, unknown> | undefined>;
   shutdown(): Promise<void>;
 };
 
-export type CloudPortReverseOptions = {
+export type ProviderPortReverseOptions = {
   leaseId: string;
   provider?: string;
   devicePort: number;
@@ -51,14 +51,19 @@ export type CloudPortReverseOptions = {
   name: string;
 };
 
-let activeCloudRuntimes: CloudDeviceRuntime[] = [];
+export type ProviderDeviceRuntimeRequestProviders = {
+  leaseLifecycleProvider?: LeaseLifecycleProvider;
+  deviceInventoryProvider?: DeviceInventoryProvider;
+};
 
-export function setActiveCloudRuntimes(runtimes: CloudDeviceRuntime[]): void {
-  activeCloudRuntimes = [...runtimes];
+let activeProviderDeviceRuntimes: ProviderDeviceRuntime[] = [];
+
+export function setActiveProviderDeviceRuntimes(runtimes: ProviderDeviceRuntime[]): void {
+  activeProviderDeviceRuntimes = [...runtimes];
 }
 
-export function getCloudInteractor(device: DeviceInfo): Interactor | undefined {
-  for (const runtime of activeCloudRuntimes) {
+export function getProviderDeviceInteractor(device: DeviceInfo): Interactor | undefined {
+  for (const runtime of activeProviderDeviceRuntimes) {
     if (!runtime.ownsDevice(device)) continue;
     const interactor = runtime.getInteractor(device);
     if (interactor) return interactor;
@@ -66,19 +71,17 @@ export function getCloudInteractor(device: DeviceInfo): Interactor | undefined {
   return undefined;
 }
 
-export function isActiveCloudDevice(device: DeviceInfo): boolean {
-  return activeCloudRuntimes.some((runtime) => runtime.ownsDevice(device));
+export function isActiveProviderDevice(device: DeviceInfo): boolean {
+  return activeProviderDeviceRuntimes.some((runtime) => runtime.ownsDevice(device));
 }
 
-export const isCloudDevice = isActiveCloudDevice;
-
-export async function installCloudApp(
+export async function installProviderDeviceApp(
   device: DeviceInfo,
   app: string,
   appPath: string,
-  options?: CloudAppInstallOptions,
-): Promise<CloudAppInstallResult | undefined> {
-  for (const runtime of activeCloudRuntimes) {
+  options?: ProviderDeviceInstallOptions,
+): Promise<ProviderDeviceInstallResult | undefined> {
+  for (const runtime of activeProviderDeviceRuntimes) {
     if (!runtime.ownsDevice(device)) continue;
     const result = await runtime.installApp?.(device, app, appPath, options);
     if (result) return result;
@@ -86,12 +89,12 @@ export async function installCloudApp(
   return undefined;
 }
 
-export async function installCloudInstallablePath(
+export async function installProviderDeviceInstallablePath(
   device: DeviceInfo,
   installablePath: string,
-  options?: CloudAppInstallOptions,
-): Promise<CloudAppInstallResult | undefined> {
-  for (const runtime of activeCloudRuntimes) {
+  options?: ProviderDeviceInstallOptions,
+): Promise<ProviderDeviceInstallResult | undefined> {
+  for (const runtime of activeProviderDeviceRuntimes) {
     if (!runtime.ownsDevice(device)) continue;
     const result = await runtime.installInstallablePath?.(device, installablePath, options);
     if (result) return result;
@@ -99,10 +102,10 @@ export async function installCloudInstallablePath(
   return undefined;
 }
 
-export async function configureCloudPortReverse(
-  options: CloudPortReverseOptions,
+export async function configureProviderPortReverse(
+  options: ProviderPortReverseOptions,
 ): Promise<Record<string, unknown> | undefined> {
-  for (const runtime of activeCloudRuntimes) {
+  for (const runtime of activeProviderDeviceRuntimes) {
     if (!runtimeMatchesProvider(runtime, options.provider)) continue;
     const result = await runtime.configurePortReverse?.(options);
     if (result) return result;
@@ -110,10 +113,10 @@ export async function configureCloudPortReverse(
   return undefined;
 }
 
-export async function removeCloudPortReverse(
-  options: CloudPortReverseOptions,
+export async function removeProviderPortReverse(
+  options: ProviderPortReverseOptions,
 ): Promise<Record<string, unknown> | undefined> {
-  for (const runtime of activeCloudRuntimes) {
+  for (const runtime of activeProviderDeviceRuntimes) {
     if (!runtimeMatchesProvider(runtime, options.provider)) continue;
     const result = await runtime.removePortReverse?.(options);
     if (result) return result;
@@ -121,8 +124,17 @@ export async function removeCloudPortReverse(
   return undefined;
 }
 
-export function composeCloudLeaseProvider(
-  runtimes: CloudDeviceRuntime[],
+export function createProviderDeviceRuntimeRequestProviders(
+  runtimes: ProviderDeviceRuntime[],
+): ProviderDeviceRuntimeRequestProviders {
+  return {
+    leaseLifecycleProvider: composeLeaseProvider(runtimes),
+    deviceInventoryProvider: composeDeviceInventoryProvider(runtimes),
+  };
+}
+
+function composeLeaseProvider(
+  runtimes: ProviderDeviceRuntime[],
 ): LeaseLifecycleProvider | undefined {
   if (runtimes.length === 0) return undefined;
   return {
@@ -132,8 +144,8 @@ export function composeCloudLeaseProvider(
   };
 }
 
-export function composeCloudDeviceInventoryProvider(
-  runtimes: CloudDeviceRuntime[],
+function composeDeviceInventoryProvider(
+  runtimes: ProviderDeviceRuntime[],
 ): DeviceInventoryProvider | undefined {
   if (runtimes.length === 0) return undefined;
   return async (request) => {
@@ -147,7 +159,7 @@ export function composeCloudDeviceInventoryProvider(
 }
 
 async function firstProviderResult(
-  runtimes: CloudDeviceRuntime[],
+  runtimes: ProviderDeviceRuntime[],
   method: keyof LeaseLifecycleProvider,
   lease: DeviceLease,
 ): Promise<Record<string, unknown> | undefined> {
@@ -161,7 +173,7 @@ async function firstProviderResult(
 }
 
 function runtimeMatchesProvider(
-  runtime: CloudDeviceRuntime,
+  runtime: ProviderDeviceRuntime,
   provider: string | undefined,
 ): boolean {
   return runtime.provider === provider;

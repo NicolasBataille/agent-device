@@ -9,7 +9,10 @@ import {
   mergeRuntimeHints,
   toRuntimePlatform,
 } from './session-runtime.ts';
-import { configureCloudPortReverse, removeCloudPortReverse } from '../../cloud/cloud-runtime.ts';
+import {
+  configureProviderPortReverse,
+  removeProviderPortReverse,
+} from '../../provider-device-runtime.ts';
 
 export async function handleRuntimeCommand(params: {
   req: DaemonRequest;
@@ -101,12 +104,12 @@ async function handlePortReverseCommand(
   const options = { leaseId, provider, devicePort, hostPort, name };
   const result =
     action === 'port-reverse'
-      ? await configureCloudPortReverse(options)
-      : await removeCloudPortReverse(options);
+      ? await configureProviderPortReverse(options)
+      : await removeProviderPortReverse(options);
   if (!result) {
     return errorResponse(
       'UNSUPPORTED_OPERATION',
-      'No active cloud runtime supports port reverse for this lease.',
+      'No active provider device runtime supports port reverse for this lease.',
     );
   }
   return {

@@ -12,11 +12,10 @@ import { teardownSessionResources } from './daemon/session-teardown.ts';
 import { closeDaemonServers } from './daemon/server-shutdown.ts';
 import { createLimrunRuntimeFromEnv } from './cloud/limrun-runtime.ts';
 import {
-  composeCloudDeviceInventoryProvider,
-  composeCloudLeaseProvider,
-  setActiveCloudRuntimes,
-  type CloudDeviceRuntime,
-} from './cloud/cloud-runtime.ts';
+  createProviderDeviceRuntimeRequestProviders,
+  setActiveProviderDeviceRuntimes,
+  type ProviderDeviceRuntime,
+} from './provider-device-runtime.ts';
 import type { SessionState } from './daemon/types.ts';
 import {
   emitDiagnostic,
@@ -79,11 +78,12 @@ export async function startDaemonRuntime(
 
   cleanupStaleAppLogProcesses(sessionsDir);
 
-  const cloudRuntimes: CloudDeviceRuntime[] = [];
+  const providerRuntimes: ProviderDeviceRuntime[] = [];
   const limrunRuntime = createLimrunRuntimeFromEnv(env);
-  if (limrunRuntime) cloudRuntimes.push(limrunRuntime);
-  setActiveCloudRuntimes(cloudRuntimes);
-  const leaseLifecycleProvider = composeCloudLeaseProvider(cloudRuntimes);
+  if (limrunRuntime) providerRuntimes.push(limrunRuntime);
+  setActiveProviderDeviceRuntimes(providerRuntimes);
+  const providerRuntimeProviders = createProviderDeviceRuntimeRequestProviders(providerRuntimes);
+  const leaseLifecycleProvider = providerRuntimeProviders.leaseLifecycleProvider;
   const releaseExpiredLease = (lease: DeviceLease) => {
     void leaseLifecycleProvider?.release?.(lease).catch((error) => {
       stderr.write(
@@ -114,7 +114,7 @@ export async function startDaemonRuntime(
     sessionStore,
     leaseRegistry,
     leaseLifecycleProvider,
-    deviceInventoryProvider: composeCloudDeviceInventoryProvider(cloudRuntimes),
+    deviceInventoryProvider: providerRuntimeProviders.deviceInventoryProvider,
     trackDownloadableArtifact,
   });
 
@@ -211,8 +211,8 @@ export async function startDaemonRuntime(
   if (!acquireDaemonLock(baseDir, lockPath, lockData)) {
     stderr.write('Daemon lock is held by another process; exiting.\n');
     setRunnerLeaseOwnerStateDir(undefined);
-    setActiveCloudRuntimes([]);
-    await Promise.allSettled(cloudRuntimes.map((runtime) => runtime.shutdown()));
+    setActiveProviderDeviceRuntimes([]);
+    await Promise.allSettled(providerRuntimes.map((runtime) => runtime.shutdown()));
     exit(0);
     return null;
   }
@@ -233,8 +233,8 @@ export async function startDaemonRuntime(
     removeInfo(infoPath);
     releaseDaemonLock(lockPath);
     setRunnerLeaseOwnerStateDir(undefined);
-    setActiveCloudRuntimes([]);
-    await Promise.allSettled(cloudRuntimes.map((runtime) => runtime.shutdown()));
+    setActiveProviderDeviceRuntimes([]);
+    await Promise.allSettled(providerRuntimes.map((runtime) => runtime.shutdown()));
     exit(1);
     return null;
   }
@@ -255,8 +255,8 @@ export async function startDaemonRuntime(
     await teardownDaemonSessions();
     const { stopAllIosRunnerSessions } = await import('./platforms/ios/runner-client.ts');
     await stopAllIosRunnerSessions();
-    await Promise.allSettled(cloudRuntimes.map((runtime) => runtime.shutdown()));
-    setActiveCloudRuntimes([]);
+    await Promise.allSettled(providerRuntimes.map((runtime) => runtime.shutdown()));
+    setActiveProviderDeviceRuntimes([]);
     // Best effort: stop the PNG worker so an in-flight job cannot delay exit.
     await Promise.race([
       terminatePngWorker().catch(() => {}),
