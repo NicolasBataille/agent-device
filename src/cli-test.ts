@@ -7,13 +7,23 @@ import {
   runReplayTestReporterProgress,
   runReplayTestReporters,
 } from './cli-test-reporters/registry.ts';
-import type { ReplayTestReporter, ReplayTestReporterContext } from './cli-test-reporters/types.ts';
+import type {
+  ReplayTestReporter,
+  ReplayTestReporterContext,
+  ReplayTestReporterStream,
+} from './cli-test-reporters/types.ts';
 import { printJson } from './utils/output.ts';
 
 export type ReplayTestReporterRuntime = {
   reporters: ReplayTestReporter[];
   context: ReplayTestReporterContext;
   onProgress(event: RequestProgressEvent): void;
+};
+
+type ReporterWritableStream = {
+  isTTY?: boolean;
+  columns?: number;
+  write(text: string): boolean;
 };
 
 export async function renderReplayTestResponse(options: {
@@ -59,17 +69,17 @@ export async function createReplayTestReporterRuntime(options: {
 function createReplayTestReporterContext(options: { debug?: boolean }): ReplayTestReporterContext {
   return {
     debug: options.debug,
-    stdout: {
-      isTTY: process.stdout.isTTY === true,
-      columns: process.stdout.columns,
-      write: (text) => process.stdout.write(text),
-    },
-    stderr: {
-      isTTY: process.stderr.isTTY === true,
-      columns: process.stderr.columns,
-      write: (text) => process.stderr.write(text),
-    },
+    stdout: createReplayTestReporterStream(process.stdout),
+    stderr: createReplayTestReporterStream(process.stderr),
     mkdir: (directory) => fs.mkdirSync(directory, { recursive: true }),
     writeFile: (filePath, contents) => fs.writeFileSync(filePath, contents, 'utf8'),
+  };
+}
+
+function createReplayTestReporterStream(stream: ReporterWritableStream): ReplayTestReporterStream {
+  return {
+    isTTY: stream.isTTY === true,
+    columns: stream.columns,
+    write: (text) => stream.write(text),
   };
 }
