@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-948/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-948/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-948/static/js/22.4a78634b86.js"></script>
-<script defer src="/agent-device/pr-preview/pr-948/static/js/index.490c0cfc35.js"></script>
+<script defer src="/agent-device/pr-preview/pr-948/static/js/index.dd2486d6ef.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -863,9 +863,10 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <ul>
 <li><code>artifacts</code> lists provider-hosted cloud artifacts such as videos, Appium logs, device logs, automation logs, and provider dashboard links.</li>
 <li>The response uses <code>cloudArtifacts</code> so it stays separate from daemon-managed local <code>artifacts</code> returned by screenshot, recording, install, replay, and remote materialization flows.</li>
+<li>Plain text output prints ready provider URLs. Use <code>--json</code> when scripts need the structured <code>cloudArtifacts</code> array.</li>
 <li>Historical lookup requires <code>--provider-session &lt;id&gt;</code> plus <code>--provider &lt;name&gt;</code>. BrowserStack expects <code>BROWSERSTACK_USERNAME</code> and <code>BROWSERSTACK_ACCESS_KEY</code>; AWS Device Farm uses the AWS CLI credential chain and infers the region from the session ARN when possible.</li>
 <li>When a cloud runtime is registered in-process by an embedding host, <code>artifacts</code> can infer the active provider session from the current lease before disconnect.</li>
-<li><code>disconnect --json</code> and <code>close --json</code> include provider release data when the runtime returns final cloud artifacts after session teardown. Some providers only finalize video/log URLs after the remote session is stopped, so retry <code>artifacts --provider ... --provider-session ...</code> if the first response is <code>pending</code>.</li>
+<li><code>disconnect --json</code> and <code>close --json</code> include provider release data when the runtime returns final cloud artifacts after session teardown. Some providers only finalize video/log URLs after the remote session is stopped, so retry <code>agent-device artifacts &lt;provider-session-id&gt; --provider &lt;name&gt; --json</code> if the first response is <code>pending</code>.</li>
 </ul>
 <h2 class="rp-toc-include" id="ios-physical-device-prerequisites"><a href="#ios-physical-device-prerequisites" class="rp-header-anchor rp-link" aria-hidden="true">#</a>iOS physical-device prerequisites</h2>
 <p>For CLI-discoverable setup guidance, run <code>agent-device help physical-device</code>.</p>
