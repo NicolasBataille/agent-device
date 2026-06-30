@@ -83,6 +83,7 @@ agent-device test ./workflows
 agent-device test "./workflows/**/*.ad" --platform android
 agent-device test ./workflows --timeout 60000 --retries 1
 agent-device test ./workflows --artifacts-dir ./tmp/agent-device-artifacts
+agent-device test ./workflows --reporter default --reporter junit:./tmp/junit.xml
 ```
 
 - `test` discovers `.ad` files from files, directories, or globs and runs them serially.
@@ -92,8 +93,98 @@ agent-device test ./workflows --artifacts-dir ./tmp/agent-device-artifacts
 - By default, suite artifacts are written under `.agent-device/test-artifacts/<run-id>/...`. Each attempt writes `replay.ad`, `result.txt`, and `replay-timing.ndjson`. Failed attempts also keep copied logs and artifact files when the replay produced them.
 - `replay-timing.ndjson` records attempt, cleanup, and per-step start/stop events with durations. Upload it from CI even for passing runs when comparing local and CI performance.
 - Timeouts are cooperative: the runner marks the attempt failed at the timeout boundary, then gives the underlying replay a short grace period to stop before session cleanup.
-- The default text reporter streams one-line `pass`, `fail`, or `skip` progress on stderr as each suite entry finishes or retries. Each line includes current/total suite position and elapsed seconds such as `pass 3/6 ... duration=12.34s`, then the final summary prints failed tests and passed-on-retry flaky tests; use `--verbose` to print every final result.
+- The default text reporter streams live progress on stderr while a suite runs, then prints the final summary, failed tests, and passed-on-retry flaky tests. Use `--verbose` to include step traces in completed-test progress output.
+- `--reporter` is repeatable. Built-ins are `default` for the console summary and `junit:<path>` for JUnit XML. Passing any explicit reporter list replaces the implicit default reporter, so include `--reporter default` when you also want terminal output. `--report-junit <path>` remains a compatibility alias for `--reporter junit:<path>`.
 - When `--fail-fast` and retries are both set, the current test still consumes its retries before the suite stops.
+
+### Custom test reporters
+
+Custom reporters are CLI-only presentation adapters. The daemon streams progress and returns the structured replay suite result; reporters run in the local CLI process and can render both live progress and final output.
+
+```bash
+agent-device test ./workflows --reporter ./scripts/replay-reporter.mjs
+```
+
+Reporter modules can export a reporter object, `reporter`, `createReporter`, or a default factory. Factories receive load context. Reporter hooks receive replay test domain objects and an IO context with `stdout` and `stderr` streams:
+
+```js
+// scripts/replay-reporter.mjs
+import fs from 'node:fs';
+import path from 'node:path';
+
+export default function createReporter(loadContext) {
+  return {
+    name: 'summary-file',
+    onTestStep(test, context) {
+      context.stderr.write(`running ${test.file} ${test.stepIndex}/${test.stepTotal}\n`);
+    },
+    onSuiteEnd(suite, context) {
+      context.stdout.write(`finished ${suite.total} tests\n`);
+      fs.mkdirSync('./tmp', { recursive: true });
+      fs.writeFileSync(
+        path.join('./tmp', 'report.txt'),
+        JSON.stringify(
+          {
+            total: suite.total,
+            passed: suite.passed,
+            failed: suite.failed,
+            modulePath: loadContext.modulePath,
+          },
+          null,
+          2,
+        ),
+        'utf8',
+      );
+    },
+    getExitCode(suite) {
+      return suite.failed > 0 ? 1 : 0;
+    },
+  };
+}
+```
+
+For a live terminal reporter that prints each completed test as an emoji, title, and duration:
+
+```js
+// scripts/emoji-reporter.mjs
+export default {
+  name: 'emoji-status',
+  onTestResult(test, context) {
+    const icon =
+      test.status === 'pass' ? '✓' : test.status === 'fail' ? '⨯' : '-';
+    const title = test.title?.trim() || test.file;
+    const duration =
+      typeof test.durationMs === 'number'
+        ? ` ${(test.durationMs / 1000).toFixed(2)}s`
+        : '';
+
+    context.stderr.write(`${icon} ${title}${duration}\n`);
+  },
+};
+```
+
+TypeScript reporters use the same object shape; compile them to JavaScript before passing them to `--reporter`:
+
+```ts
+const createReporter = () => ({
+  name: 'typed-reporter',
+  onSuiteStart(suite, context) {
+    context.stderr.write(`starting ${suite.runnable} tests\n`);
+  },
+  onTestResult(test, context) {
+    context.stderr.write(`${test.status} ${test.title ?? test.file}\n`);
+  },
+  onSuiteEnd(suite) {
+    // Write artifacts, annotations, or summaries from suite.
+  },
+});
+
+export default createReporter;
+```
+
+The CLI loads reporter modules with Node dynamic `import()`. Use `.mjs` or `.js` files at runtime; for TypeScript, compile the reporter to JavaScript before passing it to `--reporter`. Loading `.ts` files directly depends on Node's type-stripping behavior and is not part of the supported reporter contract.
+
+Live reporter hooks are semantic: `onSuiteStart`, `onTestStart`, `onTestStep`, and `onTestResult` run while the daemon request is active; generic command progress frames are not exposed to test reporters. These live hooks are synchronous — they run from the progress stream as events arrive and are not awaited, so keep their work synchronous and defer anything async to `onSuiteEnd`, which the CLI awaits before exiting. `onSuiteEnd` receives the final suite result. `getExitCode` can only raise the suite exit code, never lower it: the highest reporter-provided code wins and failed tests still exit with `1` when no reporter raises it further, so a reporter cannot mask a failing suite.
 
 ## Parametrise `.ad` scripts
 

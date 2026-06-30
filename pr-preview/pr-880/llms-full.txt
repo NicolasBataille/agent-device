@@ -540,30 +540,27 @@ For remote Metro-backed flows, import the reusable Node APIs instead of spawning
 
 Public subpath API exposed for Node consumers:
 
+- `agent-device`
+  - `createAgentDeviceClient(options?)`
+  - `createLocalArtifactAdapter(options?)`
+  - `AppError`, `isAgentDeviceError(error)`, `normalizeAgentDeviceError(error)`
+  - `centerOfRect(rect)`
+  - root types are limited to the typed client contracts used by hosted adapters, such as `AppListOptions`, `BackCommandOptions`, `ScrollOptions`, and command result types.
 - `agent-device/io`
   - artifact adapter types, file input refs, and file output refs
 - `agent-device/metro`
-  - `prepareRemoteMetro(options)`
-  - `ensureMetroTunnel(options)`
-  - `reloadRemoteMetro(options)`
-  - `stopMetroTunnel(options)`
-  - `buildIosRuntimeHints(baseUrl)`
-  - `buildAndroidRuntimeHints(baseUrl)`
-  - types: `PrepareRemoteMetroOptions`, `PrepareRemoteMetroResult`, `EnsureMetroTunnelOptions`, `EnsureMetroTunnelResult`, `ReloadRemoteMetroOptions`, `ReloadRemoteMetroResult`, `StopMetroTunnelOptions`, `MetroRuntimeHints`, `MetroBridgeResult`
+  - `buildBundleUrl(baseUrl, platform)`
+  - `normalizeBaseUrl(baseUrl)`
+  - `resolveRuntimeTransport(runtime)`
+  - types: `MetroBridgeDescriptor`, `MetroTunnelRequestMessage`, `MetroTunnelResponseMessage`
 - `agent-device/batch`
   - `runBatch(req, sessionName, invoke)`
-  - `validateAndNormalizeBatchSteps(steps, maxSteps)`
-  - `buildBatchStepFlags(parentFlags, stepFlags)`
-  - `DEFAULT_BATCH_MAX_STEPS`
-  - `BATCH_BLOCKED_COMMANDS`
-  - `INHERITED_PARENT_FLAG_KEYS`
-  - types: `BatchInvoke`, `BatchRequest`, `DaemonBatchStep`, `BatchStepResult`, `NormalizedBatchStep`
 - `agent-device/remote-config`
-  - `resolveRemoteConfigPath(options)`
-  - `resolveRemoteConfigProfile(options)`
-  - types: `RemoteConfigProfile`, `RemoteConfigProfileOptions`, `ResolvedRemoteConfigProfile`
+  - types: `RemoteConfigProfile`
 - `agent-device/contracts`
-  - types: `SessionRuntimeHints`, `DaemonInstallSource`, `DaemonLockPolicy`, `DaemonRequestMeta`, `DaemonRequest`, `DaemonArtifact`, `DaemonResponseData`, `DaemonError`, `DaemonResponse`
+  - `centerOfRect(rect)`
+  - `defaultHintForCode(code)`, `normalizeError(error)`
+  - types: `DaemonError`, `DaemonInstallSource`, `DaemonRequest`, `DaemonResponse`, `DaemonResponseData`, `JsonRpcId`, `JsonRpcRequestEnvelope`, `LeaseAllocatePayload`, `LeaseBackend`, `LeaseHeartbeatPayload`, `LeaseReleasePayload`, `SessionRuntimeHints`
 - `agent-device/selectors`
   - `parseSelectorChain(expression)`
   - `tryParseSelectorChain(expression)`
@@ -573,44 +570,27 @@ Public subpath API exposed for Node consumers:
   - `isNodeVisible(node)`
   - `isSelectorToken(token)`
   - `isNodeEditable(node, platform)`
-  - types: `Selector`, `SelectorChain`, `SelectorDiagnostics`, `SelectorResolution`, `SnapshotNode`
+  - types: `SelectorChain`, `SelectorDiagnostics`
 - `agent-device/finders`
   - `findBestMatchesByLocator(nodes, locator, query, requireRectOrOptions)`
-  - `normalizeRole(value)`
-  - `normalizeText(value)`
   - `parseFindArgs(args)`
-  - types: `FindLocator`, `FindMatchOptions`, `SnapshotNode`
+  - types: `FindMatchOptions`
 - `agent-device/install-source`
-  - `ARCHIVE_EXTENSIONS`
-  - `isBlockedIpAddress(address)`
-  - `isBlockedSourceHostname(hostname)`
   - `isTrustedInstallSourceUrl(sourceUrl)`
-  - `materializeInstallablePath(options)`
   - `validateDownloadSourceUrl(url)`
-  - types: `MaterializeInstallSource`, `MaterializedInstallable`
+  - types: `MaterializeInstallSource`
 - `agent-device/artifacts`
   - `resolveAndroidArchivePackageName(archivePath)`
-- `agent-device/android-snapshot-helper`
-  - `ensureAndroidSnapshotHelper(options)`
-  - `captureAndroidSnapshotWithHelper(options)`
-  - `parseAndroidSnapshotHelperOutput(output)`
-  - `parseAndroidSnapshotHelperXml(xml, metadata?, options?, maxNodes?)`
-  - `prepareAndroidSnapshotHelperArtifactFromManifestUrl(options)`
-  - `verifyAndroidSnapshotHelperArtifact(artifact)`
-  - types: `AndroidAdbExecutor`, `AndroidSnapshotHelperArtifact`, `AndroidSnapshotHelperManifest`, `AndroidSnapshotHelperOutput`, `AndroidSnapshotHelperParsedSnapshot`
 - `agent-device/android-adb`
   - `createAndroidPortReverseManager(provider)`
-  - `createLocalAndroidAdbProvider(device)`
   - `captureAndroidLogcatWithAdb(executor, options?)`
-  - `streamAndroidLogcatWithAdb(provider, options?)`
   - `readAndroidClipboardWithAdb(executor)` / `writeAndroidClipboardWithAdb(executor, text)`
   - `getAndroidKeyboardStatusWithAdb(executor)` / `dismissAndroidKeyboardWithAdb(executor)`
-  - `openAndroidAppWithAdb(executor, packageName, options?)`
+  - `openAndroidAppWithAdb(executor, packageName)`
   - `forceStopAndroidAppWithAdb(executor, packageName)`
-  - `resolveAndroidLaunchComponentWithAdb(executor, packageName, categories?)`
-  - `listAndroidAppsWithAdb(executor, options?)`
+  - `listAndroidAppsWithAdb(executor)`
   - `getAndroidAppStateWithAdb(executor)`
-  - types: `AndroidAdbProvider`, `AndroidAdbExecutor`, `AndroidAdbExecutorOptions`, `AndroidAdbExecutorResult`, `AndroidAdbProcess`, `AndroidAdbSpawner`, `AndroidPortReverseProvider`, `AndroidTextInjector`
+  - types: `AndroidAdbExecutor`, `AndroidAdbExecutorOptions`, `AndroidPortReverseEndpoint`
 
 The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `artifacts`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are no longer published.
 
@@ -685,69 +665,15 @@ inspection adapts managed `agent-browser` request history to the existing networ
 request and response bodies are not exposed by that backend path. Web audio probes sample HTML
 media elements and return compact dBFS buckets.
 
-## Android snapshot helper providers
-
-Remote Android providers should import `agent-device/android-snapshot-helper` and inject their own
-ADB-shaped executor. The executor receives arguments after `adb`, so local callers may wrap
-`adb -s <serial>`, while cloud providers can route the same operations through an ADB tunnel.
-Providers that can keep a long-lived instrumentation process should pass an `AndroidAdbProvider`
-with `spawn`; Agent Device will use the persistent helper-session transport and fall back to
-one-shot instrumentation if startup, socket, or protocol validation fails.
-
-Remote Android providers that expose stronger text entry should attach a provider-native
-`AndroidTextInjector` to their `AndroidAdbProvider`. Agent Device prefers that injector for
-`fill`/`type`; without one, local Android text entry uses chunk-safe ASCII shell input and
-reports unsupported non-ASCII/control text explicitly.
-
-```ts
-import {
-  captureAndroidSnapshotWithHelper,
-  ensureAndroidSnapshotHelper,
-  parseAndroidSnapshotHelperXml,
-  prepareAndroidSnapshotHelperArtifactFromManifestUrl,
-} from 'agent-device/android-snapshot-helper';
-
-const helperVersion = '<agent-device version>';
-const manifestUrl =
-  `https://github.com/callstack/agent-device/releases/download/v${helperVersion}/` +
-  `agent-device-android-snapshot-helper-${helperVersion}.manifest.json`;
-
-const artifact = await prepareAndroidSnapshotHelperArtifactFromManifestUrl({
-  manifestUrl,
-});
-
-await ensureAndroidSnapshotHelper({
-  adb: runProviderAdb,
-  artifact,
-  installPolicy: 'missing-or-outdated',
-});
-
-const output = await captureAndroidSnapshotWithHelper({
-  adb: runProviderAdb,
-  timeoutMs: 8000,
-});
-
-const snapshot = parseAndroidSnapshotHelperXml(output.xml, output.metadata);
-```
-
-Helper captures report `metadata.captureMode` as `interactive-windows` when Android returns
-interactive window roots, or `active-window` when the helper falls back to
-`getRootInActiveWindow()`. `metadata.windowCount` is the number of serialized roots.
-
 ## Android ADB providers
 
 Use `agent-device/android-adb` when a bridge owns Android device access but wants upstream command
-behavior for ADB-shaped operations. Executors receive arguments after `adb`; local callers can use
-`createLocalAndroidAdbProvider(device)`, while remote bridges can route the same argument arrays
-through an abstract provider backed by an ADB tunnel, websocket API, or another remote transport.
+behavior for ADB-shaped operations. Executors receive arguments after `adb`, so remote bridges can
+route the same argument arrays through an ADB tunnel, websocket API, or another remote transport.
 
-The provider contract covers normal stdout/stderr commands, binary stdout, stdin, timeout/signal
-cancellation, optional long-running spawn support for logcat-style streams, and optional reverse
-support for port mappings. Public helpers accept an executor/provider directly and do not expose the
-daemon's scoped adb interception internals.
-
-`streamAndroidLogcatWithAdb(provider, options?)` requires `provider.spawn`; exec-only providers can
-use `captureAndroidLogcatWithAdb(executor, options?)`.
+The public helpers accept an executor directly and do not expose the daemon's scoped adb
+interception internals. Use `captureAndroidLogcatWithAdb(executor, options?)` when a bridge needs a
+bounded logcat capture.
 
 Providers can also expose `reverse` for first-class port reverse ownership. Plain executors do not
 advertise reverse support automatically; call `createAndroidPortReverseManager(providerOrExecutor)`
@@ -860,8 +786,9 @@ Use `agent-device/batch` when a bridge or in-process runner receives daemon-shap
 
 ```ts
 import { runBatch } from 'agent-device/batch';
-import type { BatchRequest } from 'agent-device/batch';
 import type { DaemonResponse } from 'agent-device/contracts';
+
+type BatchRequest = Parameters<typeof runBatch>[0];
 
 async function handleBatch(req: BatchRequest): Promise<DaemonResponse> {
   return await runBatch(req, req.session ?? 'default', async (stepReq) => {
@@ -939,43 +866,24 @@ Direct Android `.apk` and `.aab` URL sources can still resolve package identity 
 
 ```ts
 import {
-  prepareRemoteMetro,
-  reloadRemoteMetro,
-  stopMetroTunnel,
+  buildBundleUrl,
+  normalizeBaseUrl,
+  resolveRuntimeTransport,
 } from 'agent-device/metro';
-import { resolveRemoteConfigProfile } from 'agent-device/remote-config';
 
-const remoteConfig = resolveRemoteConfigProfile({
-  configPath: './agent-device.remote.json',
-  cwd: process.cwd(),
+const bridgeBaseUrl = normalizeBaseUrl('https://bridge.example.test/metro');
+const iosBundleUrl = buildBundleUrl(bridgeBaseUrl, 'ios');
+const androidBundleUrl = buildBundleUrl(bridgeBaseUrl, 'android');
+
+const transport = resolveRuntimeTransport({
+  platform: 'ios',
+  bundleUrl: iosBundleUrl,
 });
 
-const prepared = await prepareRemoteMetro({
-  projectRoot: remoteConfig.profile.metroProjectRoot!,
-  kind: remoteConfig.profile.metroKind ?? 'auto',
-  proxyBaseUrl: remoteConfig.profile.metroProxyBaseUrl,
-  proxyBearerToken: remoteConfig.profile.metroBearerToken,
-  bridgeScope: {
-    tenantId: remoteConfig.profile.tenant!,
-    runId: remoteConfig.profile.runId!,
-    leaseId: remoteConfig.profile.leaseId!,
-  },
-  profileKey: remoteConfig.resolvedPath,
-});
-
-console.log(prepared.iosRuntime, prepared.androidRuntime);
-
-await reloadRemoteMetro({
-  runtime: prepared.iosRuntime,
-});
-
-await stopMetroTunnel({
-  projectRoot: remoteConfig.profile.metroProjectRoot!,
-  profileKey: remoteConfig.resolvedPath,
-});
+console.log(iosBundleUrl, androidBundleUrl, transport);
 ```
 
-Use `agent-device/remote-config` for profile loading and path resolution, `agent-device/metro` for Metro preparation, reload, and tunnel lifecycle, and `agent-device/contracts` when a server consumer needs daemon request or runtime contract types. For bridged remote Metro, `proxyBaseUrl` is the bridge origin and `publicBaseUrl` is optional; the bridge descriptor supplies cloud iOS wildcard HTTPS hints and Android runtime-route hints. `reloadRemoteMetro()` calls Metro's `/reload` endpoint, matching the terminal `r` reload path for connected React Native apps.
+Use `agent-device/remote-config` for the `RemoteConfigProfile` type, `agent-device/metro` for URL and transport helpers, and `agent-device/contracts` when a server consumer needs daemon request or runtime contract types. For bridged remote Metro, the bridge descriptor supplies cloud iOS wildcard HTTPS hints and Android runtime-route hints.
 
 ## Selector helpers
 
@@ -1616,9 +1524,8 @@ agent-device keyboard dismiss
 ```
 
 - `keyboard status` (or `keyboard get`) returns keyboard visibility and best-effort input type classification on Android.
-- `keyboard dismiss` attempts a non-navigation keyboard dismissal on Android and a native dismiss gesture/control on iOS, including common safe controls such as a keyboard toolbar `Done` button, then confirms the keyboard is hidden.
-- If the keyboard remains visible after the platform-native dismiss path, the command returns an explicit `UNSUPPORTED_OPERATION` error instead of falling back to back navigation.
-- On iOS, `keyboard dismiss` is best-effort and can fail when the active app exposes no native dismiss gesture/control. Prefer a visible app dismiss control, or use `back --system` only when system navigation is an acceptable side effect.
+- To hide the keyboard, use `keyboard dismiss`. It taps safe controls like `Done` when available and verifies the keyboard closed.
+- If it reports `UNSUPPORTED_OPERATION`, press a visible app control such as `Done` only when that is the intended fallback.
 - Works with active sessions and explicit selectors (`--platform`, `--device`, `--udid`, `--serial`).
 - `keyboard status|get` is supported on Android emulator/device.
 - `keyboard dismiss` is supported on Android emulator/device and best-effort on iOS simulator/device.
@@ -1768,6 +1675,7 @@ agent-device screenshot                 # Auto filename
 agent-device screenshot page.png        # Explicit screenshot path
 agent-device screenshot page.png --max-size 1024  # Downscale longest edge for agent-friendly artifacts
 agent-device screenshot page.png --overlay-refs  # Draw current @eN refs and target rectangles onto the PNG
+agent-device screenshot baseline.png --normalize-status-bar  # Normalize iOS simulator chrome for reusable diff baselines
 agent-device screenshot page.png --platform web --fullscreen  # On web, --fullscreen/--full/-f captures the entire document
 agent-device viewport 1280 900 --platform web                # Resize the active web viewport for fixed-layout or 100vh apps
 agent-device screenshot textedit.png    # App-session window capture on macOS
@@ -1787,8 +1695,9 @@ agent-device record stop                # Stop active recording
 - Recordings always produce a video artifact. When touch visualization is enabled, they also produce a gesture telemetry sidecar that can be used for post-processing or inspection.
 - `screenshot --max-size <px>` preserves aspect ratio and only downscales when the saved PNG's longest edge is larger than the requested size.
 - `screenshot --overlay-refs` captures a fresh full snapshot and burns visible `@eN` refs plus their target rectangles into the saved PNG.
+- `screenshot --normalize-status-bar` temporarily normalizes iOS simulator status-bar chrome for deterministic screenshot baselines; ordinary screenshots leave the simulator's current chrome visible.
 - `screenshot --max-size <px> --overlay-refs` writes a smaller image and draws refs for that final image size; avoid very small max sizes when text, icons, or labels need to remain readable.
-- `diff screenshot` compares the current live screenshot to `--baseline`, or compares `--baseline` to an optional saved `current.png` path without requiring an active session, then prints ranked changed regions with screen-space rectangles, shape, size, density, average color, and luminance, and writes a diff PNG with a light grayscale current-screen context, red-tinted changed pixels, and outlined changed regions when `--out` is provided. JSON also includes normalized bounds.
+- `diff screenshot` compares the current live screenshot to `--baseline`, or compares `--baseline` to an optional saved `current.png` path without requiring an active session, then prints ranked changed regions with screen-space rectangles, shape, size, density, average color, and luminance, and writes a diff PNG with a light grayscale current-screen context, red-tinted changed pixels, and outlined changed regions when `--out` is provided. Live iOS simulator diffs normalize status-bar chrome by default; use `screenshot --normalize-status-bar` when capturing reusable baselines. JSON also includes normalized bounds.
 - If `tesseract` is installed, `diff screenshot` also adds best-effort OCR text deltas, movement clusters, and bbox size-change hints to the text and JSON output. OCR improves descriptions only; it does not change the pixel comparison or the diff PNG.
 - When OCR is available, `diff screenshot` also reports best-effort non-text visual deltas by masking OCR text boxes out of the diff and clustering remaining residuals. These are hints for icons, controls, and separators, not semantic icon recognition.
 - `diff screenshot --overlay-refs` additionally writes a separate current-screen overlay guide for live captures without using that annotated image for the pixel comparison. If current-screen refs intersect changed regions, the output lists the best ref matches under those regions. Saved-image comparisons do not have live accessibility refs, so `--overlay-refs` is unavailable when a `current.png` path is provided.
@@ -2767,7 +2676,7 @@ Do not commit a config file that contains a live `daemonAuthToken`.
 
 ## What Is Exposed
 
-The proxy allows only the daemon HTTP contract: `/health`, `/rpc`, `/upload`, and `/artifacts/*`, with the same routes also available under `/agent-device/*`. Health checks are unauthenticated; command, upload, and artifact routes require the bearer token.
+The proxy allows only the daemon HTTP contract: `/health`, `/rpc`, `/upload` plus resumable `/upload/*` routes, and `/artifacts/*`, with the same routes also available under `/agent-device/*`. Health checks are unauthenticated; command, upload, and artifact routes require the bearer token.
 
 The proxy validates the client token and rewrites authorized upstream requests to the local daemon token. The local daemon still validates its own token, so the daemon token is not exposed to remote clients.
 
@@ -2870,6 +2779,7 @@ agent-device test ./workflows
 agent-device test "./workflows/**/*.ad" --platform android
 agent-device test ./workflows --timeout 60000 --retries 1
 agent-device test ./workflows --artifacts-dir ./tmp/agent-device-artifacts
+agent-device test ./workflows --reporter default --reporter junit:./tmp/junit.xml
 ```
 
 - `test` discovers `.ad` files from files, directories, or globs and runs them serially.
@@ -2879,8 +2789,98 @@ agent-device test ./workflows --artifacts-dir ./tmp/agent-device-artifacts
 - By default, suite artifacts are written under `.agent-device/test-artifacts/<run-id>/...`. Each attempt writes `replay.ad`, `result.txt`, and `replay-timing.ndjson`. Failed attempts also keep copied logs and artifact files when the replay produced them.
 - `replay-timing.ndjson` records attempt, cleanup, and per-step start/stop events with durations. Upload it from CI even for passing runs when comparing local and CI performance.
 - Timeouts are cooperative: the runner marks the attempt failed at the timeout boundary, then gives the underlying replay a short grace period to stop before session cleanup.
-- The default text reporter streams one-line `pass`, `fail`, or `skip` progress on stderr as each suite entry finishes or retries. Each line includes current/total suite position and elapsed seconds such as `pass 3/6 ... duration=12.34s`, then the final summary prints failed tests and passed-on-retry flaky tests; use `--verbose` to print every final result.
+- The default text reporter streams live progress on stderr while a suite runs, then prints the final summary, failed tests, and passed-on-retry flaky tests. Use `--verbose` to include step traces in completed-test progress output.
+- `--reporter` is repeatable. Built-ins are `default` for the console summary and `junit:<path>` for JUnit XML. Passing any explicit reporter list replaces the implicit default reporter, so include `--reporter default` when you also want terminal output. `--report-junit <path>` remains a compatibility alias for `--reporter junit:<path>`.
 - When `--fail-fast` and retries are both set, the current test still consumes its retries before the suite stops.
+
+### Custom test reporters
+
+Custom reporters are CLI-only presentation adapters. The daemon streams progress and returns the structured replay suite result; reporters run in the local CLI process and can render both live progress and final output.
+
+```bash
+agent-device test ./workflows --reporter ./scripts/replay-reporter.mjs
+```
+
+Reporter modules can export a reporter object, `reporter`, `createReporter`, or a default factory. Factories receive load context. Reporter hooks receive replay test domain objects and an IO context with `stdout` and `stderr` streams:
+
+```js
+// scripts/replay-reporter.mjs
+import fs from 'node:fs';
+import path from 'node:path';
+
+export default function createReporter(loadContext) {
+  return {
+    name: 'summary-file',
+    onTestStep(test, context) {
+      context.stderr.write(`running ${test.file} ${test.stepIndex}/${test.stepTotal}\n`);
+    },
+    onSuiteEnd(suite, context) {
+      context.stdout.write(`finished ${suite.total} tests\n`);
+      fs.mkdirSync('./tmp', { recursive: true });
+      fs.writeFileSync(
+        path.join('./tmp', 'report.txt'),
+        JSON.stringify(
+          {
+            total: suite.total,
+            passed: suite.passed,
+            failed: suite.failed,
+            modulePath: loadContext.modulePath,
+          },
+          null,
+          2,
+        ),
+        'utf8',
+      );
+    },
+    getExitCode(suite) {
+      return suite.failed > 0 ? 1 : 0;
+    },
+  };
+}
+```
+
+For a live terminal reporter that prints each completed test as an emoji, title, and duration:
+
+```js
+// scripts/emoji-reporter.mjs
+export default {
+  name: 'emoji-status',
+  onTestResult(test, context) {
+    const icon =
+      test.status === 'pass' ? '✓' : test.status === 'fail' ? '⨯' : '-';
+    const title = test.title?.trim() || test.file;
+    const duration =
+      typeof test.durationMs === 'number'
+        ? ` ${(test.durationMs / 1000).toFixed(2)}s`
+        : '';
+
+    context.stderr.write(`${icon} ${title}${duration}\n`);
+  },
+};
+```
+
+TypeScript reporters use the same object shape; compile them to JavaScript before passing them to `--reporter`:
+
+```ts
+const createReporter = () => ({
+  name: 'typed-reporter',
+  onSuiteStart(suite, context) {
+    context.stderr.write(`starting ${suite.runnable} tests\n`);
+  },
+  onTestResult(test, context) {
+    context.stderr.write(`${test.status} ${test.title ?? test.file}\n`);
+  },
+  onSuiteEnd(suite) {
+    // Write artifacts, annotations, or summaries from suite.
+  },
+});
+
+export default createReporter;
+```
+
+The CLI loads reporter modules with Node dynamic `import()`. Use `.mjs` or `.js` files at runtime; for TypeScript, compile the reporter to JavaScript before passing it to `--reporter`. Loading `.ts` files directly depends on Node's type-stripping behavior and is not part of the supported reporter contract.
+
+Live reporter hooks are semantic: `onSuiteStart`, `onTestStart`, `onTestStep`, and `onTestResult` run while the daemon request is active; generic command progress frames are not exposed to test reporters. These live hooks are synchronous — they run from the progress stream as events arrive and are not awaited, so keep their work synchronous and defer anything async to `onSuiteEnd`, which the CLI awaits before exiting. `onSuiteEnd` receives the final suite result. `getExitCode` can only raise the suite exit code, never lower it: the highest reporter-provided code wins and failed tests still exit with `1` when no reporter raises it further, so a reporter cannot mask a failing suite.
 
 ## Parametrise `.ad` scripts
 
