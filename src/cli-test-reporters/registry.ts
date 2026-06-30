@@ -4,8 +4,9 @@ import { createCustomReplayTestReporter } from './custom.ts';
 import { createDefaultReplayTestReporter } from './default.ts';
 import { getReplayTestExitCode } from './format.ts';
 import { createJunitReplayTestReporter } from './junit.ts';
+import { toReplayTestReporterProgressEvent } from './progress.ts';
 import { buildReplayTestReporterSpecs, type ReplayTestReporterSpec } from './spec.ts';
-import type { ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
+import type { Awaitable, ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
 
 export async function resolveReplayTestReporters(options: {
   reporters?: string[];
@@ -31,20 +32,74 @@ export function runReplayTestReporterProgress(
   event: RequestProgressEvent,
   context: ReplayTestReporterContext,
 ): void {
-  for (const reporter of reporters) {
-    reporter.onProgress?.(event, context);
+  const reporterEvent = toReplayTestReporterProgressEvent(event);
+  if (!reporterEvent) return;
+  if (reporterEvent.type === 'suite-start') {
+    runReplayTestReporterHook(reporters, 'onSuiteStart', context, (reporter) =>
+      reporter.onSuiteStart?.(reporterEvent.suite, context),
+    );
+    return;
   }
+
+  if (reporterEvent.type === 'test-start') {
+    runReplayTestReporterHook(reporters, 'onTestStart', context, (reporter) =>
+      reporter.onTestStart?.(reporterEvent.test, context),
+    );
+    return;
+  }
+
+  if (reporterEvent.type === 'test-step') {
+    runReplayTestReporterHook(reporters, 'onTestStep', context, (reporter) =>
+      reporter.onTestStep?.(reporterEvent.test, context),
+    );
+    return;
+  }
+
+  runReplayTestReporterHook(reporters, 'onTestResult', context, (reporter) =>
+    reporter.onTestResult?.(reporterEvent.test, context),
+  );
+}
+
+function runReplayTestReporterHook(
+  reporters: ReplayTestReporter[],
+  hookName: keyof ReplayTestReporter,
+  context: ReplayTestReporterContext,
+  run: (reporter: ReplayTestReporter) => Awaitable<void> | undefined,
+): void {
+  for (const reporter of reporters) {
+    try {
+      const result = run(reporter);
+      if (result && typeof result === 'object' && 'then' in result) {
+        void result.catch((error: unknown) =>
+          reportReplayTestReporterHookError(reporter, hookName, context, error),
+        );
+      }
+    } catch (error) {
+      reportReplayTestReporterHookError(reporter, hookName, context, error);
+    }
+  }
+}
+
+function reportReplayTestReporterHookError(
+  reporter: ReplayTestReporter,
+  hookName: keyof ReplayTestReporter,
+  context: ReplayTestReporterContext,
+  error: unknown,
+): void {
+  const message = error instanceof Error ? error.message : String(error);
+  context.stderr.write(`Reporter ${reporter.name} ${String(hookName)} failed: ${message}\n`);
 }
 
 export function getReplayTestReporterExitCode(
   reporters: ReplayTestReporter[],
   suite: ReplaySuiteResult,
 ): number {
+  const exitCodes = [getReplayTestExitCode(suite)];
   for (const reporter of reporters) {
     const exitCode = reporter.getExitCode?.(suite);
-    if (exitCode !== undefined) return exitCode;
+    if (exitCode !== undefined) exitCodes.push(exitCode);
   }
-  return getReplayTestExitCode(suite);
+  return Math.max(...exitCodes);
 }
 
 async function resolveReplayTestReporter(

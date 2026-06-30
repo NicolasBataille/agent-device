@@ -135,37 +135,38 @@ For a live terminal reporter that prints each completed test as an emoji, title,
 
 ```js
 // scripts/emoji-reporter.mjs
+import { formatReplayTestDuration, replayTestStatusIcon } from 'agent-device';
+
 export default {
   name: 'emoji-status',
   onTestResult(test, context) {
-    if (!['pass', 'fail', 'skip'].includes(test.status)) return;
-
-    const icon =
-      test.status === 'pass' ? '✅' : test.status === 'fail' ? '❌' : '⏭️';
+    const icon = replayTestStatusIcon(test.status);
     const title = test.title?.trim() || test.file;
     const duration =
       typeof test.durationMs === 'number'
-        ? ` ${formatSeconds(test.durationMs)}`
+        ? ` ${formatReplayTestDuration(test.durationMs)}`
         : '';
 
     context.stderr.write(`${icon} ${title}${duration}\n`);
   },
 };
-
-function formatSeconds(durationMs) {
-  return `${(durationMs / 1000).toFixed(2)}s`;
-}
 ```
 
 TypeScript reporters can import the public types from `agent-device`:
 
 ```ts
 import type { ReplayTestReporterFactory } from 'agent-device';
+import { createReplayTestProgressRenderer } from 'agent-device';
 
 const createReporter: ReplayTestReporterFactory = () => ({
   name: 'typed-reporter',
-  onTestStart(test, context) {
-    context.stderr.write(`started ${test.file}\n`);
+  onSuiteStart(suite, context) {
+    context.stderr.write(`starting ${suite.runnable} tests\n`);
+  },
+  onTestResult(test, context) {
+    const renderer = createReplayTestProgressRenderer();
+    const output = renderer.render({ type: 'test-result', test });
+    if (output) context.stderr.write(`${output.text}\n`);
   },
   onSuiteEnd(suite) {
     // Write artifacts, annotations, or summaries from suite.
@@ -177,7 +178,7 @@ export default createReporter;
 
 The CLI loads reporter modules with Node dynamic `import()`. Use `.mjs` or `.js` files at runtime; for TypeScript, compile the reporter to JavaScript before passing it to `--reporter`. Loading `.ts` files directly depends on Node's type-stripping behavior and is not part of the supported reporter contract.
 
-`onSuiteStart`, `onTestStart`, `onTestStep`, and `onTestResult` receive streamed replay progress while the daemon request is running. Generic command progress frames are not exposed to test reporters. `onSuiteEnd` receives the final suite result. `getExitCode` can override whether the finished suite exits successfully; when no reporter supplies one, failed tests exit with `1`.
+Live reporter hooks are semantic: `onSuiteStart`, `onTestStart`, `onTestStep`, and `onTestResult` run while the daemon request is active; generic command progress frames are not exposed to test reporters. `onSuiteEnd` receives the final suite result. `getExitCode` can override whether the finished suite exits successfully; the highest reporter-provided exit code wins, and failed tests exit with `1` when no reporter raises the code further.
 
 ## Parametrise `.ad` scripts
 

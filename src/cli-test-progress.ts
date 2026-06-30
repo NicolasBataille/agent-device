@@ -1,12 +1,15 @@
 import path from 'node:path';
-import type { RequestProgressEvent } from './daemon/request-progress.ts';
 import { replayTestStepLines } from './cli-test-trace.ts';
 import type { ReplaySuiteTestResult } from './daemon/types.ts';
+import type {
+  ReplayTestReporterProgressEvent,
+  ReplayTestResult,
+  ReplayTestStep,
+} from './cli-test-reporters/types.ts';
 import { formatDurationSeconds } from './utils/duration-format.ts';
 import { colorize, supportsColor } from './utils/output.ts';
 
-type ReplayTestCaseProgressEvent = Extract<RequestProgressEvent, { type: 'replay-test' }>;
-type ReplayTestProgressFormatOptions = {
+export type ReplayTestProgressFormatOptions = {
   verbose?: boolean;
   liveProgress?: boolean;
   columns?: number;
@@ -18,7 +21,7 @@ export type ReplayTestProgressRender = {
 };
 
 export type ReplayTestProgressRenderer = {
-  render(event: RequestProgressEvent): ReplayTestProgressRender | undefined;
+  render(event: ReplayTestReporterProgressEvent): ReplayTestProgressRender | undefined;
 };
 
 export function createReplayTestProgressRenderer(
@@ -28,28 +31,26 @@ export function createReplayTestProgressRenderer(
   let hasLiveProgressLine = false;
   return {
     render(event) {
-      if (event.type === 'replay-test-suite') {
+      if (event.type === 'suite-start') {
         completedKeys.clear();
         hasLiveProgressLine = false;
         return undefined;
       }
-      if (event.type !== 'replay-test') {
-        return undefined;
-      }
-      if (event.status === 'progress') {
+      if (event.type === 'test-step') {
         if (!options.liveProgress) return undefined;
         hasLiveProgressLine = true;
         return {
-          text: clearLinePrefix(formatReplayTestLiveProgressLine(event, options)),
+          text: clearLinePrefix(formatReplayTestLiveProgressLine(event.test, options)),
           newline: false,
         };
       }
-      if (isReplayTestCompletionProgressEvent(event)) {
-        const key = replayTestCompletionProgressKey(event);
+      if (event.type !== 'test-result') return undefined;
+      if (isReplayTestCompletionProgressEvent(event.test)) {
+        const key = replayTestCompletionProgressKey(event.test);
         if (completedKeys.has(key)) return undefined;
         completedKeys.add(key);
       }
-      const line = formatReplayTestProgressEvent(event, options);
+      const line = formatReplayTestProgressEvent(event.test, options);
       if (!line) return undefined;
       const text = hasLiveProgressLine ? clearLinePrefix(line) : line;
       hasLiveProgressLine = false;
@@ -59,20 +60,9 @@ export function createReplayTestProgressRenderer(
 }
 
 export function formatReplayTestProgressEvent(
-  event: RequestProgressEvent,
+  event: ReplayTestResult,
   options: ReplayTestProgressFormatOptions = {},
 ): string | undefined {
-  if (event.type !== 'replay-test') {
-    return undefined;
-  }
-  return formatReplayTestCaseProgressEvent(event, options);
-}
-
-function formatReplayTestCaseProgressEvent(
-  event: ReplayTestCaseProgressEvent,
-  options: ReplayTestProgressFormatOptions,
-): string | undefined {
-  if (event.status === 'start' || event.status === 'progress') return undefined;
   if (event.status === 'fail' && event.retrying) return undefined;
   const lines = [formatReplayTestCaseSummaryLine(event)];
   addReplayTestCaseDetailLines(lines, event, options);
@@ -82,8 +72,14 @@ function formatReplayTestCaseProgressEvent(
   return lines.join('\n');
 }
 
+export function replayTestStatusIcon(status: ReplayTestResult['status']): string {
+  if (status === 'pass') return '✓';
+  if (status === 'fail') return '⨯';
+  return '-';
+}
+
 function formatReplayTestLiveProgressLine(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestStep,
   options: ReplayTestProgressFormatOptions,
 ): string {
   const title = event.title?.trim();
@@ -106,7 +102,7 @@ function formatReplayTestLiveProgressLine(
 }
 
 function formatReplayTestLiveProgressStepSuffix(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestStep,
   options: { useColor?: boolean } = {},
 ): string {
   const stepIndex = event.stepIndex ?? 0;
@@ -117,7 +113,7 @@ function formatReplayTestLiveProgressStepSuffix(
 
 function addReplayTestCaseDetailLines(
   lines: string[],
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestResult,
   options: ReplayTestProgressFormatOptions,
 ): void {
   if (shouldSuppressReplayTestCaseDetailLines(event, options)) return;
@@ -130,33 +126,30 @@ function addReplayTestCaseDetailLines(
 }
 
 function shouldSuppressReplayTestCaseDetailLines(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestResult,
   options: ReplayTestProgressFormatOptions,
 ): boolean {
   return options.verbose === true && event.status === 'fail';
 }
 
-function replayTestProgressFailureFileLine(event: ReplayTestCaseProgressEvent): string | undefined {
+function replayTestProgressFailureFileLine(event: ReplayTestResult): string | undefined {
   return event.status === 'fail' && event.title?.trim()
     ? `    file: ${path.basename(event.file)}`
     : undefined;
 }
 
-function replayTestProgressMessageLine(event: ReplayTestCaseProgressEvent): string | undefined {
+function replayTestProgressMessageLine(event: ReplayTestResult): string | undefined {
   const message = event.message?.replace(/\s+/g, ' ').trim();
   if (!message) return undefined;
   return `    ${event.status === 'fail' ? `failed at: ${message}` : message}`;
 }
 
-function appendReplayTestProgressHintLine(
-  lines: string[],
-  event: ReplayTestCaseProgressEvent,
-): void {
+function appendReplayTestProgressHintLine(lines: string[], event: ReplayTestResult): void {
   const hint = event.hint?.replace(/\s+/g, ' ').trim();
   if (event.status === 'fail' && hint) lines.push(`    hint: ${hint}`);
 }
 
-function replayTestProgressFailureContextLines(event: ReplayTestCaseProgressEvent): string[] {
+function replayTestProgressFailureContextLines(event: ReplayTestResult): string[] {
   if (event.status !== 'fail' || event.retrying) return [];
   const lines: string[] = [];
   if (event.session) lines.push(`    session: ${event.session}`);
@@ -164,7 +157,7 @@ function replayTestProgressFailureContextLines(event: ReplayTestCaseProgressEven
   return lines;
 }
 
-function formatReplayTestCaseSummaryLine(event: ReplayTestCaseProgressEvent): string {
+function formatReplayTestCaseSummaryLine(event: ReplayTestResult): string {
   const useColor = supportsColor(process.stderr);
   const statusLabel = formatReplayTestProgressStatusLabel(event);
   const name = formatReplayTestProgressName(event);
@@ -174,21 +167,20 @@ function formatReplayTestCaseSummaryLine(event: ReplayTestCaseProgressEvent): st
   return `${statusLabel} ${name}${shardSuffix}${durationSuffix}`;
 }
 
-function formatReplayTestProgressName(event: ReplayTestCaseProgressEvent): string {
+function formatReplayTestProgressName(event: ReplayTestResult | ReplayTestStep): string {
   const title = event.title?.trim();
   const file = path.basename(event.file);
   return title ? title : file;
 }
 
-function formatReplayTestProgressStatusLabel(event: ReplayTestCaseProgressEvent): string {
+function formatReplayTestProgressStatusLabel(event: ReplayTestResult): string {
   const useColor = supportsColor(process.stderr);
+  const icon = replayTestStatusIcon(event.status);
   if (event.status === 'pass') {
     const format = event.attempt && event.attempt > 1 ? 'yellow' : 'green';
-    return useColor ? colorizeProgressMarker('✓', format) : '✓';
+    return useColor ? colorizeProgressMarker(icon, format) : icon;
   }
-  if (event.status === 'fail') return useColor ? colorizeProgressMarker('⨯', 'red') : '⨯';
-  if (event.status === 'progress') return '⊙';
-  return useColor ? colorizeProgressMarker('-', 'dim') : '-';
+  return useColor ? colorizeProgressMarker(icon, event.status === 'fail' ? 'red' : 'dim') : icon;
 }
 
 function colorizeProgressMarker(text: string, format: Parameters<typeof colorize>[1]): string {
@@ -196,7 +188,7 @@ function colorizeProgressMarker(text: string, format: Parameters<typeof colorize
 }
 
 function formatReplayTestProgressShardSuffix(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestResult | ReplayTestStep,
   options: { useColor?: boolean } = {},
 ): string {
   if (typeof event.shardIndex !== 'number') return '';
@@ -206,7 +198,9 @@ function formatReplayTestProgressShardSuffix(
   return options.useColor ? colorizeProgressMarker(suffix, 'dim') : suffix;
 }
 
-function replayTestProgressShardDeviceName(event: ReplayTestCaseProgressEvent): string | undefined {
+function replayTestProgressShardDeviceName(
+  event: ReplayTestResult | ReplayTestStep,
+): string | undefined {
   const name = event.deviceName?.trim();
   if (name) return name;
   const id = event.deviceId?.trim();
@@ -214,14 +208,14 @@ function replayTestProgressShardDeviceName(event: ReplayTestCaseProgressEvent): 
 }
 
 function formatReplayProgressDuration(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestResult,
   options: { useColor?: boolean } = {},
 ): string {
   const duration = formatDurationSeconds(event.durationMs ?? 0);
   return options.useColor ? colorizeProgressMarker(duration, 'yellow') : duration;
 }
 
-function isReplayTestCompletionProgressEvent(event: ReplayTestCaseProgressEvent): boolean {
+function isReplayTestCompletionProgressEvent(event: ReplayTestResult): boolean {
   return (
     event.status === 'pass' ||
     event.status === 'skip' ||
@@ -229,7 +223,7 @@ function isReplayTestCompletionProgressEvent(event: ReplayTestCaseProgressEvent)
   );
 }
 
-function replayTestCompletionProgressKey(event: ReplayTestCaseProgressEvent): string {
+function replayTestCompletionProgressKey(event: ReplayTestResult): string {
   const shard = typeof event.shardIndex === 'number' ? event.shardIndex : '';
   return [event.status, event.index, event.total, event.file, event.title ?? '', shard].join('\0');
 }
@@ -252,7 +246,7 @@ function trimToColumns(value: string, columns: number | undefined): string {
   return `${value.slice(0, limit - 3)}...`;
 }
 
-function replayTestProgressStepLines(event: ReplayTestCaseProgressEvent): string[] {
+function replayTestProgressStepLines(event: ReplayTestResult): string[] {
   if (event.status !== 'pass' && event.status !== 'fail') return [];
   if (!event.artifactsDir || !event.attempt) return [];
   const result =
@@ -263,7 +257,7 @@ function replayTestProgressStepLines(event: ReplayTestCaseProgressEvent): string
 }
 
 function buildPassedReplayTestProgressResult(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestResult,
 ): Extract<ReplaySuiteTestResult, { status: 'passed' }> {
   return {
     ...replayTestProgressResultBase(event),
@@ -274,7 +268,7 @@ function buildPassedReplayTestProgressResult(
 }
 
 function buildFailedReplayTestProgressResult(
-  event: ReplayTestCaseProgressEvent,
+  event: ReplayTestResult,
 ): Extract<ReplaySuiteTestResult, { status: 'failed' }> {
   return {
     ...replayTestProgressResultBase(event),
@@ -283,7 +277,7 @@ function buildFailedReplayTestProgressResult(
   };
 }
 
-function replayTestProgressResultBase(event: ReplayTestCaseProgressEvent) {
+function replayTestProgressResultBase(event: ReplayTestResult) {
   return {
     file: event.file,
     title: event.title,

@@ -12,7 +12,10 @@ type CustomReporterModule = {
 };
 
 const OPTIONAL_REPORTER_HOOKS = [
-  'onProgress',
+  'onSuiteStart',
+  'onTestStart',
+  'onTestStep',
+  'onTestResult',
   'onSuiteEnd',
   'getExitCode',
 ] as const satisfies readonly (keyof ReplayTestReporter)[];

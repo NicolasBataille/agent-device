@@ -3,7 +3,11 @@ import { replayTestFailureStepLines } from '../cli-test-trace.ts';
 import { createReplayTestProgressRenderer } from '../cli-test-progress.ts';
 import { formatDurationSeconds } from '../utils/duration-format.ts';
 import { colorize, supportsColor } from '../utils/output.ts';
-import type { ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
+import type {
+  ReplayTestReporter,
+  ReplayTestReporterContext,
+  ReplayTestReporterProgressEvent,
+} from './types.ts';
 import {
   getReplayTestExitCode,
   isDefinedString,
@@ -21,17 +25,29 @@ import {
 
 export function createDefaultReplayTestReporter(): ReplayTestReporter {
   let progressRenderer: ReturnType<typeof createReplayTestProgressRenderer> | undefined;
+  const renderProgress = (
+    event: ReplayTestReporterProgressEvent,
+    context: ReplayTestReporterContext,
+  ) => {
+    progressRenderer ??= createReplayTestProgressRenderer({
+      verbose: context.verbose,
+      liveProgress: context.stderr.isTTY && !process.env.CI,
+      columns: context.stderr.columns,
+    });
+    const output = progressRenderer.render(event);
+    if (!output) return;
+    context.stderr.write(output.newline ? `${output.text}\n` : output.text);
+  };
   return {
     name: 'default',
-    onProgress: (event, context) => {
-      progressRenderer ??= createReplayTestProgressRenderer({
-        verbose: context.verbose,
-        liveProgress: context.stderr.isTTY && !process.env.CI,
-        columns: context.stderr.columns,
-      });
-      const output = progressRenderer.render(event);
-      if (!output) return;
-      context.stderr.write(output.newline ? `${output.text}\n` : output.text);
+    onSuiteStart: (suite, context) => {
+      renderProgress({ type: 'suite-start', suite }, context);
+    },
+    onTestStep: (test, context) => {
+      renderProgress({ type: 'test-step', test }, context);
+    },
+    onTestResult: (test, context) => {
+      renderProgress({ type: 'test-result', test }, context);
     },
     onSuiteEnd: (suite, context) => renderReplayTestSummary(suite, context),
     getExitCode: getReplayTestExitCode,

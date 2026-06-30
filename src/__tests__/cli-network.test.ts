@@ -867,7 +867,7 @@ test('test command loads custom reporter modules', async () => {
       },
     );
 
-    assert.equal(result.code, null);
+    assert.equal(result.code, 1);
     assert.doesNotMatch(result.stdout, /Test summary:/);
     assert.doesNotMatch(result.stderr, /✓ 01-pass\.ad/);
     assert.deepEqual(JSON.parse(await fs.readFile(outputPath, 'utf8')), {
@@ -889,9 +889,11 @@ test('test command streams progress to custom reporter modules', async () => {
       [
         'export default {',
         "  name: 'live-custom',",
-        '  onProgress(event, context) {',
-        '    if (event.type !== "replay-test") return;',
-        '    context.stderr.write(`live:${event.status}:${event.stepIndex ?? 0}/${event.stepTotal ?? 0}\\n`);',
+        '  onTestStep(test, context) {',
+        '    context.stderr.write(`live:progress:${test.stepIndex ?? 0}/${test.stepTotal ?? 0}\\n`);',
+        '  },',
+        '  onTestResult(test, context) {',
+        '    context.stderr.write(`live:${test.status}:0/0\\n`);',
         '  },',
         '  onSuiteEnd(suite, context) {',
         '    context.stdout.write(`final:${suite.total}\\n`);',
@@ -926,7 +928,7 @@ test('test command streams progress to custom reporter modules', async () => {
       },
     );
 
-    assert.equal(result.code, null);
+    assert.equal(result.code, 1);
     assert.equal(result.stdout, 'final:3\n');
     assert.match(result.stderr, /live:progress:1\/2/);
     assert.match(result.stderr, /live:pass:0\/0/);
@@ -947,8 +949,8 @@ test('test command reuses custom reporter instance for progress and final output
         '  const seen = [];',
         '  return {',
         "    name: 'stateful-custom',",
-        '    onProgress(event) {',
-        '      if (event.type === "replay-test") seen.push(event.status);',
+        '    onTestResult(test) {',
+        '      seen.push(test.status);',
         '    },',
         '    onSuiteEnd(_suite, context) {',
         '      context.stdout.write(`seen:${seen.join(",")}\\n`);',
@@ -975,7 +977,7 @@ test('test command reuses custom reporter instance for progress and final output
       },
     );
 
-    assert.equal(result.code, null);
+    assert.equal(result.code, 1);
     assert.equal(result.stdout, 'seen:pass\n');
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true });
