@@ -2808,26 +2808,31 @@ export default {
 };
 ```
 
-TypeScript reporters can import the public types from `agent-device`:
+TypeScript reporters can infer the reporter shape from the exported default reporter factory:
 
 ```ts
-import type { ReplayTestReporterFactory } from 'agent-device';
-import { createReplayTestProgressRenderer } from 'agent-device';
+import {
+  createDefaultReplayTestReporter,
+  createReplayTestProgressRenderer,
+} from 'agent-device';
 
-const createReporter: ReplayTestReporterFactory = () => ({
-  name: 'typed-reporter',
-  onSuiteStart(suite, context) {
-    context.stderr.write(`starting ${suite.runnable} tests\n`);
-  },
-  onTestResult(test, context) {
-    const renderer = createReplayTestProgressRenderer();
-    const output = renderer.render({ type: 'test-result', test });
-    if (output) context.stderr.write(`${output.text}\n`);
-  },
-  onSuiteEnd(suite) {
-    // Write artifacts, annotations, or summaries from suite.
-  },
-});
+type ReplayTestReporter = ReturnType<typeof createDefaultReplayTestReporter>;
+
+const createReporter = () =>
+  ({
+    name: 'typed-reporter',
+    onSuiteStart(suite, context) {
+      context.stderr.write(`starting ${suite.runnable} tests\n`);
+    },
+    onTestResult(test, context) {
+      const renderer = createReplayTestProgressRenderer();
+      const output = renderer.render({ type: 'test-result', test });
+      if (output) context.stderr.write(`${output.text}\n`);
+    },
+    onSuiteEnd(suite) {
+      // Write artifacts, annotations, or summaries from suite.
+    },
+  }) satisfies ReplayTestReporter;
 
 export default createReporter;
 ```
