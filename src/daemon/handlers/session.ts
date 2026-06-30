@@ -38,10 +38,8 @@ import { handleSessionObservabilityCommands } from './session-observability.ts';
 import { handleSessionReplayCommands } from './session-replay.ts';
 import { getSessionCommandKind } from '../daemon-command-registry.ts';
 import { LeaseRegistry } from '../lease-registry.ts';
-
-const PREPARE_IOS_RUNNER_MIN_STARTUP_TIMEOUT_MS = 45_000;
-const PREPARE_IOS_RUNNER_DEFAULT_BUILD_TIMEOUT_MS = 5 * 60_000;
-const PREPARE_IOS_RUNNER_HEALTH_TIMEOUT_MS = 90_000;
+import { PREPARE_REQUEST_TIMEOUT_MS } from '../request-timeouts.ts';
+import { Deadline } from '../../utils/retry.ts';
 
 async function handlePrepareCommand(params: {
   req: DaemonRequest;
@@ -75,7 +73,7 @@ async function handlePrepareCommand(params: {
   const startedAtMs = Date.now();
   const result = await prepareIosRunner(
     device,
-    buildPrepareIosRunnerOptions(req, session, logPath),
+    buildPrepareIosRunnerOptions(req, session, logPath, startedAtMs),
   );
   const durationMs = Math.max(0, Date.now() - startedAtMs);
   return {
@@ -88,8 +86,9 @@ function buildPrepareIosRunnerOptions(
   req: DaemonRequest,
   session: SessionState | undefined,
   logPath: string,
+  startedAtMs: number,
 ): Parameters<typeof prepareIosRunner>[1] {
-  const buildTimeoutMs = readPrepareIosRunnerBuildTimeoutMs(req);
+  const timeoutMs = readPrepareIosRunnerTimeoutMs(req);
   return {
     ...buildAppleRunnerRequestOptions({
       req,
@@ -97,24 +96,18 @@ function buildPrepareIosRunnerOptions(
       traceLogPath: session?.trace?.outPath,
     }),
     cleanStaleBundles: true,
-    startupTimeoutMs: resolvePrepareIosRunnerStartupTimeoutMs(req.flags?.timeoutMs),
-    buildTimeoutMs,
-    healthTimeoutMs: Math.min(buildTimeoutMs, PREPARE_IOS_RUNNER_HEALTH_TIMEOUT_MS),
+    buildTimeoutMs: timeoutMs,
+    healthTimeoutMs: timeoutMs,
+    prepareDeadline: Deadline.fromTimeoutMs(timeoutMs, startedAtMs),
+    startupTimeoutMs: timeoutMs,
   };
 }
 
-function resolvePrepareIosRunnerStartupTimeoutMs(timeoutMs: unknown): number | undefined {
-  if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    return undefined;
-  }
-  return Math.max(PREPARE_IOS_RUNNER_MIN_STARTUP_TIMEOUT_MS, Math.floor(timeoutMs));
-}
-
-function readPrepareIosRunnerBuildTimeoutMs(req: DaemonRequest): number {
+function readPrepareIosRunnerTimeoutMs(req: DaemonRequest): number {
   const value = req.flags?.timeoutMs;
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
-    : PREPARE_IOS_RUNNER_DEFAULT_BUILD_TIMEOUT_MS;
+    : PREPARE_REQUEST_TIMEOUT_MS;
 }
 
 function prepareIosRunnerResponseData(

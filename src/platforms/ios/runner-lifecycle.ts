@@ -72,6 +72,7 @@ async function runPrepareAttempt(params: {
   const session = await ensureRunnerSession(device, {
     ...options,
     cleanStaleBundles: attempt > 1 ? true : options.cleanStaleBundles,
+    ...readPrepareDeadlinePhaseTimeouts(options, 'runner_session'),
   });
   const connectMs = Date.now() - connectStartedAt;
   try {
@@ -169,6 +170,7 @@ async function recoverBadCachedRunnerArtifact(params: {
     ...options,
     cleanStaleBundles: true,
     forceRunnerXctestrunRebuild: true,
+    ...readPrepareDeadlinePhaseTimeouts(options, 'runner_rebuild'),
   });
   const connectMs = Date.now() - connectStartedAt;
   try {
@@ -364,12 +366,17 @@ async function runPrepareHealthCheck(
   reason?: { recoveryReason?: string; failureReason?: string },
 ): Promise<PrepareIosRunnerResult> {
   const healthStartedAt = Date.now();
+  const timeoutMs = readPreparePhaseTimeoutMs(
+    options.prepareDeadline,
+    options.healthTimeoutMs,
+    'runner_health',
+  );
   const runner = await executeRunnerCommandWithSession(
     device,
     session,
     command,
     options.logPath,
-    options.healthTimeoutMs,
+    timeoutMs,
     signal,
   );
   return buildPrepareIosRunnerResult(
@@ -379,6 +386,35 @@ async function runPrepareHealthCheck(
     Date.now() - healthStartedAt,
     reason,
   );
+}
+
+function readPrepareDeadlinePhaseTimeouts(
+  options: PrepareIosRunnerOptions,
+  phase: string,
+): { buildTimeoutMs: number; startupTimeoutMs: number } | Record<string, never> {
+  if (!options.prepareDeadline) return {};
+  const timeoutMs = readPreparePhaseTimeoutMs(
+    options.prepareDeadline,
+    options.buildTimeoutMs,
+    phase,
+  );
+  return { buildTimeoutMs: timeoutMs, startupTimeoutMs: timeoutMs };
+}
+
+function readPreparePhaseTimeoutMs(
+  deadline: PrepareIosRunnerOptions['prepareDeadline'],
+  fallbackTimeoutMs: number | undefined,
+  phase: string,
+): number {
+  if (!deadline) return fallbackTimeoutMs ?? RUNNER_STARTUP_TIMEOUT_MS;
+  const remainingMs = Math.floor(deadline.remainingMs());
+  if (remainingMs <= 0) {
+    throw new AppError('COMMAND_FAILED', 'prepare ios-runner timed out', {
+      phase,
+      reason: 'prepare_deadline_expired',
+    });
+  }
+  return remainingMs;
 }
 
 function shouldRecoverBadCachedRunnerArtifact(
