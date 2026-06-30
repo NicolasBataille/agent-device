@@ -1,4 +1,5 @@
 import type { ReplaySuiteResult } from '../daemon/types.ts';
+import type { RequestProgressEvent } from '../daemon/request-progress.ts';
 import { createCustomReplayTestReporter } from './custom.ts';
 import { createDefaultReplayTestReporter } from './default.ts';
 import { getReplayTestExitCode } from './format.ts';
@@ -22,6 +23,16 @@ export async function runReplayTestReporters(
 ): Promise<void> {
   for (const reporter of reporters) {
     await reporter.onSuiteEnd?.(suite, context);
+  }
+}
+
+export function runReplayTestReporterProgress(
+  reporters: ReplayTestReporter[],
+  event: RequestProgressEvent,
+  context: ReplayTestReporterContext,
+): void {
+  for (const reporter of reporters) {
+    reporter.onProgress?.(event, context);
   }
 }
 

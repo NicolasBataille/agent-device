@@ -771,16 +771,84 @@ test('test command loads custom reporter modules', async () => {
       'utf8',
     );
 
-    const result = await runCliCapture(['test', './suite', '--reporter', reporterPath], async () =>
-      makeReplaySuiteResponse(),
+    const result = await runCliCapture(
+      ['test', './suite', '--reporter', reporterPath],
+      async (_req, options) => {
+        options?.onProgress?.({
+          type: 'replay-test',
+          file: '/tmp/01-pass.ad',
+          status: 'pass',
+          index: 1,
+          total: 1,
+          durationMs: 10,
+        });
+        return makeReplaySuiteResponse();
+      },
     );
 
     assert.equal(result.code, null);
     assert.doesNotMatch(result.stdout, /Test summary:/);
+    assert.doesNotMatch(result.stderr, /✓ 01-pass\.ad/);
     assert.deepEqual(JSON.parse(await fs.readFile(outputPath, 'utf8')), {
       total: 3,
       failed: 1,
     });
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('test command streams progress to custom reporter modules', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-device-live-reporter-test-'));
+  const reporterPath = path.join(tmpDir, 'live-reporter.mjs');
+
+  try {
+    await fs.writeFile(
+      reporterPath,
+      [
+        'export default {',
+        "  name: 'live-custom',",
+        '  onProgress(event, context) {',
+        '    if (event.type !== "replay-test") return;',
+        '    context.stderr.write(`live:${event.status}:${event.stepIndex ?? 0}/${event.stepTotal ?? 0}\\n`);',
+        '  },',
+        '  onSuiteEnd(suite, context) {',
+        '    context.stdout.write(`final:${suite.total}\\n`);',
+        '  },',
+        '  getExitCode() { return 0; },',
+        '};',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const result = await runCliCapture(
+      ['test', './suite', '--reporter', reporterPath],
+      async (_req, options) => {
+        options?.onProgress?.({
+          type: 'replay-test',
+          file: '/tmp/01-pass.ad',
+          status: 'progress',
+          index: 1,
+          total: 1,
+          stepIndex: 1,
+          stepTotal: 2,
+        });
+        options?.onProgress?.({
+          type: 'replay-test',
+          file: '/tmp/01-pass.ad',
+          status: 'pass',
+          index: 1,
+          total: 1,
+          durationMs: 10,
+        });
+        return makeReplaySuiteResponse();
+      },
+    );
+
+    assert.equal(result.code, null);
+    assert.equal(result.stdout, 'final:3\n');
+    assert.match(result.stderr, /live:progress:1\/2/);
+    assert.match(result.stderr, /live:pass:0\/0/);
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true });
   }

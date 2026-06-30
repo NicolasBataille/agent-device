@@ -6,6 +6,8 @@ import { pathToFileURL } from 'node:url';
 import { sendToDaemon } from './daemon/client/daemon-client.ts';
 import fs from 'node:fs';
 import type { BatchStep } from './client/client-types.ts';
+import { createReplayTestReporterRuntime } from './cli-test.ts';
+import type { ReplayTestReporterRuntime } from './cli-test.ts';
 import {
   createAgentDeviceClient,
   type AgentDeviceClientConfig,
@@ -39,6 +41,11 @@ import type { SessionRuntimeHints } from './kernel/contracts.ts';
 type CliDeps = {
   sendToDaemon: typeof sendToDaemon;
 };
+
+type CliDaemonTransport = typeof sendToDaemon;
+type CliDaemonRequest = Parameters<CliDaemonTransport>[0];
+type CliDaemonTransportOptions = Parameters<CliDaemonTransport>[1];
+type ClientDaemonRequest = Parameters<AgentDeviceDaemonTransport>[0];
 
 const DEFAULT_CLI_DEPS: CliDeps = {
   sendToDaemon,
@@ -277,7 +284,7 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
           const materializationClient = createAgentDeviceClient(
             buildClientConfig(effectiveFlags, resolvedRuntime, connectionMetadata),
             {
-              transport: deps.sendToDaemon as AgentDeviceDaemonTransport,
+              transport: createClientDaemonTransport(deps.sendToDaemon),
             },
           );
           const materialized = await materializeRemoteConnectionForCommand({
@@ -321,13 +328,24 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
           debugOutputEnabled && !effectiveFlags.json && !remoteDaemonBaseUrl
             ? startDaemonLogTail(daemonPaths.logPath)
             : null;
+        const replayTestReporterRuntime =
+          command === 'test'
+            ? await createReplayTestReporterRuntime({
+                debug: debugOutputEnabled,
+                verbose: effectiveFlags.verbose,
+                json: effectiveFlags.json,
+                reporter: effectiveFlags.reporter,
+                reportJunit: effectiveFlags.reportJunit,
+              })
+            : undefined;
         const client = createAgentDeviceClient(
           buildClientConfig(effectiveFlags, resolvedRuntime, connectionMetadata),
           {
             transport: createCliDaemonTransport({
               command,
               flags: effectiveFlags,
-              transport: deps.sendToDaemon as AgentDeviceDaemonTransport,
+              replayTestReporterRuntime,
+              transport: deps.sendToDaemon,
             }),
           },
         );
@@ -354,6 +372,7 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
               flags: { ...effectiveFlags, batchSteps },
               client,
               debug: debugOutputEnabled,
+              replayTestReporterRuntime,
             })
           ) {
             return;
@@ -370,6 +389,7 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
             flags: effectiveFlags,
             client,
             debug: debugOutputEnabled,
+            replayTestReporterRuntime,
           })
         ) {
           return;
@@ -557,18 +577,37 @@ function hasExplicitMetroRuntimeOverrides(explicitFlagKeys: Set<FlagKey>): boole
 function createCliDaemonTransport(options: {
   command: string;
   flags: CliFlags;
-  transport: AgentDeviceDaemonTransport;
+  replayTestReporterRuntime?: ReplayTestReporterRuntime;
+  transport: CliDaemonTransport;
 }): AgentDeviceDaemonTransport {
-  const { command, flags, transport } = options;
-  if (flags.json) return transport;
+  const { command, flags, replayTestReporterRuntime, transport } = options;
+  if (flags.json) return createClientDaemonTransport(transport);
   return async (req) =>
-    await transport({
-      ...req,
-      meta: {
-        ...req.meta,
-        requestProgress: command === 'test' ? 'replay-test' : 'command',
+    await sendClientRequestToCliTransport(
+      transport,
+      {
+        ...req,
+        meta: {
+          ...req.meta,
+          requestProgress: command === 'test' ? 'replay-test' : 'command',
+        },
       },
-    });
+      command === 'test' && replayTestReporterRuntime
+        ? { onProgress: replayTestReporterRuntime.onProgress }
+        : undefined,
+    );
+}
+
+function createClientDaemonTransport(transport: CliDaemonTransport): AgentDeviceDaemonTransport {
+  return async (req) => await sendClientRequestToCliTransport(transport, req);
+}
+
+async function sendClientRequestToCliTransport(
+  transport: CliDaemonTransport,
+  req: ClientDaemonRequest,
+  options?: CliDaemonTransportOptions,
+): ReturnType<CliDaemonTransport> {
+  return await transport(req as CliDaemonRequest, options);
 }
 
 function guessSessionFromArgv(argv: string[]): string | null {

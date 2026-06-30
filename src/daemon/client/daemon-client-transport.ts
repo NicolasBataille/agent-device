@@ -17,8 +17,12 @@ import { handleRequestTimeout } from './daemon-client-timeout.ts';
 import { isRemoteDaemon, type DaemonInfo } from './daemon-client-metadata.ts';
 import { DAEMON_RPC_PROTOCOL_VERSION } from '../http-health.ts';
 import { readVersion } from '../../utils/version.ts';
+import type { RequestProgressSink } from '../request-progress.ts';
 
 type ResolvedDaemonTransport = 'socket' | 'http';
+type SendRequestOptions = {
+  onProgress?: RequestProgressSink;
+};
 
 const LOCAL_DAEMON_HEALTHCHECK_TIMEOUT_MS = 500;
 const REMOTE_DAEMON_HEALTHCHECK_TIMEOUT_MS = 3000;
@@ -173,14 +177,15 @@ export async function sendRequest(
   preference: DaemonTransportPreference,
   statePaths: DaemonPaths,
   timeoutMs: number | undefined,
+  options: SendRequestOptions = {},
 ): Promise<DaemonResponse> {
   const transport = chooseTransport(info, preference);
   try {
-    return await sendRequestWithTransport(info, req, statePaths, timeoutMs, transport);
+    return await sendRequestWithTransport(info, req, statePaths, timeoutMs, transport, options);
   } catch (error) {
     const fallback = chooseAutoFallbackTransport(info, preference, transport);
     if (!fallback || !isSafeAutoTransportFallbackError(error, transport)) throw error;
-    return await sendRequestWithTransport(info, req, statePaths, timeoutMs, fallback);
+    return await sendRequestWithTransport(info, req, statePaths, timeoutMs, fallback, options);
   }
 }
 
@@ -190,10 +195,11 @@ async function sendRequestWithTransport(
   statePaths: DaemonPaths,
   timeoutMs: number | undefined,
   transport: ResolvedDaemonTransport,
+  options: SendRequestOptions,
 ): Promise<DaemonResponse> {
   return transport === 'http'
-    ? await sendHttpRequest(info, req, statePaths, timeoutMs)
-    : await sendSocketRequest(info, req, statePaths, timeoutMs);
+    ? await sendHttpRequest(info, req, statePaths, timeoutMs, options)
+    : await sendSocketRequest(info, req, statePaths, timeoutMs, options);
 }
 
 function chooseTransport(
@@ -294,6 +300,7 @@ async function sendSocketRequest(
   req: DaemonRequest,
   statePaths: DaemonPaths,
   timeoutMs: number | undefined,
+  options: SendRequestOptions,
 ): Promise<DaemonResponse> {
   const port = info.port;
   if (!port) throw new AppError('COMMAND_FAILED', DAEMON_SOCKET_ENDPOINT_UNAVAILABLE_MESSAGE);
@@ -324,6 +331,7 @@ async function sendSocketRequest(
 
     readDaemonSocketProgressResponse(socket, {
       req,
+      onProgress: options.onProgress,
       isSettled: () => settled,
       clearTimeout: () => {
         if (timeoutHandle) clearTimeout(timeoutHandle);
@@ -356,6 +364,7 @@ async function sendHttpRequest(
   req: DaemonRequest,
   statePaths: DaemonPaths,
   timeoutMs: number | undefined,
+  options: SendRequestOptions,
 ): Promise<DaemonResponse> {
   const rpcUrl = info.baseUrl
     ? new URL(buildDaemonHttpUrl(info.baseUrl, 'rpc'))
@@ -387,6 +396,7 @@ async function sendHttpRequest(
         if (shouldReadDaemonProgressStream(req, res.headers?.['content-type'])) {
           readDaemonHttpProgressResponse(res, {
             req,
+            onProgress: options.onProgress,
             reject,
             clearTimeout: () => {
               if (timeoutHandle) clearTimeout(timeoutHandle);

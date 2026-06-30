@@ -47,7 +47,7 @@ function writeGenericCliOutput(
   command: ClientBackedCliCommandName,
   flags: CliFlags,
   data: CommandRequestResult,
-  options: { debug?: boolean } = {},
+  options: Pick<ClientCommandParams, 'debug' | 'replayTestReporterRuntime'> = {},
 ): Promise<number> | number {
   if (command === 'test') {
     return renderReplayTestResponse({
@@ -56,6 +56,7 @@ function writeGenericCliOutput(
       json: flags.json,
       reporter: flags.reporter,
       reportJunit: flags.reportJunit,
+      reporterRuntime: options.replayTestReporterRuntime,
     });
   }
   writeCommandOutput(flags, data, () =>

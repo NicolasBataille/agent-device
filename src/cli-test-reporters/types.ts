@@ -3,9 +3,16 @@ import type { ReplaySuiteResult } from '../daemon/types.ts';
 
 export type ReplayTestReporterContext = {
   debug?: boolean;
-  writeStdout(text: string): void;
+  stdout: ReplayTestReporterStream;
+  stderr: ReplayTestReporterStream;
   mkdir(path: string): void;
   writeFile(path: string, contents: string): void;
+};
+
+export type ReplayTestReporterStream = {
+  isTTY: boolean;
+  columns?: number;
+  write(text: string): void;
 };
 
 export type ReplayTestReporterLoadContext = {
@@ -15,10 +22,6 @@ export type ReplayTestReporterLoadContext = {
 
 export type ReplayTestReporter = {
   name: string;
-  /**
-   * Reserved for live reporter support. The CLI currently invokes reporters after the final
-   * ReplaySuiteResult is available, so custom reporters should use onSuiteEnd for now.
-   */
   onProgress?(event: RequestProgressEvent, context: ReplayTestReporterContext): void;
   onSuiteEnd?(suite: ReplaySuiteResult, context: ReplayTestReporterContext): Promise<void> | void;
   getExitCode?(suite: ReplaySuiteResult): number | undefined;

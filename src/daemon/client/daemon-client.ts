@@ -2,6 +2,7 @@ import type {
   DaemonRequest as SharedDaemonRequest,
   DaemonResponse as SharedDaemonResponse,
 } from '../types.ts';
+import type { RequestProgressSink } from '../request-progress.ts';
 import { createRequestId, emitDiagnostic, withDiagnosticTimer } from '../../utils/diagnostics.ts';
 import { INTERNAL_COMMANDS, PUBLIC_COMMANDS } from '../../command-catalog.ts';
 import { prepareRemoteRequestArtifacts } from '../../remote/daemon-artifacts.ts';
@@ -27,8 +28,14 @@ export { canConnectSocket } from './daemon-client-transport.ts';
 export { shouldResetDaemonAfterRequestTimeout } from './daemon-client-timeout.ts';
 export type DaemonRequest = SharedDaemonRequest;
 export type DaemonResponse = SharedDaemonResponse;
+type DaemonTransportOptions = {
+  onProgress?: RequestProgressSink;
+};
 
-export async function sendToDaemon(req: Omit<DaemonRequest, 'token'>): Promise<DaemonResponse> {
+export async function sendToDaemon(
+  req: Omit<DaemonRequest, 'token'>,
+  options: DaemonTransportOptions = {},
+): Promise<DaemonResponse> {
   const requestId = req.meta?.requestId ?? createRequestId();
   const debug = Boolean(req.meta?.debug || req.flags?.verbose);
   const settings = resolveClientSettings(req);
@@ -90,6 +97,7 @@ export async function sendToDaemon(req: Omit<DaemonRequest, 'token'>): Promise<D
           settings.transportPreference,
           settings.paths,
           requestTimeoutMs,
+          options,
         ),
       { requestId, command: req.command },
     );

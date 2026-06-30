@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runCli } from '../cli.ts';
-import type { DaemonRequest, DaemonResponse } from '../daemon/client/daemon-client.ts';
+import type { DaemonRequest, DaemonResponse, sendToDaemon } from '../daemon/client/daemon-client.ts';
 import { installIsolatedCliTestEnv } from './cli-test-env.ts';
 
 class ExitSignal extends Error {
@@ -15,6 +15,7 @@ class ExitSignal extends Error {
 }
 
 export type CapturedDaemonRequest = Omit<DaemonRequest, 'token'>;
+type DaemonTransportOptions = Parameters<typeof sendToDaemon>[1];
 
 export type CapturedCliRun = {
   code: number | null;
@@ -28,11 +29,17 @@ export type CliCaptureOptions = {
   env?: Record<string, string | undefined>;
   stateDirPrefix?: string;
   passthroughBufferWrites?: boolean;
-  sendToDaemon?: (req: CapturedDaemonRequest) => Promise<DaemonResponse>;
+  sendToDaemon?: (
+    req: CapturedDaemonRequest,
+    options?: DaemonTransportOptions,
+  ) => Promise<DaemonResponse>;
   defaultResponse?: DaemonResponse;
 };
 
-type CliCaptureResponder = (req: CapturedDaemonRequest) => Promise<DaemonResponse>;
+type CliCaptureResponder = (
+  req: CapturedDaemonRequest,
+  options?: DaemonTransportOptions,
+) => Promise<DaemonResponse>;
 
 export async function runCliCapture(
   argv: string[],
@@ -82,10 +89,13 @@ export async function runCliCapture(
     return true;
   }) as typeof process.stderr.write;
 
-  const sendToDaemon = async (req: CapturedDaemonRequest): Promise<DaemonResponse> => {
+  const sendToDaemon = async (
+    req: CapturedDaemonRequest,
+    daemonOptions?: DaemonTransportOptions,
+  ): Promise<DaemonResponse> => {
     calls.push(req);
     if (options.sendToDaemon) {
-      return await options.sendToDaemon(req);
+      return await options.sendToDaemon(req, daemonOptions);
     }
     return options.defaultResponse ?? { ok: true, data: {} };
   };
