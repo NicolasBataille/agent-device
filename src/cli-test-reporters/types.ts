@@ -1,14 +1,10 @@
 import type { ReplaySuiteResult } from '../daemon/types.ts';
 
-export type Awaitable<T> = T | Promise<T>;
-
 export type ReplayTestReporterContext = {
   debug?: boolean;
   verbose?: boolean;
   stdout: ReplayTestReporterStream;
   stderr: ReplayTestReporterStream;
-  mkdir(path: string): void;
-  writeFile(path: string, contents: string): void;
 };
 
 export type ReplayTestReporterStream = {
@@ -67,11 +63,14 @@ export type ReplayTestReporterProgressEvent =
 
 export type ReplayTestReporter = {
   name: string;
-  onSuiteStart?(suite: ReplayTestSuiteStart, context: ReplayTestReporterContext): Awaitable<void>;
-  onTestStart?(test: ReplayTestCase, context: ReplayTestReporterContext): Awaitable<void>;
-  onTestStep?(test: ReplayTestStep, context: ReplayTestReporterContext): Awaitable<void>;
-  onTestResult?(test: ReplayTestResult, context: ReplayTestReporterContext): Awaitable<void>;
-  onSuiteEnd?(suite: ReplaySuiteResult, context: ReplayTestReporterContext): Awaitable<void>;
+  onSuiteStart?(
+    suite: ReplayTestSuiteStart,
+    context: ReplayTestReporterContext,
+  ): void | Promise<void>;
+  onTestStart?(test: ReplayTestCase, context: ReplayTestReporterContext): void | Promise<void>;
+  onTestStep?(test: ReplayTestStep, context: ReplayTestReporterContext): void | Promise<void>;
+  onTestResult?(test: ReplayTestResult, context: ReplayTestReporterContext): void | Promise<void>;
+  onSuiteEnd?(suite: ReplaySuiteResult, context: ReplayTestReporterContext): void | Promise<void>;
   getExitCode?(suite: ReplaySuiteResult): number | undefined;
 };
 

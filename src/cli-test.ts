@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import type { RequestProgressEvent } from './daemon/request-progress.ts';
 import type { ReplaySuiteResult } from './daemon/types.ts';
 import {
@@ -80,8 +79,6 @@ function createReplayTestReporterContext(options: {
     verbose: options.verbose ?? options.debug,
     stdout: createReplayTestReporterStream(process.stdout),
     stderr: createReplayTestReporterStream(process.stderr),
-    mkdir: (directory) => fs.mkdirSync(directory, { recursive: true }),
-    writeFile: (filePath, contents) => fs.writeFileSync(filePath, contents, 'utf8'),
   };
 }
 

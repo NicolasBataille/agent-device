@@ -27,7 +27,6 @@ export type {
 export type { AppErrorCode, NormalizedError } from './kernel/errors.ts';
 
 export type {
-  Awaitable,
   ReplayTestReporter,
   ReplayTestReporterContext,
   ReplayTestReporterFactory,

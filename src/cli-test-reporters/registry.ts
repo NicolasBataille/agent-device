@@ -6,7 +6,11 @@ import { getReplayTestExitCode } from './format.ts';
 import { createJunitReplayTestReporter } from './junit.ts';
 import { toReplayTestReporterProgressEvent } from './progress.ts';
 import { buildReplayTestReporterSpecs, type ReplayTestReporterSpec } from './spec.ts';
-import type { Awaitable, ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
+import type { ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
+
+type ReplayTestReporterLiveHook = 'onSuiteStart' | 'onTestStart' | 'onTestStep' | 'onTestResult';
+
+type ReporterHookResult = void | Promise<void>;
 
 export async function resolveReplayTestReporters(options: {
   reporters?: string[];
@@ -62,9 +66,9 @@ export function runReplayTestReporterProgress(
 
 function runReplayTestReporterHook(
   reporters: ReplayTestReporter[],
-  hookName: keyof ReplayTestReporter,
+  hookName: ReplayTestReporterLiveHook,
   context: ReplayTestReporterContext,
-  run: (reporter: ReplayTestReporter) => Awaitable<void> | undefined,
+  run: (reporter: ReplayTestReporter) => ReporterHookResult | undefined,
 ): void {
   for (const reporter of reporters) {
     try {
@@ -82,7 +86,7 @@ function runReplayTestReporterHook(
 
 function reportReplayTestReporterHookError(
   reporter: ReplayTestReporter,
-  hookName: keyof ReplayTestReporter,
+  hookName: ReplayTestReporterLiveHook,
   context: ReplayTestReporterContext,
   error: unknown,
 ): void {
@@ -94,12 +98,12 @@ export function getReplayTestReporterExitCode(
   reporters: ReplayTestReporter[],
   suite: ReplaySuiteResult,
 ): number {
-  const exitCodes = [getReplayTestExitCode(suite)];
+  let exitCode = getReplayTestExitCode(suite);
   for (const reporter of reporters) {
-    const exitCode = reporter.getExitCode?.(suite);
-    if (exitCode !== undefined) exitCodes.push(exitCode);
+    const reporterExitCode = reporter.getExitCode?.(suite);
+    if (reporterExitCode !== undefined) exitCode = Math.max(exitCode, reporterExitCode);
   }
-  return Math.max(...exitCodes);
+  return exitCode;
 }
 
 async function resolveReplayTestReporter(

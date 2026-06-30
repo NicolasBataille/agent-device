@@ -1,7 +1,8 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import type { ReplaySuiteResult, ReplaySuiteTestResult } from '../daemon/types.ts';
 import { AppError } from '../kernel/errors.ts';
-import type { ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
+import type { ReplayTestReporter } from './types.ts';
 import {
   appendOptionalLine,
   appendReplayErrorDetails,
@@ -22,7 +23,7 @@ export function createJunitReplayTestReporter(reportPath: string | undefined): R
   const outputPath = readJunitReportPath(reportPath);
   return {
     name: 'junit',
-    onSuiteEnd: (suite, context) => writeReplayJunitReport(outputPath, suite, context),
+    onSuiteEnd: (suite) => writeReplayJunitReport(outputPath, suite),
     getExitCode: getReplayTestExitCode,
   };
 }
@@ -35,15 +36,11 @@ function readJunitReportPath(reportPath: string | undefined): string {
   );
 }
 
-function writeReplayJunitReport(
-  reportPath: string,
-  suite: ReplaySuiteResult,
-  context: ReplayTestReporterContext,
-): void {
+function writeReplayJunitReport(reportPath: string, suite: ReplaySuiteResult): void {
   const directory = path.dirname(reportPath);
   try {
-    context.mkdir(directory);
-    context.writeFile(reportPath, buildReplayJunitXml(suite));
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(reportPath, buildReplayJunitXml(suite), 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new AppError(
