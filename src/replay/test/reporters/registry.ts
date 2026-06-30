@@ -6,11 +6,20 @@ import { getReplayTestExitCode } from './format.ts';
 import { createJunitReplayTestReporter } from './junit.ts';
 import { toReplayTestReporterProgressEvent } from './progress.ts';
 import { buildReplayTestReporterSpecs, type ReplayTestReporterSpec } from './spec.ts';
-import type { ReplayTestReporter, ReplayTestReporterContext } from './types.ts';
+import type {
+  ReplayTestReporter,
+  ReplayTestReporterContext,
+  ReplayTestReporterProgressEvent,
+} from './types.ts';
 
 type ReplayTestReporterLiveHook = 'onSuiteStart' | 'onTestStart' | 'onTestStep' | 'onTestResult';
 
-type ReporterHookResult = void | Promise<void>;
+const LIVE_HOOK_BY_EVENT = {
+  'suite-start': 'onSuiteStart',
+  'test-start': 'onTestStart',
+  'test-step': 'onTestStep',
+  'test-result': 'onTestResult',
+} as const satisfies Record<ReplayTestReporterProgressEvent['type'], ReplayTestReporterLiveHook>;
 
 export async function resolveReplayTestReporters(options: {
   reporters?: string[];
@@ -38,44 +47,14 @@ export function runReplayTestReporterProgress(
 ): void {
   const reporterEvent = toReplayTestReporterProgressEvent(event);
   if (!reporterEvent) return;
-  if (reporterEvent.type === 'suite-start') {
-    runReplayTestReporterHook(reporters, 'onSuiteStart', context, (reporter) =>
-      reporter.onSuiteStart?.(reporterEvent.suite, context),
-    );
-    return;
-  }
-
-  if (reporterEvent.type === 'test-start') {
-    runReplayTestReporterHook(reporters, 'onTestStart', context, (reporter) =>
-      reporter.onTestStart?.(reporterEvent.test, context),
-    );
-    return;
-  }
-
-  if (reporterEvent.type === 'test-step') {
-    runReplayTestReporterHook(reporters, 'onTestStep', context, (reporter) =>
-      reporter.onTestStep?.(reporterEvent.test, context),
-    );
-    return;
-  }
-
-  runReplayTestReporterHook(reporters, 'onTestResult', context, (reporter) =>
-    reporter.onTestResult?.(reporterEvent.test, context),
-  );
-}
-
-function runReplayTestReporterHook(
-  reporters: ReplayTestReporter[],
-  hookName: ReplayTestReporterLiveHook,
-  context: ReplayTestReporterContext,
-  run: (reporter: ReplayTestReporter) => ReporterHookResult | undefined,
-): void {
+  const hookName = LIVE_HOOK_BY_EVENT[reporterEvent.type];
   for (const reporter of reporters) {
     try {
-      const result = run(reporter);
-      if (result && typeof result === 'object' && 'then' in result) {
-        // Progress hooks run from synchronous daemon stream readers, so async work
-        // is observed for errors but not awaited before later hooks.
+      const result = invokeReplayTestReporterLiveHook(reporter, reporterEvent, context);
+      if (result instanceof Promise) {
+        // Live hooks are synchronous by contract and not awaited; a custom reporter
+        // that returns a promise anyway has its rejection surfaced here so it cannot
+        // crash the CLI with an unhandled rejection.
         void result.catch((error: unknown) =>
           reportReplayTestReporterHookError(reporter, hookName, context, error),
         );
@@ -83,6 +62,23 @@ function runReplayTestReporterHook(
     } catch (error) {
       reportReplayTestReporterHookError(reporter, hookName, context, error);
     }
+  }
+}
+
+function invokeReplayTestReporterLiveHook(
+  reporter: ReplayTestReporter,
+  event: ReplayTestReporterProgressEvent,
+  context: ReplayTestReporterContext,
+): unknown {
+  switch (event.type) {
+    case 'suite-start':
+      return reporter.onSuiteStart?.(event.suite, context);
+    case 'test-start':
+      return reporter.onTestStart?.(event.test, context);
+    case 'test-step':
+      return reporter.onTestStep?.(event.test, context);
+    case 'test-result':
+      return reporter.onTestResult?.(event.test, context);
   }
 }
 

@@ -983,3 +983,48 @@ test('test command reuses custom reporter instance for progress and final output
     await fs.rm(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('test command surfaces a throwing live reporter hook without aborting the run', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-device-throwing-reporter-test-'));
+  const reporterPath = path.join(tmpDir, 'throwing-reporter.mjs');
+
+  try {
+    await fs.writeFile(
+      reporterPath,
+      [
+        'export default {',
+        "  name: 'throwing-custom',",
+        '  onTestResult() {',
+        "    throw new Error('boom');",
+        '  },',
+        '  onSuiteEnd(suite, context) {',
+        '    context.stdout.write(`final:${suite.total}\\n`);',
+        '  },',
+        '  getExitCode() { return 0; },',
+        '};',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const result = await runCliCapture(
+      ['test', './suite', '--reporter', reporterPath],
+      async (_req, options) => {
+        options?.onProgress?.({
+          type: 'replay-test',
+          file: '/tmp/01-pass.ad',
+          status: 'pass',
+          index: 1,
+          total: 1,
+          durationMs: 10,
+        });
+        return makeReplaySuiteResponse();
+      },
+    );
+
+    assert.equal(result.code, 1);
+    assert.equal(result.stdout, 'final:3\n');
+    assert.match(result.stderr, /Reporter throwing-custom onTestResult failed: boom/);
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});

@@ -63,13 +63,14 @@ export type ReplayTestReporterProgressEvent =
 
 export type ReplayTestReporter = {
   name: string;
-  onSuiteStart?(
-    suite: ReplayTestSuiteStart,
-    context: ReplayTestReporterContext,
-  ): void | Promise<void>;
-  onTestStart?(test: ReplayTestCase, context: ReplayTestReporterContext): void | Promise<void>;
-  onTestStep?(test: ReplayTestStep, context: ReplayTestReporterContext): void | Promise<void>;
-  onTestResult?(test: ReplayTestResult, context: ReplayTestReporterContext): void | Promise<void>;
+  // Live hooks are synchronous: they run from the daemon progress stream reader as
+  // events arrive and are not awaited, so any returned promise is fire-and-forget and
+  // may not settle before `onSuiteEnd`. Keep per-event work synchronous and flush
+  // async work from `onSuiteEnd`, which the CLI awaits before exiting.
+  onSuiteStart?(suite: ReplayTestSuiteStart, context: ReplayTestReporterContext): void;
+  onTestStart?(test: ReplayTestCase, context: ReplayTestReporterContext): void;
+  onTestStep?(test: ReplayTestStep, context: ReplayTestReporterContext): void;
+  onTestResult?(test: ReplayTestResult, context: ReplayTestReporterContext): void;
   onSuiteEnd?(suite: ReplaySuiteResult, context: ReplayTestReporterContext): void | Promise<void>;
   getExitCode?(suite: ReplaySuiteResult): number | undefined;
 };
