@@ -30,14 +30,15 @@ export async function renderReplayTestResponse(options: {
   suite: ReplaySuiteResult;
   json?: boolean;
   debug?: boolean;
+  verbose?: boolean;
   reporter?: string[];
   reportJunit?: string;
   reporterRuntime?: ReplayTestReporterRuntime;
 }): Promise<number> {
-  const { suite, json, debug, reporter, reportJunit } = options;
+  const { suite, json, debug, verbose, reporter, reportJunit } = options;
   const runtime =
     options.reporterRuntime ??
-    (await createReplayTestReporterRuntime({ debug, reporter, reportJunit, json }));
+    (await createReplayTestReporterRuntime({ debug, verbose, reporter, reportJunit, json }));
   await runReplayTestReporters(runtime.reporters, suite, runtime.context);
   if (json) {
     printJson({ success: true, data: suite });
@@ -47,6 +48,7 @@ export async function renderReplayTestResponse(options: {
 
 export async function createReplayTestReporterRuntime(options: {
   debug?: boolean;
+  verbose?: boolean;
   reporter?: string[];
   reportJunit?: string;
   json?: boolean;
@@ -56,7 +58,10 @@ export async function createReplayTestReporterRuntime(options: {
     reportJunit: options.reportJunit,
     json: options.json,
   });
-  const context = createReplayTestReporterContext({ debug: options.debug });
+  const context = createReplayTestReporterContext({
+    debug: options.debug,
+    verbose: options.verbose,
+  });
   return {
     reporters,
     context,
@@ -66,9 +71,13 @@ export async function createReplayTestReporterRuntime(options: {
   };
 }
 
-function createReplayTestReporterContext(options: { debug?: boolean }): ReplayTestReporterContext {
+function createReplayTestReporterContext(options: {
+  debug?: boolean;
+  verbose?: boolean;
+}): ReplayTestReporterContext {
   return {
     debug: options.debug,
+    verbose: options.verbose ?? options.debug,
     stdout: createReplayTestReporterStream(process.stdout),
     stderr: createReplayTestReporterStream(process.stderr),
     mkdir: (directory) => fs.mkdirSync(directory, { recursive: true }),

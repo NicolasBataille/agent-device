@@ -97,7 +97,7 @@ agent-device test ./workflows --reporter default --reporter junit:./tmp/junit.xm
 - By default, suite artifacts are written under `.agent-device/test-artifacts/<run-id>/...`. Each attempt writes `replay.ad`, `result.txt`, and `replay-timing.ndjson`. Failed attempts also keep copied logs and artifact files when the replay produced them.
 - `replay-timing.ndjson` records attempt, cleanup, and per-step start/stop events with durations. Upload it from CI even for passing runs when comparing local and CI performance.
 - Timeouts are cooperative: the runner marks the attempt failed at the timeout boundary, then gives the underlying replay a short grace period to stop before session cleanup.
-- The default text reporter streams live progress on stderr while a suite runs, then prints the final summary, failed tests, and passed-on-retry flaky tests. Use `--verbose` to include final step traces for completed tests.
+- The default text reporter streams live progress on stderr while a suite runs, then prints the final summary, failed tests, and passed-on-retry flaky tests. Use `--verbose` to include step traces in completed-test progress output.
 - `--reporter` is repeatable. Built-ins are `default` for the console summary and `junit:<path>` for JUnit XML. Passing any explicit reporter list replaces the implicit default reporter, so include `--reporter default` when you also want terminal output. `--report-junit <path>` remains a compatibility alias for `--reporter junit:<path>`.
 - When `--fail-fast` and retries are both set, the current test still consumes its retries before the suite stops.
 

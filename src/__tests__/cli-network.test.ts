@@ -282,6 +282,87 @@ test('test command --verbose omits step telemetry for passing tests without debu
   }
 });
 
+test('test command --verbose includes step telemetry in completed progress output', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-device-cli-test-live-verbose-'));
+  const artifactsDir = path.join(tmpDir, 'auth-flow');
+  const attemptDir = path.join(artifactsDir, 'attempt-1');
+  await fs.mkdir(attemptDir, { recursive: true });
+  await fs.writeFile(
+    path.join(attemptDir, 'replay-timing.ndjson'),
+    [
+      {
+        type: 'replay_action_start',
+        step: 1,
+        line: 3,
+        command: '__maestroTapOn',
+        positionals: ['text="Log in"'],
+      },
+      {
+        type: 'replay_action_stop',
+        step: 1,
+        line: 3,
+        command: '__maestroTapOn',
+        ok: true,
+        durationMs: 250,
+      },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join('\n'),
+  );
+
+  try {
+    const result = await runCliCapture(['test', './suite', '--verbose'], async (_req, options) => {
+      options?.onProgress?.({
+        type: 'replay-test',
+        file: '/tmp/auth-flow.yml',
+        title: 'Authentication flow',
+        status: 'pass',
+        index: 1,
+        total: 1,
+        durationMs: 500,
+        attempt: 1,
+        artifactsDir,
+      });
+      return {
+        ok: true,
+        data: {
+          total: 1,
+          executed: 1,
+          passed: 1,
+          failed: 0,
+          skipped: 0,
+          notRun: 0,
+          durationMs: 500,
+          failures: [],
+          tests: [
+            {
+              file: '/tmp/auth-flow.yml',
+              title: 'Authentication flow',
+              session: 'default:test:suite:1',
+              status: 'passed',
+              durationMs: 500,
+              finalAttemptDurationMs: 500,
+              attempts: 1,
+              artifactsDir,
+              replayed: 1,
+              healed: 0,
+            },
+          ],
+        },
+      };
+    });
+
+    assert.equal(result.code, null);
+    assert.equal(result.calls[0]?.meta?.debug, false);
+    assert.match(result.stderr, /✓ Authentication flow 0\.5s/);
+    assert.match(result.stderr, /steps:/);
+    assert.match(result.stderr, /tapOn "text=\\"Log in\\"" \(line 3, 0\.25s\)/);
+    assert.doesNotMatch(result.stdout, /steps:/);
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('test command --verbose omits nested passing step telemetry', async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-device-cli-test-verbose-retry-'));
   const artifactsDir = path.join(tmpDir, 'material-top-tabs');
@@ -849,6 +930,53 @@ test('test command streams progress to custom reporter modules', async () => {
     assert.equal(result.stdout, 'final:3\n');
     assert.match(result.stderr, /live:progress:1\/2/);
     assert.match(result.stderr, /live:pass:0\/0/);
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('test command reuses custom reporter instance for progress and final output', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-device-stateful-reporter-test-'));
+  const reporterPath = path.join(tmpDir, 'stateful-reporter.mjs');
+
+  try {
+    await fs.writeFile(
+      reporterPath,
+      [
+        'export default function createReporter() {',
+        '  const seen = [];',
+        '  return {',
+        "    name: 'stateful-custom',",
+        '    onProgress(event) {',
+        '      if (event.type === "replay-test") seen.push(event.status);',
+        '    },',
+        '    onSuiteEnd(_suite, context) {',
+        '      context.stdout.write(`seen:${seen.join(",")}\\n`);',
+        '    },',
+        '    getExitCode() { return 0; },',
+        '  };',
+        '}',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const result = await runCliCapture(
+      ['test', './suite', '--reporter', reporterPath],
+      async (_req, options) => {
+        options?.onProgress?.({
+          type: 'replay-test',
+          file: '/tmp/01-pass.ad',
+          status: 'pass',
+          index: 1,
+          total: 1,
+          durationMs: 10,
+        });
+        return makeReplaySuiteResponse();
+      },
+    );
+
+    assert.equal(result.code, null);
+    assert.equal(result.stdout, 'seen:pass\n');
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true });
   }

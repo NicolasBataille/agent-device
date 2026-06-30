@@ -3,6 +3,7 @@ import type { ReplaySuiteResult } from '../daemon/types.ts';
 
 export type ReplayTestReporterContext = {
   debug?: boolean;
+  verbose?: boolean;
   stdout: ReplayTestReporterStream;
   stderr: ReplayTestReporterStream;
   mkdir(path: string): void;

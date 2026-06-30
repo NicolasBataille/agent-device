@@ -25,7 +25,7 @@ export function createDefaultReplayTestReporter(): ReplayTestReporter {
     name: 'default',
     onProgress: (event, context) => {
       progressRenderer ??= createReplayTestProgressRenderer({
-        verbose: context.debug,
+        verbose: context.verbose,
         liveProgress: context.stderr.isTTY && !process.env.CI,
         columns: context.stderr.columns,
       });
