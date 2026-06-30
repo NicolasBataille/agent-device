@@ -17,8 +17,6 @@ Public subpath API exposed for Node consumers:
 - `agent-device/metro`
   - `buildBundleUrl(baseUrl, options?)`
   - `normalizeBaseUrl(baseUrl)`
-  - `buildIosRuntimeHints(baseUrl)`
-  - `buildAndroidRuntimeHints(baseUrl)`
   - `resolveRuntimeTransport(options)`
   - types: `MetroBridgeDescriptor`, `MetroTunnelRequestMessage`, `MetroTunnelResponseMessage`
 - `agent-device/batch`
@@ -27,8 +25,6 @@ Public subpath API exposed for Node consumers:
   - types: `RemoteConfigProfile`
 - `agent-device/contracts`
   - `centerOfRect(rect)`
-  - `daemonCommandRequestSchema`, `daemonRuntimeSchema`, `jsonRpcRequestSchema`
-  - `leaseAllocateSchema`, `leaseHeartbeatSchema`, `leaseReleaseSchema`
   - `defaultHintForCode(code)`, `normalizeError(error)`
   - types: `DaemonError`, `DaemonInstallSource`, `DaemonRequest`, `DaemonResponse`, `DaemonResponseData`, `JsonRpcId`, `JsonRpcRequestEnvelope`, `LeaseAllocatePayload`, `LeaseBackend`, `LeaseHeartbeatPayload`, `LeaseReleasePayload`, `SessionRuntimeHints`
 - `agent-device/selectors`
@@ -306,25 +302,24 @@ Direct Android `.apk` and `.aab` URL sources can still resolve package identity 
 
 ```ts
 import {
-  buildAndroidRuntimeHints,
-  buildIosRuntimeHints,
+  buildBundleUrl,
   normalizeBaseUrl,
   resolveRuntimeTransport,
 } from 'agent-device/metro';
 
 const bridgeBaseUrl = normalizeBaseUrl('https://bridge.example.test/metro');
-const iosRuntime = buildIosRuntimeHints(bridgeBaseUrl);
-const androidRuntime = buildAndroidRuntimeHints(bridgeBaseUrl);
+const iosBundleUrl = buildBundleUrl(bridgeBaseUrl, 'ios');
+const androidBundleUrl = buildBundleUrl(bridgeBaseUrl, 'android');
 
 const transport = resolveRuntimeTransport({
   platform: 'ios',
-  runtime: iosRuntime,
+  bundleUrl: iosBundleUrl,
 });
 
-console.log(iosRuntime.bundleUrl, androidRuntime.bundleUrl, transport);
+console.log(iosBundleUrl, androidBundleUrl, transport);
 ```
 
-Use `agent-device/remote-config` for the `RemoteConfigProfile` type, `agent-device/metro` for URL and runtime-hint helpers, and `agent-device/contracts` when a server consumer needs daemon request or runtime contract types. For bridged remote Metro, the bridge descriptor supplies cloud iOS wildcard HTTPS hints and Android runtime-route hints.
+Use `agent-device/remote-config` for the `RemoteConfigProfile` type, `agent-device/metro` for URL and transport helpers, and `agent-device/contracts` when a server consumer needs daemon request or runtime contract types. For bridged remote Metro, the bridge descriptor supplies cloud iOS wildcard HTTPS hints and Android runtime-route hints.
 
 ## Selector helpers
 
