@@ -1,7 +1,7 @@
 import type { CliFlags } from '../parser/cli-flags.ts';
 import type { AgentDeviceClient } from '../../client/client.ts';
 import type { CliCommandName } from '../../command-catalog.ts';
-import type { ReplayTestReporterRuntime } from '../../cli-test.ts';
+import type { ReplayTestReporterRuntime } from '../../replay/test/reporting.ts';
 
 export type ClientCommandParams = {
   positionals: string[];

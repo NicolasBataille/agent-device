@@ -1,17 +1,17 @@
-import type { RequestProgressEvent } from './daemon/request-progress.ts';
-import type { ReplaySuiteResult } from './daemon/types.ts';
+import type { RequestProgressEvent } from '../../daemon/request-progress.ts';
+import type { ReplaySuiteResult } from '../../daemon/types.ts';
 import {
   getReplayTestReporterExitCode,
   resolveReplayTestReporters,
   runReplayTestReporterProgress,
   runReplayTestReporters,
-} from './cli-test-reporters/registry.ts';
+} from './reporters/registry.ts';
 import type {
   ReplayTestReporter,
   ReplayTestReporterContext,
   ReplayTestReporterStream,
-} from './cli-test-reporters/types.ts';
-import { printJson } from './utils/output.ts';
+} from './reporters/types.ts';
+import { printJson } from '../../utils/output.ts';
 
 export type ReplayTestReporterRuntime = {
   reporters: ReplayTestReporter[];

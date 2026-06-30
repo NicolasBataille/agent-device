@@ -1,7 +1,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { createReplayTestProgressRenderer } from '../cli-test-progress.ts';
-import type { ReplayTestResult } from '../cli-test-reporters/types.ts';
+import { createReplayTestProgressRenderer } from '../progress.ts';
+import type { ReplayTestResult } from '../reporters/types.ts';
 
 function withStreamTty<T>(stream: NodeJS.WriteStream, isTTY: boolean, run: () => T): T {
   const descriptor = Object.getOwnPropertyDescriptor(stream, 'isTTY');

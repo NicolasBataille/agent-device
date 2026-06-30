@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import {
-  buildReplayTestReporterSpecs,
-  parseReplayTestReporterSpec,
-} from '../cli-test-reporters/spec.ts';
+import { buildReplayTestReporterSpecs, parseReplayTestReporterSpec } from '../reporters/spec.ts';
 
 test('parses built-in reporter shorthand specs', () => {
   assert.deepEqual(parseReplayTestReporterSpec('default'), {

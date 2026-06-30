@@ -6,8 +6,8 @@ import { pathToFileURL } from 'node:url';
 import { sendToDaemon } from './daemon/client/daemon-client.ts';
 import fs from 'node:fs';
 import type { BatchStep } from './client/client-types.ts';
-import { createReplayTestReporterRuntime } from './cli-test.ts';
-import type { ReplayTestReporterRuntime } from './cli-test.ts';
+import { createReplayTestReporterRuntime } from './replay/test/reporting.ts';
+import type { ReplayTestReporterRuntime } from './replay/test/reporting.ts';
 import {
   createAgentDeviceClient,
   type AgentDeviceClientConfig,

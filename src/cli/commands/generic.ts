@@ -1,5 +1,5 @@
 import type { CommandRequestResult } from '../../client/client.ts';
-import { renderReplayTestResponse } from '../../cli-test.ts';
+import { renderReplayTestResponse } from '../../replay/test/reporting.ts';
 import { runCliCommandWithOutput } from '../../commands/cli-runner.ts';
 import type { CommandName } from '../../commands/command-metadata.ts';
 import type { CliOutput } from '../../commands/command-contract.ts';

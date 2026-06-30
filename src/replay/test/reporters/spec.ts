@@ -1,4 +1,4 @@
-import { AppError } from '../kernel/errors.ts';
+import { AppError } from '../../../kernel/errors.ts';
 
 export type ReplayTestReporterSpec =
   | {

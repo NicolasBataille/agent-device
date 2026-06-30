@@ -1,4 +1,4 @@
-import type { ReplaySuiteResult } from '../daemon/types.ts';
+import type { ReplaySuiteResult } from '../../../daemon/types.ts';
 
 export type ReplayTestReporterContext = {
   debug?: boolean;

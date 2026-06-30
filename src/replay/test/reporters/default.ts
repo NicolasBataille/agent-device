@@ -1,8 +1,8 @@
-import type { ReplaySuiteResult } from '../daemon/types.ts';
-import { replayTestFailureStepLines } from '../cli-test-trace.ts';
-import { createReplayTestProgressRenderer } from '../cli-test-progress.ts';
-import { formatDurationSeconds } from '../utils/duration-format.ts';
-import { colorize, supportsColor } from '../utils/output.ts';
+import type { ReplaySuiteResult } from '../../../daemon/types.ts';
+import { replayTestFailureStepLines } from '../trace.ts';
+import { createReplayTestProgressRenderer } from '../progress.ts';
+import { formatDurationSeconds } from '../../../utils/duration-format.ts';
+import { colorize, supportsColor } from '../../../utils/output.ts';
 import type {
   ReplayTestReporter,
   ReplayTestReporterContext,

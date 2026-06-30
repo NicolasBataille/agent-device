@@ -1,13 +1,13 @@
 import path from 'node:path';
-import { replayTestStepLines } from './cli-test-trace.ts';
-import type { ReplaySuiteTestResult } from './daemon/types.ts';
+import { replayTestStepLines } from './trace.ts';
+import type { ReplaySuiteTestResult } from '../../daemon/types.ts';
 import type {
   ReplayTestReporterProgressEvent,
   ReplayTestResult,
   ReplayTestStep,
-} from './cli-test-reporters/types.ts';
-import { formatDurationSeconds } from './utils/duration-format.ts';
-import { colorize, supportsColor } from './utils/output.ts';
+} from './reporters/types.ts';
+import { formatDurationSeconds } from '../../utils/duration-format.ts';
+import { colorize, supportsColor } from '../../utils/output.ts';
 
 export type ReplayTestProgressFormatOptions = {
   verbose?: boolean;
