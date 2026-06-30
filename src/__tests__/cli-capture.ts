@@ -2,7 +2,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runCli } from '../cli.ts';
-import type { DaemonRequest, DaemonResponse, sendToDaemon } from '../daemon/client/daemon-client.ts';
+import type {
+  DaemonRequest,
+  DaemonResponse,
+  sendToDaemon,
+} from '../daemon/client/daemon-client.ts';
 import { installIsolatedCliTestEnv } from './cli-test-env.ts';
 
 class ExitSignal extends Error {

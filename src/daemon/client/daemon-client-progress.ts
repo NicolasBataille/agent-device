@@ -16,12 +16,6 @@ type ProgressLineReader = {
 
 type ProgressResponseFormat = 'socket-legacy' | 'ndjson-envelope';
 
-type ProgressLineReader = {
-  handleLine(line: string): boolean;
-};
-
-type ProgressResponseFormat = 'socket-legacy' | 'ndjson-envelope';
-
 function emitProgressEvent(
   event: RequestProgressEvent,
   options: {

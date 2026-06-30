@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
 import { test } from 'vitest';
 import type { DaemonRequest, DaemonResponse } from '../daemon/types.ts';
+import type { RequestProgressEvent } from '../daemon/request-progress.ts';
 import { readDaemonSocketProgressResponse } from '../daemon/client/daemon-client-progress.ts';
 import { AppError } from '../kernel/errors.ts';
 
@@ -12,6 +13,8 @@ type MockSocket = EventEmitter & {
   end: () => MockSocket;
   setEncoding: (encoding: BufferEncoding) => MockSocket;
 };
+
+type ReplayTestProgressEvent = Extract<RequestProgressEvent, { type: 'replay-test' }>;
 
 function createMockSocket(): MockSocket {
   const socket = new EventEmitter() as MockSocket;
@@ -31,11 +34,13 @@ function createMockSocket(): MockSocket {
 function readSocketProgressResponse(
   socket: MockSocket,
   req: DaemonRequest,
+  onProgress?: (event: RequestProgressEvent) => void,
 ): Promise<DaemonResponse> {
   let settled = false;
   return new Promise((resolve, reject) => {
     readDaemonSocketProgressResponse(socket as unknown as Socket, {
       req,
+      onProgress,
       isSettled: () => settled,
       clearTimeout: () => {},
       resolve: (response) => {
@@ -50,33 +55,54 @@ function readSocketProgressResponse(
   });
 }
 
-function withStderrTerminal<T>(params: { isTTY: boolean; columns: number }, run: () => T): T {
-  const stderr = process.stderr as typeof process.stderr & {
-    isTTY?: boolean;
-    columns?: number;
-  };
-  const mutableStderr = stderr as unknown as Record<string, unknown>;
-  const originalIsTTY = Object.getOwnPropertyDescriptor(stderr, 'isTTY');
-  const originalColumns = Object.getOwnPropertyDescriptor(stderr, 'columns');
-  try {
-    Object.defineProperty(stderr, 'isTTY', {
-      configurable: true,
-      value: params.isTTY,
-    });
-    Object.defineProperty(stderr, 'columns', {
-      configurable: true,
-      value: params.columns,
-    });
-    return run();
-  } finally {
-    if (originalIsTTY) Object.defineProperty(stderr, 'isTTY', originalIsTTY);
-    else delete mutableStderr.isTTY;
-    if (originalColumns) Object.defineProperty(stderr, 'columns', originalColumns);
-    else delete mutableStderr.columns;
-  }
+function replayProgressLine(stepIndex: number): string {
+  return JSON.stringify({
+    type: 'progress',
+    event: {
+      type: 'replay-test',
+      file: '/tmp/tab-view-coverflow.yml',
+      title: 'Tab View - Coverflow',
+      status: 'progress',
+      index: 1,
+      total: 1,
+      attempt: 1,
+      maxAttempts: 1,
+      stepIndex,
+      stepTotal: 10,
+    },
+  });
 }
 
-test('readDaemonSocketProgressResponse parses split progress lines before response envelopes', async () => {
+function replayPassLine(): string {
+  return JSON.stringify({
+    type: 'progress',
+    event: {
+      type: 'replay-test',
+      file: '/tmp/tab-view-coverflow.yml',
+      title: 'Tab View - Coverflow',
+      status: 'pass',
+      index: 1,
+      total: 1,
+      attempt: 1,
+      maxAttempts: 1,
+      durationMs: 17_800,
+    },
+  });
+}
+
+function responseLine(data: Record<string, unknown>): string {
+  return JSON.stringify({
+    type: 'response',
+    response: { ok: true, data },
+  });
+}
+
+function replayTestEvent(event: RequestProgressEvent | undefined): ReplayTestProgressEvent {
+  assert.equal(event?.type, 'replay-test');
+  return event as ReplayTestProgressEvent;
+}
+
+test('readDaemonSocketProgressResponse forwards split progress lines before response envelopes', async () => {
   const socket = createMockSocket();
   const req: DaemonRequest = {
     session: 'default',
@@ -87,6 +113,7 @@ test('readDaemonSocketProgressResponse parses split progress lines before respon
     meta: { requestId: 'req-socket-progress', requestProgress: 'replay-test' },
   };
   let stderr = '';
+  const events: RequestProgressEvent[] = [];
   const originalStderrWrite = process.stderr.write.bind(process.stderr);
 
   try {
@@ -95,7 +122,7 @@ test('readDaemonSocketProgressResponse parses split progress lines before respon
       return true;
     }) as typeof process.stderr.write;
 
-    const responsePromise = readSocketProgressResponse(socket, req);
+    const responsePromise = readSocketProgressResponse(socket, req, (event) => events.push(event));
     const progressLine = JSON.stringify({
       type: 'progress',
       event: {
@@ -123,7 +150,13 @@ test('readDaemonSocketProgressResponse parses split progress lines before respon
     assert.deepEqual(await responsePromise, { ok: true, data: { via: 'socket-progress' } });
     assert.equal(socket.encoding, 'utf8');
     assert.equal(socket.ended, true);
-    assert.match(stderr, /✓ Login flow 1\.23s/);
+    assert.equal(stderr, '');
+    assert.equal(events.length, 1);
+    const event = events[0];
+    assert.equal(event?.type, 'replay-test');
+    if (event?.type === 'replay-test') {
+      assert.equal(event.title, 'Login flow');
+    }
   } finally {
     process.stderr.write = originalStderrWrite;
   }
@@ -175,7 +208,7 @@ test('readDaemonSocketProgressResponse renders generic command progress', async 
   }
 });
 
-test('readDaemonSocketProgressResponse rewrites live progress and clears it for final result', async () => {
+test('readDaemonSocketProgressResponse forwards replay progress events to the sink', async () => {
   const socket = createMockSocket();
   const req: DaemonRequest = {
     session: 'default',
@@ -186,68 +219,41 @@ test('readDaemonSocketProgressResponse rewrites live progress and clears it for 
     meta: { requestId: 'req-live-progress', requestProgress: 'replay-test' },
   };
   let stderr = '';
+  const events: RequestProgressEvent[] = [];
   const originalStderrWrite = process.stderr.write.bind(process.stderr);
-  const originalCi = process.env.CI;
 
   try {
-    delete process.env.CI;
     (process.stderr as any).write = ((chunk: unknown) => {
       stderr += String(chunk);
       return true;
     }) as typeof process.stderr.write;
 
-    const responsePromise = withStderrTerminal({ isTTY: true, columns: 53 }, () =>
-      readSocketProgressResponse(socket, req),
+    const responsePromise = readSocketProgressResponse(socket, req, (event) => events.push(event));
+    socket.emit(
+      'data',
+      [
+        replayProgressLine(3),
+        replayProgressLine(4),
+        replayPassLine(),
+        responseLine({ via: 'socket-progress' }),
+      ].join('\n') + '\n',
     );
-    const progress = (stepIndex: number) =>
-      JSON.stringify({
-        type: 'progress',
-        event: {
-          type: 'replay-test',
-          file: '/tmp/tab-view-coverflow.yml',
-          title: 'Tab View - Coverflow',
-          status: 'progress',
-          index: 1,
-          total: 1,
-          attempt: 1,
-          maxAttempts: 1,
-          stepIndex,
-          stepTotal: 10,
-        },
-      });
-    const pass = JSON.stringify({
-      type: 'progress',
-      event: {
-        type: 'replay-test',
-        file: '/tmp/tab-view-coverflow.yml',
-        title: 'Tab View - Coverflow',
-        status: 'pass',
-        index: 1,
-        total: 1,
-        attempt: 1,
-        maxAttempts: 1,
-        durationMs: 17_800,
-      },
-    });
-    const responseLine = JSON.stringify({
-      type: 'response',
-      response: { ok: true, data: { via: 'socket-progress' } },
-    });
-
-    socket.emit('data', `${progress(3)}\n${progress(4)}\n${pass}\n${responseLine}\n`);
 
     assert.deepEqual(await responsePromise, { ok: true, data: { via: 'socket-progress' } });
-    assert.ok(stderr.includes('\r\u001B[2K⊙ Tab View - Coverflow [3/10]'));
-    assert.ok(stderr.includes('\r\u001B[2K⊙ Tab View - Coverflow [4/10]'));
-    assert.ok(stderr.includes('\r\u001B[2K✓ Tab View - Coverflow 17.8s\n'));
+    assert.equal(stderr, '');
+    assert.deepEqual(
+      events.map((event) => replayTestEvent(event).status),
+      ['progress', 'progress', 'pass'],
+    );
+    assert.equal(replayTestEvent(events[0]).stepIndex, 3);
+    assert.equal(replayTestEvent(events[1]).stepIndex, 4);
+    assert.equal(replayTestEvent(events[2]).durationMs, 17_800);
   } finally {
-    if (typeof originalCi === 'string') process.env.CI = originalCi;
-    else delete process.env.CI;
     process.stderr.write = originalStderrWrite;
   }
 });
 
-test('readDaemonSocketProgressResponse suppresses live progress outside interactive terminals', async () => {
+test('readDaemonSocketProgressResponse does not render replay progress without a sink', async () => {
   const socket = createMockSocket();
   const req: DaemonRequest = {
     session: 'default',
@@ -266,9 +272,7 @@ test('readDaemonSocketProgressResponse suppresses live progress outside interact
       return true;
     }) as typeof process.stderr.write;
 
-    const responsePromise = withStderrTerminal({ isTTY: false, columns: 53 }, () =>
-      readSocketProgressResponse(socket, req),
-    );
+    const responsePromise = readSocketProgressResponse(socket, req);
     const progress = JSON.stringify({
       type: 'progress',
       event: {
@@ -306,7 +310,7 @@ test('readDaemonSocketProgressResponse suppresses live progress outside interact
     socket.emit('data', `${progress}\n${pass}\n${responseLine}\n`);
 
     assert.deepEqual(await responsePromise, { ok: true, data: { via: 'socket-progress' } });
-    assert.equal(stderr, '✓ Tab View - Coverflow 17.8s\n');
+    assert.equal(stderr, '');
   } finally {
     process.stderr.write = originalStderrWrite;
   }

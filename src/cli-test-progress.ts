@@ -59,7 +59,7 @@ export function createReplayTestProgressRenderer(
   };
 }
 
-export function formatReplayTestProgressEvent(
+function formatReplayTestProgressEvent(
   event: ReplayTestResult,
   options: ReplayTestProgressFormatOptions = {},
 ): string | undefined {
@@ -72,7 +72,7 @@ export function formatReplayTestProgressEvent(
   return lines.join('\n');
 }
 
-export function replayTestStatusIcon(status: ReplayTestResult['status']): string {
+function replayTestStatusIcon(status: ReplayTestResult['status']): string {
   if (status === 'pass') return '✓';
   if (status === 'fail') return '⨯';
   return '-';

@@ -74,6 +74,8 @@ function runReplayTestReporterHook(
     try {
       const result = run(reporter);
       if (result && typeof result === 'object' && 'then' in result) {
+        // Progress hooks run from synchronous daemon stream readers, so async work
+        // is observed for errors but not awaited before later hooks.
         void result.catch((error: unknown) =>
           reportReplayTestReporterHookError(reporter, hookName, context, error),
         );

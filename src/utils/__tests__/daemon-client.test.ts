@@ -23,6 +23,7 @@ import {
   shouldResetDaemonAfterRequestTimeout,
 } from '../../daemon/client/daemon-client.ts';
 import { resolveDaemonPaths } from '../../daemon/config.ts';
+import type { RequestProgressEvent } from '../../daemon/request-progress.ts';
 import {
   isProcessAlive,
   readProcessCommand,
@@ -443,7 +444,7 @@ test('sendToDaemon reuses reachable local socket daemon metadata', async (t) => 
   }
 });
 
-test('sendToDaemon prints replay test progress before the socket response', async () => {
+test('sendToDaemon forwards replay test progress before the socket response', async () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-device-socket-progress-'));
   const artifactsDir = path.join(stateDir, 'login-flow');
   const attemptDir = path.join(artifactsDir, 'attempt-2');
@@ -486,6 +487,7 @@ test('sendToDaemon prints replay test progress before the socket response', asyn
       .join('\n'),
   );
   let stderr = '';
+  const progressEvents: RequestProgressEvent[] = [];
   const originalStderrWrite = process.stderr.write.bind(process.stderr);
   const originalCreateConnection = net.createConnection;
   let createConnectionCalls = 0;
@@ -552,20 +554,26 @@ test('sendToDaemon prints replay test progress before the socket response', asyn
 
     writeCurrentDaemonInfo(stateDir, { port: 65_530, transport: 'socket' });
 
-    const response = await sendToDaemon({
-      session: 'default',
-      command: 'test',
-      positionals: ['/tmp/replays'],
-      flags: { stateDir, daemonTransport: 'socket', verbose: true },
-      meta: { requestId: 'req-progress', requestProgress: 'replay-test' },
-    });
+    const response = await sendToDaemon(
+      {
+        session: 'default',
+        command: 'test',
+        positionals: ['/tmp/replays'],
+        flags: { stateDir, daemonTransport: 'socket', verbose: true },
+        meta: { requestId: 'req-progress', requestProgress: 'replay-test' },
+      },
+      { onProgress: (event) => progressEvents.push(event) },
+    );
 
     assert.deepEqual(response, { ok: true, data: { via: 'socket' } });
-    assert.match(stderr, /✓ Login flow 1\.23s/);
-    assert.equal(stderr.match(/✓ Login flow 1\.23s/g)?.length, 1);
-    assert.match(stderr, /steps \(attempt 2\):/);
-    assert.match(stderr, /open "Demo" \(line 3, 0\.25s\)/);
-    assert.match(stderr, /assertVisible "text=\\"Home\\"" "3000" \(line 4, 0\.75s\)/);
+    assert.equal(stderr, '');
+    assert.equal(progressEvents.length, 2);
+    const progressEvent = progressEvents[0];
+    assert.equal(progressEvent?.type, 'replay-test');
+    if (progressEvent?.type === 'replay-test') {
+      assert.equal(progressEvent.title, 'Login flow');
+      assert.equal(progressEvent.artifactsDir, artifactsDir);
+    }
   } finally {
     (net as unknown as { createConnection: typeof net.createConnection }).createConnection =
       originalCreateConnection;
@@ -574,9 +582,10 @@ test('sendToDaemon prints replay test progress before the socket response', asyn
   }
 });
 
-test('sendToDaemon prints replay test progress before the HTTP NDJSON response', async () => {
+test('sendToDaemon forwards replay test progress before the HTTP NDJSON response', async () => {
   let stderr = '';
   const seenPaths: string[] = [];
+  const progressEvents: RequestProgressEvent[] = [];
   const originalStderrWrite = process.stderr.write.bind(process.stderr);
   const originalHttpRequest = http.request;
   (http as unknown as { request: typeof http.request }).request = ((
@@ -655,18 +664,27 @@ test('sendToDaemon prints replay test progress before the HTTP NDJSON response',
     }) as typeof process.stderr.write;
 
     await withRemoteDaemonEnv(async () => {
-      const response = await sendToDaemon({
-        session: 'default',
-        command: 'test',
-        positionals: ['/tmp/replays'],
-        flags: {},
-        meta: { requestId: 'req-http-progress', requestProgress: 'replay-test' },
-      });
+      const response = await sendToDaemon(
+        {
+          session: 'default',
+          command: 'test',
+          positionals: ['/tmp/replays'],
+          flags: {},
+          meta: { requestId: 'req-http-progress', requestProgress: 'replay-test' },
+        },
+        { onProgress: (event) => progressEvents.push(event) },
+      );
 
       assert.deepEqual(response, { ok: true, data: { via: 'http-progress' } });
     });
     assert.deepEqual(seenPaths, ['GET /agent-device/health', 'POST /agent-device/rpc']);
-    assert.match(stderr, /✓ Payments flow 2\.50s/);
+    assert.equal(stderr, '');
+    assert.equal(progressEvents.length, 1);
+    const progressEvent = progressEvents[0];
+    assert.equal(progressEvent?.type, 'replay-test');
+    if (progressEvent?.type === 'replay-test') {
+      assert.equal(progressEvent.title, 'Payments flow');
+    }
   } finally {
     (http as unknown as { request: typeof http.request }).request = originalHttpRequest;
     process.stderr.write = originalStderrWrite;

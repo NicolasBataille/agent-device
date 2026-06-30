@@ -151,16 +151,15 @@ For a live terminal reporter that prints each completed test as an emoji, title,
 
 ```js
 // scripts/emoji-reporter.mjs
-import { formatReplayTestDuration, replayTestStatusIcon } from 'agent-device';
-
 export default {
   name: 'emoji-status',
   onTestResult(test, context) {
-    const icon = replayTestStatusIcon(test.status);
+    const icon =
+      test.status === 'pass' ? '✓' : test.status === 'fail' ? '⨯' : '-';
     const title = test.title?.trim() || test.file;
     const duration =
       typeof test.durationMs === 'number'
-        ? ` ${formatReplayTestDuration(test.durationMs)}`
+        ? ` ${(test.durationMs / 1000).toFixed(2)}s`
         : '';
 
     context.stderr.write(`${icon} ${title}${duration}\n`);
@@ -168,21 +167,16 @@ export default {
 };
 ```
 
-TypeScript reporters can import the public types from `agent-device`:
+TypeScript reporters use the same object shape; compile them to JavaScript before passing them to `--reporter`:
 
 ```ts
-import type { ReplayTestReporterFactory } from 'agent-device';
-import { createReplayTestProgressRenderer } from 'agent-device';
-
-const createReporter: ReplayTestReporterFactory = () => ({
+const createReporter = () => ({
   name: 'typed-reporter',
   onSuiteStart(suite, context) {
     context.stderr.write(`starting ${suite.runnable} tests\n`);
   },
   onTestResult(test, context) {
-    const renderer = createReplayTestProgressRenderer();
-    const output = renderer.render({ type: 'test-result', test });
-    if (output) context.stderr.write(`${output.text}\n`);
+    context.stderr.write(`${test.status} ${test.title ?? test.file}\n`);
   },
   onSuiteEnd(suite) {
     // Write artifacts, annotations, or summaries from suite.
