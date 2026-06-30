@@ -105,10 +105,13 @@ Custom reporters are CLI-only presentation adapters. The daemon streams progress
 agent-device test ./workflows --reporter ./scripts/replay-reporter.mjs
 ```
 
-Reporter modules can export a reporter object, `reporter`, `createReporter`, or a default factory. Factories receive load context. Reporter hooks receive replay test domain objects and an IO context with `stdout`, `stderr`, `mkdir`, and `writeFile` helpers:
+Reporter modules can export a reporter object, `reporter`, `createReporter`, or a default factory. Factories receive load context. Reporter hooks receive replay test domain objects and an IO context with `stdout` and `stderr` streams:
 
 ```js
 // scripts/replay-reporter.mjs
+import fs from 'node:fs';
+import path from 'node:path';
+
 export default function createReporter(loadContext) {
   return {
     name: 'summary-file',
@@ -117,8 +120,9 @@ export default function createReporter(loadContext) {
     },
     onSuiteEnd(suite, context) {
       context.stdout.write(`finished ${suite.total} tests\n`);
-      context.writeFile(
-        './tmp/report.txt',
+      fs.mkdirSync('./tmp', { recursive: true });
+      fs.writeFileSync(
+        path.join('./tmp', 'report.txt'),
         JSON.stringify(
           {
             total: suite.total,
@@ -129,6 +133,7 @@ export default function createReporter(loadContext) {
           null,
           2,
         ),
+        'utf8',
       );
     },
     getExitCode(suite) {
