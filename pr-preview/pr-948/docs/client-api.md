@@ -56,15 +56,6 @@ Public subpath API exposed for Node consumers:
   - types: `MaterializeInstallSource`, `MaterializedInstallable`
 - `agent-device/artifacts`
   - `resolveAndroidArchivePackageName(archivePath)`
-- `agent-device/cloud-webdriver`
-  - `createCloudWebDriverRuntime(options)`
-  - `createBrowserStackWebDriverRuntime(options)`
-  - `createAwsDeviceFarmWebDriverRuntime(options)`
-  - `listBrowserStackCloudArtifacts(provider, providerSessionId, options)`
-  - `listAwsDeviceFarmCloudArtifacts(provider, providerSessionId, client)`
-  - `uploadBrowserStackApp(appPath, options)`
-  - `createAwsCliDeviceFarmClient(options)`
-  - types: `CloudArtifact`, `CloudArtifactsResult`, `CloudWebDriverProviderCapabilities`, `BrowserStackWebDriverRuntimeOptions`, `AwsDeviceFarmWebDriverRuntimeOptions`
 - `agent-device/android-snapshot-helper`
   - `ensureAndroidSnapshotHelper(options)`
   - `captureAndroidSnapshotWithHelper(options)`
@@ -87,7 +78,7 @@ Public subpath API exposed for Node consumers:
   - `getAndroidAppStateWithAdb(executor)`
   - types: `AndroidAdbProvider`, `AndroidAdbExecutor`, `AndroidAdbExecutorOptions`, `AndroidAdbExecutorResult`, `AndroidAdbProcess`, `AndroidAdbSpawner`, `AndroidPortReverseProvider`, `AndroidTextInjector`
 
-The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `artifacts`, `cloud-webdriver`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are no longer published.
+The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `artifacts`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/cloud-webdriver`, `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are not published.
 
 ## Basic usage
 
@@ -145,7 +136,27 @@ for (const artifact of result.cloudArtifacts) {
 }
 ```
 
-The `agent-device/cloud-webdriver` subpath is the reusable provider-runtime layer for BrowserStack, AWS Device Farm remote access, and custom Appium/WebDriver clouds. It exposes explicit provider capability metadata because WebDriver cloud snapshots use Appium page source, not the native iOS runner or Android snapshot helper backends.
+## Device cloud sessions
+
+BrowserStack and AWS Device Farm can be driven through the normal typed client methods. Use the CLI `connect browserstack` / `connect aws-device-farm` flow when you want persisted local connection state. Use direct client config when a Node integration already owns credentials and provider selectors.
+
+```ts
+import { createAgentDeviceClient } from 'agent-device';
+
+const client = createAgentDeviceClient({
+  leaseProvider: 'browserstack',
+  platform: 'android',
+  device: 'Google Pixel 8',
+  providerOsVersion: '14.0',
+  providerApp: 'bs://app-id',
+});
+
+await client.apps.open({ app: 'com.example.app' });
+await client.capture.snapshot({ interactiveOnly: true });
+const closed = await client.sessions.close();
+```
+
+Use `client.sessions.artifacts({ provider, providerSessionId })` with `closed.provider?.providerSessionId` to fetch hosted video/log URLs after close. See [Device Clouds & Farms](/agent-device/pr-preview/pr-948/docs/device-clouds.md) for BrowserStack, AWS Device Farm, CLI, JavaScript, and MCP flows.
 
 ## Web sessions
 

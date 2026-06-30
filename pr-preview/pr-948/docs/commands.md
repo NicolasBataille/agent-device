@@ -83,6 +83,7 @@ agent-device app-switcher
 - Remote daemon clients can pass `--daemon-base-url http(s)://host:port[/base-path]` to skip local daemon discovery/startup and call a remote HTTP daemon directly.
 - Use `--daemon-auth-token <token>` (or `AGENT_DEVICE_DAEMON_AUTH_TOKEN`) for explicit service/API-token automation against non-loopback remote daemon URLs; the client sends it in both the JSON-RPC request token and HTTP auth headers.
 - Use [Remote Proxy](/agent-device/pr-preview/pr-948/docs/remote-proxy.md) when you need to run `agent-device proxy` on a Mac with simulator/device access and drive it from another machine through cloudflared, ngrok, or another HTTP tunnel.
+- Use [Device Clouds & Farms](/agent-device/pr-preview/pr-948/docs/device-clouds.md) when agents need BrowserStack or AWS Device Farm sessions from CI without interactive login.
 - For human cloud access, `connect` can discover a cloud connection profile, while `connect --remote-config ...` uses a local profile. Both refresh a stored CLI session into a short-lived `adc_agent_...` token when needed. If no CLI session exists, interactive shells start login automatically; CI and non-interactive shells fail with API-token setup instructions. Use `--no-login` to disable implicit login. `AGENT_DEVICE_CLOUD_BASE_URL` is the bridge/control-plane API origin; its `/api-keys` route may redirect to the dashboard for token creation.
 - For remote `connect` and `connect --remote-config` flows, see [Remote Metro workflow](#remote-metro-workflow).
 - Android React Native relaunch flows require an installed package name for `open --relaunch`; install/reinstall the APK first, then relaunch by package. `open <apk|aab> --relaunch` is rejected because runtime hints are written through the installed app sandbox.
@@ -606,9 +607,8 @@ agent-device keyboard dismiss
 ```
 
 - `keyboard status` (or `keyboard get`) returns keyboard visibility and best-effort input type classification on Android.
-- `keyboard dismiss` attempts a non-navigation keyboard dismissal on Android and a native dismiss gesture/control on iOS, including common safe controls such as a keyboard toolbar `Done` button, then confirms the keyboard is hidden.
-- If the keyboard remains visible after the platform-native dismiss path, the command returns an explicit `UNSUPPORTED_OPERATION` error instead of falling back to back navigation.
-- On iOS, `keyboard dismiss` is best-effort and can fail when the active app exposes no native dismiss gesture/control. Prefer a visible app dismiss control, or use `back --system` only when system navigation is an acceptable side effect.
+- To hide the keyboard, use `keyboard dismiss`. It taps safe controls like `Done` when available and verifies the keyboard closed.
+- If it reports `UNSUPPORTED_OPERATION`, press a visible app control such as `Done` only when that is the intended fallback.
 - Works with active sessions and explicit selectors (`--platform`, `--device`, `--udid`, `--serial`).
 - `keyboard status|get` is supported on Android emulator/device.
 - `keyboard dismiss` is supported on Android emulator/device and best-effort on iOS simulator/device.
@@ -972,7 +972,7 @@ agent-device artifacts --provider aws-device-farm --provider-session <remote-acc
 - `artifacts` lists provider-hosted cloud artifacts such as videos, Appium logs, device logs, automation logs, and provider dashboard links.
 - The response uses `cloudArtifacts` so it stays separate from daemon-managed local `artifacts` returned by screenshot, recording, install, replay, and remote materialization flows.
 - Plain text output prints ready provider URLs. Use `--json` when scripts need the structured `cloudArtifacts` array.
-- Historical lookup requires `--provider-session <id>` plus `--provider <name>`. BrowserStack expects `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY`; AWS Device Farm uses the AWS CLI credential chain and infers the region from the session ARN when possible.
+- Historical lookup requires `--provider-session <id>` plus `--provider <name>`. BrowserStack expects `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY`; AWS Device Farm uses the AWS CLI credential chain and infers the region from the session ARN when possible. See [Device Clouds & Farms](/agent-device/pr-preview/pr-948/docs/device-clouds.md) for autonomous CI credential setup.
 - When a cloud runtime is registered in-process by an embedding host, `artifacts` can infer the active provider session from the current lease before disconnect.
 - `disconnect --json` and `close --json` include provider release data when the runtime returns final cloud artifacts after session teardown. Some providers only finalize video/log URLs after the remote session is stopped, so retry `agent-device artifacts <provider-session-id> --provider <name> --json` if the first response is `pending`.
 
