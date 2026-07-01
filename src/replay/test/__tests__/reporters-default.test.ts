@@ -41,19 +41,33 @@ function emptySuite(): ReplaySuiteResult {
   };
 }
 
+function withCiEnv<T>(value: string | undefined, run: () => T): T {
+  const original = process.env.CI;
+  if (value === undefined) delete process.env.CI;
+  else process.env.CI = value;
+  try {
+    return run();
+  } finally {
+    if (original === undefined) delete process.env.CI;
+    else process.env.CI = original;
+  }
+}
+
 test('default replay test reporter hides and restores cursor for tty progress', () => {
-  const reporter = createDefaultReplayTestReporter();
-  const { context, stderr, stdout } = createReporterContext({ stderrIsTty: true });
+  withCiEnv(undefined, () => {
+    const reporter = createDefaultReplayTestReporter();
+    const { context, stderr, stdout } = createReporterContext({ stderrIsTty: true });
 
-  reporter.onSuiteStart?.(
-    { total: 0, runnable: 0, skipped: 0, artifactsDir: '/tmp/replay' },
-    context,
-  );
-  reporter.onSuiteEnd?.(emptySuite(), context);
+    reporter.onSuiteStart?.(
+      { total: 0, runnable: 0, skipped: 0, artifactsDir: '/tmp/replay' },
+      context,
+    );
+    reporter.onSuiteEnd?.(emptySuite(), context);
 
-  assert.equal(stderr[0], '\u001B[?25l');
-  assert.equal(stderr.at(-1), '\u001B[?25h');
-  assert.deepEqual(stdout, ['Test summary: 0 passed (0) in 0s\n']);
+    assert.equal(stderr[0], '\u001B[?25l');
+    assert.equal(stderr.at(-1), '\u001B[?25h');
+    assert.deepEqual(stdout, ['Test summary: 0 passed (0) in 0s\n']);
+  });
 });
 
 test('default replay test reporter leaves cursor alone for non-tty streams', () => {
