@@ -188,6 +188,8 @@ test('test emits progress when attempts retry and pass', async () => {
     maxAttempts: 2,
     stepIndex: 1,
     stepTotal: 1,
+    stepCommand: 'open',
+    stepValue: 'Demo',
   });
   expect(testEvents[2]).toMatchObject({
     type: 'replay-test',
@@ -211,6 +213,8 @@ test('test emits progress when attempts retry and pass', async () => {
     maxAttempts: 2,
     stepIndex: 1,
     stepTotal: 1,
+    stepCommand: 'open',
+    stepValue: 'Demo',
   });
   expect(testEvents[4]).toMatchObject({
     type: 'replay-test',

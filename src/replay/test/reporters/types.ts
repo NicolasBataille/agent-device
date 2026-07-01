@@ -45,6 +45,8 @@ export type ReplayTestCase = {
 export type ReplayTestStep = ReplayTestCase & {
   stepIndex?: number;
   stepTotal?: number;
+  stepCommand?: string;
+  stepValue?: string;
 };
 
 export type ReplayTestResult = ReplayTestCase & {

@@ -20,6 +20,8 @@ export type ReplayTestProgressEvent = {
   total: number;
   stepIndex?: number;
   stepTotal?: number;
+  stepCommand?: string;
+  stepValue?: string;
   attempt?: number;
   maxAttempts?: number;
   durationMs?: number;
@@ -47,7 +49,15 @@ export type RequestProgressEvent =
 export type RequestProgressSink = (event: RequestProgressEvent) => void;
 export type ReplayTestActionProgressContext = Omit<
   ReplayTestProgressEvent,
-  'type' | 'status' | 'stepIndex' | 'stepTotal' | 'durationMs' | 'retrying' | 'message'
+  | 'type'
+  | 'status'
+  | 'stepIndex'
+  | 'stepTotal'
+  | 'stepCommand'
+  | 'stepValue'
+  | 'durationMs'
+  | 'retrying'
+  | 'message'
 >;
 
 const requestProgress = new AsyncLocalStorage<RequestProgressSink | undefined>();

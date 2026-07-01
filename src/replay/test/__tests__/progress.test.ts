@@ -23,6 +23,24 @@ function renderTestResult(
     ?.text;
 }
 
+function withForcedColor<T>(run: () => T): T {
+  const originalForceColor = process.env.FORCE_COLOR;
+  const originalNoColor = process.env.NO_COLOR;
+  process.env.FORCE_COLOR = '1';
+  delete process.env.NO_COLOR;
+  try {
+    return run();
+  } finally {
+    restoreEnvValue('FORCE_COLOR', originalForceColor);
+    restoreEnvValue('NO_COLOR', originalNoColor);
+  }
+}
+
+function restoreEnvValue(name: 'FORCE_COLOR' | 'NO_COLOR', value: string | undefined): void {
+  if (typeof value === 'string') process.env[name] = value;
+  else delete process.env[name];
+}
+
 test('createReplayTestProgressRenderer renders pass, retry, fail, and skip cases', () => {
   const cases: Array<{ event: ReplayTestResult; expected: RegExp }> = [
     {
@@ -130,12 +148,8 @@ test('createReplayTestProgressRenderer colors stderr progress rows when stdout i
   }
 });
 
-test('createReplayTestProgressRenderer dims live step progress when color is enabled', () => {
-  const originalForceColor = process.env.FORCE_COLOR;
-  const originalNoColor = process.env.NO_COLOR;
-  process.env.FORCE_COLOR = '1';
-  delete process.env.NO_COLOR;
-  try {
+test('createReplayTestProgressRenderer renders live step progress with spinner and action detail', () => {
+  withForcedColor(() => {
     const renderer = createReplayTestProgressRenderer({ liveProgress: true });
     const rendered = renderer.render({
       type: 'test-step',
@@ -146,27 +160,61 @@ test('createReplayTestProgressRenderer dims live step progress when color is ena
         total: 1,
         stepIndex: 3,
         stepTotal: 20,
+        stepCommand: 'tapOn',
+        stepValue: 'Sign in',
       },
     });
 
     assert.deepEqual(rendered, {
-      text: '\r\u001B[2K⊙ Checkout flow\u001B[2m [3/20]\u001B[22m',
+      text: '\r\u001B[2K\u001B[34m⠋\u001B[39m Checkout flow \u001B[2m[\u001B[22m\u001B[2m3/20\u001B[22m \u001B[35mtapOn\u001B[39m \u001B[32mSign in\u001B[39m\u001B[2m]\u001B[22m',
       newline: false,
     });
-  } finally {
-    if (typeof originalForceColor === 'string') process.env.FORCE_COLOR = originalForceColor;
-    else delete process.env.FORCE_COLOR;
-    if (typeof originalNoColor === 'string') process.env.NO_COLOR = originalNoColor;
-    else delete process.env.NO_COLOR;
-  }
+  });
+});
+
+test('createReplayTestProgressRenderer trims live step progress by visible columns', () => {
+  withForcedColor(() => {
+    const renderer = createReplayTestProgressRenderer({ liveProgress: true, columns: 56 });
+    const rendered = renderer.render({
+      type: 'test-step',
+      test: {
+        file: '/tmp/checkout-form.yaml',
+        index: 1,
+        total: 1,
+        stepIndex: 2,
+        stepTotal: 20,
+        stepCommand: 'assertVisible',
+        stepValue: 'Agent',
+      },
+    });
+
+    assert.deepEqual(rendered, {
+      text: '\r\u001B[2K\u001B[34m⠋\u001B[39m checkout-form.yaml \u001B[2m[\u001B[22m\u001B[2m2/20\u001B[22m \u001B[35massertVisible\u001B[39m \u001B[32mAgent\u001B[39m\u001B[2m]\u001B[22m',
+      newline: false,
+    });
+
+    const truncatingRenderer = createReplayTestProgressRenderer({
+      liveProgress: true,
+      columns: 36,
+    });
+    const truncated = truncatingRenderer.render({
+      type: 'test-step',
+      test: {
+        file: '/tmp/checkout-form.yaml',
+        index: 1,
+        total: 1,
+        stepIndex: 2,
+        stepTotal: 20,
+        stepCommand: 'assertVisible',
+        stepValue: 'Agent Login',
+      },
+    });
+    assert.ok(truncated?.text.endsWith('...\u001B[0m'));
+  });
 });
 
 test('createReplayTestProgressRenderer colors completed result markers when color is enabled', () => {
-  const originalForceColor = process.env.FORCE_COLOR;
-  const originalNoColor = process.env.NO_COLOR;
-  process.env.FORCE_COLOR = '1';
-  delete process.env.NO_COLOR;
-  try {
+  withForcedColor(() => {
     assert.equal(
       renderTestResult({
         file: '/tmp/01-pass.ad',
@@ -201,10 +249,5 @@ test('createReplayTestProgressRenderer colors completed result markers when colo
       message: 'boom',
     });
     assert.ok(failedLine?.startsWith('\u001B[31m⨯\u001B[39m Checkout failure'));
-  } finally {
-    if (typeof originalForceColor === 'string') process.env.FORCE_COLOR = originalForceColor;
-    else delete process.env.FORCE_COLOR;
-    if (typeof originalNoColor === 'string') process.env.NO_COLOR = originalNoColor;
-    else delete process.env.NO_COLOR;
-  }
+  });
 });

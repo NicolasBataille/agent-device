@@ -1,4 +1,5 @@
 appId: com.callstack.agentdevicelab
+name: Checkout form
 env:
   CHECKOUT_NAME: Ada Lovelace
   CHECKOUT_EMAIL: ada@example.com

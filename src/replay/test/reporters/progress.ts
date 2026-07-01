@@ -40,6 +40,8 @@ export function toReplayTestReporterProgressEvent(
         ...test,
         stepIndex: event.stepIndex,
         stepTotal: event.stepTotal,
+        stepCommand: event.stepCommand,
+        stepValue: event.stepValue,
       },
     };
   }

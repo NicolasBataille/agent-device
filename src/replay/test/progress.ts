@@ -24,11 +24,21 @@ export type ReplayTestProgressRenderer = {
   render(event: ReplayTestReporterProgressEvent): ReplayTestProgressRender | undefined;
 };
 
+const REPLAY_TEST_PROGRESS_SPINNER = {
+  interval: 80,
+  frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
+};
+const ANSI_ESCAPE_PREFIX = `${String.fromCharCode(27)}[`;
+const ANSI_RESET = `${ANSI_ESCAPE_PREFIX}0m`;
+
+export const REPLAY_TEST_PROGRESS_SPINNER_INTERVAL_MS = REPLAY_TEST_PROGRESS_SPINNER.interval;
+
 export function createReplayTestProgressRenderer(
   options: ReplayTestProgressFormatOptions = {},
 ): ReplayTestProgressRenderer {
   const completedKeys = new Set<string>();
   let hasLiveProgressLine = false;
+  let spinnerFrameIndex = 0;
   return {
     render(event) {
       if (event.type === 'suite-start') {
@@ -39,8 +49,12 @@ export function createReplayTestProgressRenderer(
       if (event.type === 'test-step') {
         if (!options.liveProgress) return undefined;
         hasLiveProgressLine = true;
+        const spinnerFrame = nextReplayTestProgressSpinnerFrame(spinnerFrameIndex);
+        spinnerFrameIndex += 1;
         return {
-          text: clearLinePrefix(formatReplayTestLiveProgressLine(event.test, options)),
+          text: clearLinePrefix(
+            formatReplayTestLiveProgressLine(event.test, options, spinnerFrame),
+          ),
           newline: false,
         };
       }
@@ -57,6 +71,13 @@ export function createReplayTestProgressRenderer(
       return { text, newline: true };
     },
   };
+}
+
+function nextReplayTestProgressSpinnerFrame(index: number): string {
+  return (
+    REPLAY_TEST_PROGRESS_SPINNER.frames[index % REPLAY_TEST_PROGRESS_SPINNER.frames.length] ??
+    REPLAY_TEST_PROGRESS_SPINNER.frames[0]!
+  );
 }
 
 function formatReplayTestProgressEvent(
@@ -81,24 +102,31 @@ function replayTestStatusIcon(status: ReplayTestResult['status']): string {
 function formatReplayTestLiveProgressLine(
   event: ReplayTestStep,
   options: ReplayTestProgressFormatOptions,
+  spinnerFrame: string,
 ): string {
   const title = event.title?.trim();
   const file = path.basename(event.file);
   const useColor = supportsColor(process.stderr);
+  const spinner = formatReplayTestProgressSpinner(spinnerFrame, { useColor });
   const shardSuffix = formatReplayTestProgressShardSuffix(event, { useColor });
   const stepSuffix = formatReplayTestLiveProgressStepSuffix(event, { useColor });
   const suffix = `${shardSuffix}${stepSuffix}`;
-  const prefix = '⊙ ';
+  const prefix = `${spinner} `;
   if (!title) return trimToColumns(`${prefix}${file}${suffix}`, options.columns);
 
-  const titlePrefix = prefix;
-  const titleSuffix = suffix;
   const availableTitleColumns = Math.max(
     0,
-    resolveColumns(options.columns) - titlePrefix.length - titleSuffix.length,
+    resolveColumns(options.columns) - visibleLength(prefix) - visibleLength(suffix),
   );
   const formattedTitle = trimToColumns(title, availableTitleColumns);
-  return trimToColumns(`${titlePrefix}${formattedTitle}${titleSuffix}`, options.columns);
+  return trimToColumns(`${prefix}${formattedTitle}${suffix}`, options.columns);
+}
+
+function formatReplayTestProgressSpinner(
+  frame: string,
+  options: { useColor?: boolean } = {},
+): string {
+  return options.useColor ? colorizeProgressMarker(frame, 'blue') : frame;
 }
 
 function formatReplayTestLiveProgressStepSuffix(
@@ -107,8 +135,21 @@ function formatReplayTestLiveProgressStepSuffix(
 ): string {
   const stepIndex = event.stepIndex ?? 0;
   const stepTotal = event.stepTotal ?? 0;
-  const suffix = ` [${stepIndex}/${stepTotal}]`;
-  return options.useColor ? colorizeProgressMarker(suffix, 'dim') : suffix;
+  const stepMarker = `${stepIndex}/${stepTotal}`;
+  const command = event.stepCommand?.trim();
+  const value = event.stepValue?.trim();
+  if (!options.useColor) {
+    const details = [stepMarker, command, value].filter(Boolean).join(' ');
+    return ` [${details}]`;
+  }
+  const openBracket = colorizeProgressMarker('[', 'dim');
+  const closeBracket = colorizeProgressMarker(']', 'dim');
+  const details = [
+    colorizeProgressMarker(stepMarker, 'dim'),
+    command ? colorizeProgressMarker(command, 'magenta') : '',
+    value ? colorizeProgressMarker(value, 'green') : '',
+  ].filter(Boolean);
+  return ` ${openBracket}${details.join(' ')}${closeBracket}`;
 }
 
 function addReplayTestCaseDetailLines(
@@ -240,10 +281,58 @@ function resolveColumns(columns: number | undefined): number {
 
 function trimToColumns(value: string, columns: number | undefined): string {
   const limit = resolveColumns(columns);
-  if (value.length <= limit) return value;
+  if (visibleLength(value) <= limit) return value;
   if (limit <= 0) return '';
   if (limit <= 3) return '.'.repeat(limit);
-  return `${value.slice(0, limit - 3)}...`;
+  return `${sliceVisibleColumns(value, limit - 3)}...${hasAnsi(value) ? ANSI_RESET : ''}`;
+}
+
+function visibleLength(value: string): number {
+  let length = 0;
+  for (let index = 0; index < value.length; ) {
+    const ansi = readAnsiEscapeAt(value, index);
+    if (ansi) {
+      index += ansi.length;
+      continue;
+    }
+    length += 1;
+    index += 1;
+  }
+  return length;
+}
+
+function hasAnsi(value: string): boolean {
+  return value.includes(ANSI_ESCAPE_PREFIX);
+}
+
+function sliceVisibleColumns(value: string, columns: number): string {
+  if (columns <= 0) return '';
+  let visibleColumns = 0;
+  let output = '';
+  for (let index = 0; index < value.length && visibleColumns < columns; ) {
+    const ansi = readAnsiEscapeAt(value, index);
+    if (ansi) {
+      output += ansi;
+      index += ansi.length;
+      continue;
+    }
+    output += value[index];
+    index += 1;
+    visibleColumns += 1;
+  }
+  return output;
+}
+
+function readAnsiEscapeAt(value: string, index: number): string | null {
+  if (!value.startsWith(ANSI_ESCAPE_PREFIX, index)) return null;
+  for (let cursor = index + ANSI_ESCAPE_PREFIX.length; cursor < value.length; cursor += 1) {
+    if (isAnsiFinalByte(value.charCodeAt(cursor))) return value.slice(index, cursor + 1);
+  }
+  return null;
+}
+
+function isAnsiFinalByte(code: number): boolean {
+  return code >= 0x40 && code <= 0x7e;
 }
 
 function replayTestProgressStepLines(event: ReplayTestResult): string[] {

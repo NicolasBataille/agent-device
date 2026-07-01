@@ -6,7 +6,10 @@
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "buildCacheProvider": {
-      "plugin": "expo-build-disk-cache"
+      "plugin": "expo-build-disk-cache",
+      "options": {
+        "cacheDir": "~/Developer/agent-device/.expo/build-run-cache"
+      }
     },
     "plugins": ["expo-router"],
     "ios": {

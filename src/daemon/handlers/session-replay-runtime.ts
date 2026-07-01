@@ -4,13 +4,18 @@ import { type CommandFlags } from '../../core/dispatch.ts';
 import { parseReplayInput } from '../../compat/replay-input.ts';
 import { asAppError } from '../../kernel/errors.ts';
 import type { DaemonInvokeFn, DaemonRequest, DaemonResponse, SessionAction } from '../types.ts';
-import { emitRequestProgress, readReplayTestActionProgress } from '../request-progress.ts';
+import {
+  emitRequestProgress,
+  readReplayTestActionProgress,
+  type ReplayTestProgressEvent,
+} from '../request-progress.ts';
 import { SessionStore } from '../session-store.ts';
 import { type ReplayScriptMetadata, writeReplayScript } from '../../replay/script.ts';
 import { healReplayAction } from './session-replay-heal.ts';
 import { formatScriptActionSummary } from '../../replay/script-utils.ts';
 import { errorResponse } from './response.ts';
 import { invokeReplayAction } from './session-replay-action-runtime.ts';
+import { tryParseSelectorChain } from '../selectors.ts';
 import {
   buildReplayVarScope,
   collectReplayShellEnv,
@@ -93,7 +98,7 @@ export async function runReplayScriptFile(params: {
     for (let index = 0; index < actions.length; index += 1) {
       const action = actions[index];
       if (!action || action.command === 'replay') continue;
-      emitReplayTestActionProgress(resolved, index, actions.length);
+      emitReplayTestActionProgress(resolved, index, actions.length, action);
 
       const sampleStart = readSessionSnapshotSampleCount(sessionStore, sessionName);
       let response = await invokeReplayAction({
@@ -239,6 +244,7 @@ function emitReplayTestActionProgress(
   file: string,
   actionIndex: number,
   actionTotal: number,
+  action: SessionAction,
 ): void {
   const progress = readReplayTestActionProgress();
   if (!progress) return;
@@ -249,7 +255,53 @@ function emitReplayTestActionProgress(
     status: 'progress',
     stepIndex: actionIndex + 1,
     stepTotal: actionTotal,
+    ...formatReplayTestActionProgress(action),
   });
+}
+
+function formatReplayTestActionProgress(
+  action: SessionAction,
+): Pick<ReplayTestProgressEvent, 'stepCommand' | 'stepValue'> {
+  return {
+    stepCommand: formatReplayTestProgressCommand(action.command),
+    ...formatReplayTestProgressValue(action),
+  };
+}
+
+function formatReplayTestProgressCommand(command: string): string {
+  if (!command.startsWith('__maestro')) return command;
+  const name = command.slice('__maestro'.length);
+  return name.length > 0 ? name[0]!.toLowerCase() + name.slice(1) : command;
+}
+
+function formatReplayTestProgressValue(
+  action: SessionAction,
+): Pick<ReplayTestProgressEvent, 'stepValue'> {
+  const positionals = action.positionals ?? [];
+  const selectorValue = readSelectorDisplayValue(positionals[0]);
+  if (selectorValue) return { stepValue: selectorValue };
+  if (action.command === '__maestroTapPointPercent' && positionals.length >= 2) {
+    return { stepValue: `${positionals[0]},${positionals[1]}%` };
+  }
+  if (positionals.length === 0) return {};
+  return { stepValue: positionals.join(' ') };
+}
+
+function readSelectorDisplayValue(selector: string | undefined): string | undefined {
+  if (!selector) return undefined;
+  const parsed = tryParseSelectorChain(selector);
+  if (!parsed) return undefined;
+  const values = parsed.selectors.flatMap((entry) =>
+    entry.terms.flatMap((term) =>
+      (term.key === 'label' || term.key === 'text' || term.key === 'id') &&
+      typeof term.value === 'string'
+        ? [term.value]
+        : [],
+    ),
+  );
+  if (values.length === 0) return undefined;
+  const first = values[0];
+  return first && values.every((value) => value === first) ? first : undefined;
 }
 
 function buildReplayMetadataFlags(
