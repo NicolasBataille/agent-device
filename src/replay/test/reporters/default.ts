@@ -43,13 +43,13 @@ export function createDefaultReplayTestReporter(): ReplayTestReporter {
     latestLiveProgressEvent = event.type === 'test-step' ? event : undefined;
     progressRenderer ??= createReplayTestProgressRenderer({
       verbose: context.verbose,
-      liveProgress: context.stderr.isTTY && !process.env.CI,
+      liveProgress: shouldUseLiveProgress(context),
       columns: context.stderr.columns,
     });
     const output = progressRenderer.render(event);
     if (!output) return;
     context.stderr.write(output.newline ? `${output.text}\n` : output.text);
-    if (event.type === 'test-step' && context.stderr.isTTY && !process.env.CI) {
+    if (event.type === 'test-step' && shouldUseLiveProgress(context)) {
       startLiveProgressInterval(context);
     }
   };
@@ -68,7 +68,7 @@ export function createDefaultReplayTestReporter(): ReplayTestReporter {
     progressInterval = undefined;
   };
   const hideCursor = (context: ReplayTestReporterContext) => {
-    if (cursorHidden || !shouldControlCursor(context)) return;
+    if (cursorHidden || !shouldUseLiveProgress(context)) return;
     context.stderr.write(HIDE_CURSOR);
     cursorHidden = true;
   };
@@ -99,7 +99,7 @@ export function createDefaultReplayTestReporter(): ReplayTestReporter {
   };
 }
 
-function shouldControlCursor(context: ReplayTestReporterContext): boolean {
+function shouldUseLiveProgress(context: ReplayTestReporterContext): boolean {
   return context.stderr.isTTY && !process.env.CI;
 }
 
