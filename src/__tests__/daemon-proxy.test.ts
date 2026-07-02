@@ -10,6 +10,15 @@ import {
   skipWhenLoopbackUnavailable,
 } from './test-utils/index.ts';
 
+const PROXY_ARTIFACT_INVENTORY_ENTRY = {
+  id: 'shot-1',
+  filename: 'shot.png',
+  mimeType: 'image/png',
+  sizeBytes: 8,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  expiresAt: '2026-01-01T00:15:00.000Z',
+};
+
 test('daemon proxy forwards rpc requests with upstream daemon token', async (t) => {
   if (await skipWhenLoopbackUnavailable(t)) return;
 
@@ -163,63 +172,8 @@ test('daemon proxy leaves health endpoint unauthenticated', async (t) => {
 test('daemon proxy streams uploads and artifact downloads with upstream daemon token', async (t) => {
   if (await skipWhenLoopbackUnavailable(t)) return;
 
-  let uploadAuth = '';
-  let uploadTokenHeader = '';
-  let uploadArtifactType = '';
-  let uploadArtifactFilename = '';
-  let uploadBody = '';
-  let artifactListAuth = '';
-  let artifactListTokenHeader = '';
-  let artifactAuth = '';
-  let artifactTokenHeader = '';
-  const upstream = http.createServer((req, res) => {
-    if (req.method === 'POST' && req.url === '/upload') {
-      uploadAuth = String(req.headers.authorization ?? '');
-      uploadTokenHeader = String(req.headers['x-agent-device-token'] ?? '');
-      uploadArtifactType = String(req.headers['x-artifact-type'] ?? '');
-      uploadArtifactFilename = String(req.headers['x-artifact-filename'] ?? '');
-      req.setEncoding('utf8');
-      req.on('data', (chunk) => {
-        uploadBody += chunk;
-      });
-      req.on('end', () => {
-        res.setHeader('content-type', 'application/json');
-        res.end(JSON.stringify({ ok: true, uploadId: 'upload-1' }));
-      });
-      return;
-    }
-
-    if (req.method === 'GET' && req.url === '/artifacts') {
-      artifactListAuth = String(req.headers.authorization ?? '');
-      artifactListTokenHeader = String(req.headers['x-agent-device-token'] ?? '');
-      res.setHeader('content-type', 'application/json');
-      res.end(
-        JSON.stringify({
-          artifacts: [
-            {
-              id: 'shot-1',
-              filename: 'shot.png',
-              mimeType: 'image/png',
-              sizeBytes: 8,
-              createdAt: '2026-01-01T00:00:00.000Z',
-              expiresAt: '2026-01-01T00:15:00.000Z',
-            },
-          ],
-        }),
-      );
-      return;
-    }
-
-    assert.equal(req.method, 'GET');
-    assert.equal(req.url, '/artifacts/shot-1?download=1');
-    artifactAuth = String(req.headers.authorization ?? '');
-    artifactTokenHeader = String(req.headers['x-agent-device-token'] ?? '');
-    res.setHeader('content-type', 'image/png');
-    res.setHeader('content-disposition', 'attachment; filename="shot.png"');
-    res.setHeader('x-request-id', 'upstream-request-1');
-    res.write('png-');
-    res.end('body');
-  });
+  const capture: UploadAndArtifactProxyCapture = {};
+  const upstream = createUploadAndArtifactProxyUpstream(capture);
   const proxy = createDaemonProxyServer({
     upstreamBaseUrl: `http://127.0.0.1:${await listenOnLoopback(upstream)}`,
     upstreamToken: 'daemon-secret',
@@ -240,30 +194,25 @@ test('daemon proxy streams uploads and artifact downloads with upstream daemon t
     });
     assert.equal(upload.status, 200);
     assert.deepEqual(await upload.json(), { ok: true, uploadId: 'upload-1' });
-    assert.equal(uploadAuth, 'Bearer daemon-secret');
-    assert.equal(uploadTokenHeader, 'daemon-secret');
-    assert.equal(uploadArtifactType, 'file');
-    assert.equal(uploadArtifactFilename, 'demo.apk');
-    assert.equal(uploadBody, 'fake-apk');
+    assert.deepEqual(capture.upload, {
+      auth: 'Bearer daemon-secret',
+      token: 'daemon-secret',
+      artifactType: 'file',
+      artifactFilename: 'demo.apk',
+      body: 'fake-apk',
+    });
 
     const artifactList = await fetch(`http://127.0.0.1:${proxyPort}/agent-device/artifacts`, {
       headers: { authorization: 'Bearer proxy-secret' },
     });
     assert.equal(artifactList.status, 200);
     assert.deepEqual(await artifactList.json(), {
-      artifacts: [
-        {
-          id: 'shot-1',
-          filename: 'shot.png',
-          mimeType: 'image/png',
-          sizeBytes: 8,
-          createdAt: '2026-01-01T00:00:00.000Z',
-          expiresAt: '2026-01-01T00:15:00.000Z',
-        },
-      ],
+      artifacts: [PROXY_ARTIFACT_INVENTORY_ENTRY],
     });
-    assert.equal(artifactListAuth, 'Bearer daemon-secret');
-    assert.equal(artifactListTokenHeader, 'daemon-secret');
+    assert.deepEqual(capture.artifactList, {
+      auth: 'Bearer daemon-secret',
+      token: 'daemon-secret',
+    });
 
     const artifact = await fetch(
       `http://127.0.0.1:${proxyPort}/agent-device/artifacts/shot-1?download=1`,
@@ -274,13 +223,102 @@ test('daemon proxy streams uploads and artifact downloads with upstream daemon t
     assert.equal(artifact.headers.get('content-type'), 'image/png');
     assert.match(artifact.headers.get('content-disposition') ?? '', /shot\.png/);
     assert.equal(artifact.headers.get('x-request-id'), 'upstream-request-1');
-    assert.equal(artifactAuth, 'Bearer daemon-secret');
-    assert.equal(artifactTokenHeader, 'daemon-secret');
+    assert.deepEqual(capture.artifactDownload, {
+      auth: 'Bearer daemon-secret',
+      token: 'daemon-secret',
+    });
   } finally {
     await closeLoopbackServer(proxy);
     await closeLoopbackServer(upstream);
   }
 });
+
+type UploadAndArtifactProxyCapture = {
+  upload?: {
+    auth: string;
+    token: string;
+    artifactType: string;
+    artifactFilename: string;
+    body: string;
+  };
+  artifactList?: {
+    auth: string;
+    token: string;
+  };
+  artifactDownload?: {
+    auth: string;
+    token: string;
+  };
+};
+
+function createUploadAndArtifactProxyUpstream(capture: UploadAndArtifactProxyCapture): http.Server {
+  return http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/upload') {
+      handleUploadProxyRequest(req, res, capture);
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/artifacts') {
+      handleArtifactListProxyRequest(req, res, capture);
+      return;
+    }
+    handleArtifactDownloadProxyRequest(req, res, capture);
+  });
+}
+
+function handleUploadProxyRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  capture: UploadAndArtifactProxyCapture,
+): void {
+  let body = '';
+  capture.upload = {
+    auth: String(req.headers.authorization ?? ''),
+    token: String(req.headers['x-agent-device-token'] ?? ''),
+    artifactType: String(req.headers['x-artifact-type'] ?? ''),
+    artifactFilename: String(req.headers['x-artifact-filename'] ?? ''),
+    body,
+  };
+  req.setEncoding('utf8');
+  req.on('data', (chunk) => {
+    body += chunk;
+  });
+  req.on('end', () => {
+    capture.upload = { ...capture.upload!, body };
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ ok: true, uploadId: 'upload-1' }));
+  });
+}
+
+function handleArtifactListProxyRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  capture: UploadAndArtifactProxyCapture,
+): void {
+  capture.artifactList = {
+    auth: String(req.headers.authorization ?? ''),
+    token: String(req.headers['x-agent-device-token'] ?? ''),
+  };
+  res.setHeader('content-type', 'application/json');
+  res.end(JSON.stringify({ artifacts: [PROXY_ARTIFACT_INVENTORY_ENTRY] }));
+}
+
+function handleArtifactDownloadProxyRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  capture: UploadAndArtifactProxyCapture,
+): void {
+  assert.equal(req.method, 'GET');
+  assert.equal(req.url, '/artifacts/shot-1?download=1');
+  capture.artifactDownload = {
+    auth: String(req.headers.authorization ?? ''),
+    token: String(req.headers['x-agent-device-token'] ?? ''),
+  };
+  res.setHeader('content-type', 'image/png');
+  res.setHeader('content-disposition', 'attachment; filename="shot.png"');
+  res.setHeader('x-request-id', 'upstream-request-1');
+  res.write('png-');
+  res.end('body');
+}
 
 test('daemon proxy forwards resumable upload routes and rewrites direct upload tickets', async (t) => {
   if (await skipWhenLoopbackUnavailable(t)) return;
