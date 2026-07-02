@@ -1,5 +1,4 @@
 import http, { type IncomingHttpHeaders } from 'node:http';
-import fs from 'node:fs';
 import { AppError, normalizeError, toAppErrorCode } from '../../kernel/errors.ts';
 import { emitDiagnostic } from '../../utils/diagnostics.ts';
 import { timingSafeStringEqual } from '../../utils/timing-safe-equal.ts';
@@ -22,11 +21,6 @@ import {
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { sleep } from '../../utils/timeouts.ts';
-import {
-  cleanupDownloadableArtifact,
-  listDownloadableArtifacts,
-  prepareDownloadableArtifact,
-} from '../artifact-tracking.ts';
 import { type RequestProgressEvent, withRequestProgressSink } from '../request-progress.ts';
 import {
   serializeDaemonProgressEnvelope,
@@ -36,6 +30,7 @@ import {
 import { buildDaemonHealthPayload } from '../http-health.ts';
 import { sendRestJsonError, statusCodeForNormalizedError } from '../http-errors.ts';
 import { tryHandleUploadHttpRoute } from '../upload-http.ts';
+import { tryHandleDownloadableArtifactHttpRoute } from '../downloadable-artifact-http.ts';
 
 type JsonRpcRequest = JsonRpcRequestEnvelope;
 
@@ -548,13 +543,21 @@ export async function createDaemonHttpServer(options: {
       return;
     }
 
-    if (req.method === 'GET' && isArtifactInventoryRoute(req.url)) {
-      void handleArtifactInventory(req, res, authHook, token);
-      return;
-    }
-
-    if (req.method === 'GET' && isArtifactDownloadRoute(req.url)) {
-      void handleArtifactDownload(req, res, authHook, token, { retainArtifacts });
+    if (
+      tryHandleDownloadableArtifactHttpRoute({
+        req,
+        res,
+        retainArtifacts,
+        authorize: async (request) =>
+          await authorizeAuxiliaryHttpRequest({
+            req: request.req,
+            res: request.res,
+            authHook,
+            expectedToken: token,
+            daemonRequest: request.daemonRequest,
+          }),
+      })
+    ) {
       return;
     }
 
@@ -740,124 +743,6 @@ export async function createDaemonHttpServer(options: {
       }
     });
   });
-}
-
-async function handleArtifactDownload(
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-  authHook: HttpAuthHook | null,
-  expectedToken?: string,
-  options: { retainArtifacts?: boolean } = {},
-): Promise<void> {
-  const artifactId = readArtifactId(req.url);
-  if (!artifactId) {
-    res.statusCode = 400;
-    res.end('Missing artifact id');
-    return;
-  }
-  try {
-    const auth = await authorizeAuxiliaryHttpRequest({
-      req,
-      res,
-      authHook,
-      expectedToken,
-      daemonRequest: {
-        command: 'download_artifact',
-        positionals: [artifactId],
-      },
-    });
-    if (!auth) return;
-
-    const artifact = await prepareDownloadableArtifact(artifactId, auth.tenantId);
-    const retainArtifactAfterDownload = options.retainArtifacts === true;
-    const stream = fs.createReadStream(artifact.artifactPath);
-    res.statusCode = 200;
-    res.setHeader('content-type', artifact.mimeType);
-    res.setHeader('content-length', String(artifact.sizeBytes));
-    if (artifact.fileName) {
-      res.setHeader(
-        'content-disposition',
-        `attachment; filename="${artifact.fileName.replace(/"/g, '')}"`,
-      );
-    }
-    stream.on('error', (error) => {
-      if (!res.headersSent) {
-        const normalized = normalizeError(error);
-        res.statusCode = statusCodeForNormalizedError(normalized.code);
-        res.end(normalized.message);
-      } else {
-        res.destroy(error as Error);
-      }
-    });
-    let didCleanupArtifact = false;
-    const cleanupCompletedDownload = () => {
-      if (didCleanupArtifact || retainArtifactAfterDownload) return;
-      didCleanupArtifact = true;
-      cleanupDownloadableArtifact(artifactId);
-    };
-    res.on('close', () => {
-      if (res.writableFinished) {
-        cleanupCompletedDownload();
-      }
-    });
-    stream.pipe(res);
-  } catch (error) {
-    const normalized = normalizeError(error);
-    sendRestJsonError(res, normalized);
-  }
-}
-
-async function handleArtifactInventory(
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-  authHook: HttpAuthHook | null,
-  expectedToken?: string,
-): Promise<void> {
-  try {
-    const auth = await authorizeAuxiliaryHttpRequest({
-      req,
-      res,
-      authHook,
-      expectedToken,
-      daemonRequest: {
-        command: 'list_artifacts',
-        positionals: [],
-      },
-    });
-    if (!auth) return;
-
-    res.statusCode = 200;
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ artifacts: await listDownloadableArtifacts(auth.tenantId) }));
-  } catch (error) {
-    const normalized = normalizeError(error);
-    sendRestJsonError(res, normalized);
-  }
-}
-
-function isArtifactInventoryRoute(requestUrl: string | undefined): boolean {
-  const pathname = readRequestPathname(requestUrl);
-  return pathname === '/artifacts' || pathname === '/artifacts/';
-}
-
-function isArtifactDownloadRoute(requestUrl: string | undefined): boolean {
-  return readRequestPathname(requestUrl).startsWith('/artifacts/');
-}
-
-function readArtifactId(requestUrl: string | undefined): string {
-  const encoded = readRequestPathname(requestUrl).slice('/artifacts/'.length);
-  if (!encoded || encoded.includes('/')) return '';
-  try {
-    return decodeURIComponent(encoded);
-  } catch {
-    return '';
-  }
-}
-
-function readRequestPathname(requestUrl: string | undefined): string {
-  const requestTarget = requestUrl || '/';
-  const queryIndex = requestTarget.indexOf('?');
-  return queryIndex >= 0 ? requestTarget.slice(0, queryIndex) || '/' : requestTarget;
 }
 
 async function abortInFlightIosRunnerSessionsWhileDisconnected(
