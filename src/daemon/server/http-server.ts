@@ -22,7 +22,11 @@ import {
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { sleep } from '../../utils/timeouts.ts';
-import { cleanupDownloadableArtifact, prepareDownloadableArtifact } from '../artifact-tracking.ts';
+import {
+  cleanupDownloadableArtifact,
+  listDownloadableArtifacts,
+  prepareDownloadableArtifact,
+} from '../artifact-tracking.ts';
 import { type RequestProgressEvent, withRequestProgressSink } from '../request-progress.ts';
 import {
   serializeDaemonProgressEnvelope,
@@ -514,9 +518,10 @@ async function loadHttpAuthHook(): Promise<HttpAuthHook | null> {
 export async function createDaemonHttpServer(options: {
   handleRequest: DaemonInvokeFn;
   token?: string;
+  retainArtifacts?: boolean;
 }): Promise<http.Server> {
   const authHook = await loadHttpAuthHook();
-  const { handleRequest, token } = options;
+  const { handleRequest, token, retainArtifacts = false } = options;
   return http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/health') {
       res.statusCode = 200;
@@ -543,8 +548,13 @@ export async function createDaemonHttpServer(options: {
       return;
     }
 
-    if (req.method === 'GET' && req.url?.startsWith('/artifacts/')) {
-      void handleArtifactDownload(req, res, authHook, token);
+    if (req.method === 'GET' && isArtifactInventoryRoute(req.url)) {
+      void handleArtifactInventory(req, res, authHook, token);
+      return;
+    }
+
+    if (req.method === 'GET' && isArtifactDownloadRoute(req.url)) {
+      void handleArtifactDownload(req, res, authHook, token, { retainArtifacts });
       return;
     }
 
@@ -737,8 +747,9 @@ async function handleArtifactDownload(
   res: http.ServerResponse,
   authHook: HttpAuthHook | null,
   expectedToken?: string,
+  options: { retainArtifacts?: boolean } = {},
 ): Promise<void> {
-  const artifactId = req.url?.slice('/artifacts/'.length) ?? '';
+  const artifactId = readArtifactId(req.url);
   if (!artifactId) {
     res.statusCode = 400;
     res.end('Missing artifact id');
@@ -757,10 +768,12 @@ async function handleArtifactDownload(
     });
     if (!auth) return;
 
-    const artifact = prepareDownloadableArtifact(artifactId, auth.tenantId);
+    const artifact = await prepareDownloadableArtifact(artifactId, auth.tenantId);
+    const retainArtifactAfterDownload = options.retainArtifacts === true;
     const stream = fs.createReadStream(artifact.artifactPath);
     res.statusCode = 200;
-    res.setHeader('content-type', 'application/octet-stream');
+    res.setHeader('content-type', artifact.mimeType);
+    res.setHeader('content-length', String(artifact.sizeBytes));
     if (artifact.fileName) {
       res.setHeader(
         'content-disposition',
@@ -776,9 +789,15 @@ async function handleArtifactDownload(
         res.destroy(error as Error);
       }
     });
+    let didCleanupArtifact = false;
+    const cleanupCompletedDownload = () => {
+      if (didCleanupArtifact || retainArtifactAfterDownload) return;
+      didCleanupArtifact = true;
+      cleanupDownloadableArtifact(artifactId);
+    };
     res.on('close', () => {
       if (res.writableFinished) {
-        cleanupDownloadableArtifact(artifactId);
+        cleanupCompletedDownload();
       }
     });
     stream.pipe(res);
@@ -786,6 +805,59 @@ async function handleArtifactDownload(
     const normalized = normalizeError(error);
     sendRestJsonError(res, normalized);
   }
+}
+
+async function handleArtifactInventory(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  authHook: HttpAuthHook | null,
+  expectedToken?: string,
+): Promise<void> {
+  try {
+    const auth = await authorizeAuxiliaryHttpRequest({
+      req,
+      res,
+      authHook,
+      expectedToken,
+      daemonRequest: {
+        command: 'list_artifacts',
+        positionals: [],
+      },
+    });
+    if (!auth) return;
+
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ artifacts: await listDownloadableArtifacts(auth.tenantId) }));
+  } catch (error) {
+    const normalized = normalizeError(error);
+    sendRestJsonError(res, normalized);
+  }
+}
+
+function isArtifactInventoryRoute(requestUrl: string | undefined): boolean {
+  const pathname = readRequestPathname(requestUrl);
+  return pathname === '/artifacts' || pathname === '/artifacts/';
+}
+
+function isArtifactDownloadRoute(requestUrl: string | undefined): boolean {
+  return readRequestPathname(requestUrl).startsWith('/artifacts/');
+}
+
+function readArtifactId(requestUrl: string | undefined): string {
+  const encoded = readRequestPathname(requestUrl).slice('/artifacts/'.length);
+  if (!encoded || encoded.includes('/')) return '';
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return '';
+  }
+}
+
+function readRequestPathname(requestUrl: string | undefined): string {
+  const requestTarget = requestUrl || '/';
+  const queryIndex = requestTarget.indexOf('?');
+  return queryIndex >= 0 ? requestTarget.slice(0, queryIndex) || '/' : requestTarget;
 }
 
 async function abortInFlightIosRunnerSessionsWhileDisconnected(

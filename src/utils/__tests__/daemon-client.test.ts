@@ -1315,6 +1315,40 @@ test('sendToDaemon preserves install_source payload metadata for remote HTTP RPC
   }
 });
 
+test('downloadRemoteArtifact downloads daemon artifact URL', async (t) => {
+  if (!(await supportsLoopbackBind())) {
+    t.skip('loopback listeners are not permitted in this environment');
+    return;
+  }
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-device-remote-artifact-'));
+  const destinationPath = path.join(tempRoot, 'artifacts', 'screen.png');
+  let seenUrl = '';
+  let seenAuth = '';
+  const server = http.createServer((req, res) => {
+    seenUrl = req.url ?? '';
+    seenAuth = String(req.headers.authorization ?? '');
+    res.statusCode = 200;
+    res.end('png-body');
+  });
+  const port = await listenOnLoopback(server);
+
+  try {
+    await downloadRemoteArtifact({
+      baseUrl: `http://127.0.0.1:${port}/agent-device`,
+      token: 'remote-secret',
+      artifactId: 'artifact-download',
+      destinationPath,
+      requestId: 'req-remote-artifact-download',
+    });
+    assert.equal(seenUrl, '/agent-device/artifacts/artifact-download');
+    assert.equal(seenAuth, 'Bearer remote-secret');
+    assert.equal(fs.readFileSync(destinationPath, 'utf8'), 'png-body');
+  } finally {
+    await closeLoopbackServer(server);
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('downloadRemoteArtifact times out stalled artifact responses and removes partial files', async (t) => {
   if (!(await supportsLoopbackBind())) {
     t.skip('loopback listeners are not permitted in this environment');

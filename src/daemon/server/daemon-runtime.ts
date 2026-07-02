@@ -21,6 +21,7 @@ import {
   flushDiagnosticsToSessionFile,
   withDiagnosticsScope,
 } from '../../utils/diagnostics.ts';
+import { isEnvTruthy } from '../../utils/retry.ts';
 import {
   acquireDaemonLock,
   parseIntegerEnv,
@@ -73,6 +74,7 @@ export async function startDaemonRuntime(
   const daemonPaths = resolveDaemonPaths(env.AGENT_DEVICE_STATE_DIR);
   const { baseDir, infoPath, lockPath, logPath, sessionsDir } = daemonPaths;
   const daemonServerMode = resolveDaemonServerMode(env.AGENT_DEVICE_DAEMON_SERVER_MODE);
+  const retainArtifacts = isEnvTruthy(env.AGENT_DEVICE_RETAIN_ARTIFACTS);
   setRunnerLeaseOwnerStateDir(baseDir);
 
   cleanupStaleAppLogProcesses(sessionsDir);
@@ -165,7 +167,11 @@ export async function startDaemonRuntime(
     }
 
     if (startHttpServer) {
-      const httpServer = await createDaemonHttpServer({ handleRequest, token });
+      const httpServer = await createDaemonHttpServer({
+        handleRequest,
+        token,
+        retainArtifacts,
+      });
       servers.push(httpServer);
       httpPort = await listenHttpServer(httpServer);
     }

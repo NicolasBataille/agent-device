@@ -168,6 +168,8 @@ test('daemon proxy streams uploads and artifact downloads with upstream daemon t
   let uploadArtifactType = '';
   let uploadArtifactFilename = '';
   let uploadBody = '';
+  let artifactListAuth = '';
+  let artifactListTokenHeader = '';
   let artifactAuth = '';
   let artifactTokenHeader = '';
   const upstream = http.createServer((req, res) => {
@@ -184,6 +186,27 @@ test('daemon proxy streams uploads and artifact downloads with upstream daemon t
         res.setHeader('content-type', 'application/json');
         res.end(JSON.stringify({ ok: true, uploadId: 'upload-1' }));
       });
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/artifacts') {
+      artifactListAuth = String(req.headers.authorization ?? '');
+      artifactListTokenHeader = String(req.headers['x-agent-device-token'] ?? '');
+      res.setHeader('content-type', 'application/json');
+      res.end(
+        JSON.stringify({
+          artifacts: [
+            {
+              id: 'shot-1',
+              filename: 'shot.png',
+              mimeType: 'image/png',
+              sizeBytes: 8,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              expiresAt: '2026-01-01T00:15:00.000Z',
+            },
+          ],
+        }),
+      );
       return;
     }
 
@@ -222,6 +245,25 @@ test('daemon proxy streams uploads and artifact downloads with upstream daemon t
     assert.equal(uploadArtifactType, 'file');
     assert.equal(uploadArtifactFilename, 'demo.apk');
     assert.equal(uploadBody, 'fake-apk');
+
+    const artifactList = await fetch(`http://127.0.0.1:${proxyPort}/agent-device/artifacts`, {
+      headers: { authorization: 'Bearer proxy-secret' },
+    });
+    assert.equal(artifactList.status, 200);
+    assert.deepEqual(await artifactList.json(), {
+      artifacts: [
+        {
+          id: 'shot-1',
+          filename: 'shot.png',
+          mimeType: 'image/png',
+          sizeBytes: 8,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          expiresAt: '2026-01-01T00:15:00.000Z',
+        },
+      ],
+    });
+    assert.equal(artifactListAuth, 'Bearer daemon-secret');
+    assert.equal(artifactListTokenHeader, 'daemon-secret');
 
     const artifact = await fetch(
       `http://127.0.0.1:${proxyPort}/agent-device/artifacts/shot-1?download=1`,

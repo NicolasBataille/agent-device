@@ -285,6 +285,7 @@ function resolveProxyRoute(requestUrl: string): string {
 function isSupportedDaemonRoute(route: string, method: string | undefined): boolean {
   if (route === '/rpc') return method === 'POST';
   if (isSupportedUploadRoute(route, method)) return true;
+  if (route === '/artifacts' || route === '/artifacts/') return method === 'GET';
   if (route.startsWith('/artifacts/')) return method === 'GET';
   return false;
 }

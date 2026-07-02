@@ -335,14 +335,16 @@ function resolveMaterializedArtifactPath(artifact: DaemonArtifact, req: DaemonRe
   return path.resolve(req.meta?.cwd ?? process.cwd(), fallbackName);
 }
 
-export async function downloadRemoteArtifact(params: {
+type DownloadRemoteArtifactParams = {
   baseUrl: string;
   token: string;
   artifactId: string;
   destinationPath: string;
   requestId?: string;
   timeoutMs?: number;
-}): Promise<void> {
+};
+
+export async function downloadRemoteArtifact(params: DownloadRemoteArtifactParams): Promise<void> {
   const artifactUrl = new URL(buildDaemonArtifactUrl(params.baseUrl, params.artifactId));
   const transport = artifactUrl.protocol === 'https:' ? https : http;
   await fs.promises.mkdir(path.dirname(params.destinationPath), { recursive: true });
