@@ -37,6 +37,7 @@ import {
 import { resolveRemoteAuthForCli } from './cli/auth-session.ts';
 import type { CliFlags, FlagKey } from './cli/parser/cli-flags.ts';
 import type { SessionRuntimeHints } from './kernel/contracts.ts';
+import { isKnownCliCommandName } from './command-catalog.ts';
 
 type CliDeps = {
   sendToDaemon: typeof sendToDaemon;
@@ -405,6 +406,13 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
           return;
         }
 
+        if (isKnownCliCommandName(command)) {
+          emitDiagnostic({
+            level: 'error',
+            phase: 'cli_known_command_unhandled',
+            data: { command },
+          });
+        }
         throw new AppError('INVALID_ARGS', `Unknown command: ${command}`);
       } catch (err) {
         const appErr = asAppError(err);

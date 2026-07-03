@@ -1,9 +1,17 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { parseArgs, usage, usageForCommand } from '../../cli/parser/args.ts';
 import { AppError } from '../../kernel/errors.ts';
 import { listCapabilityCommands } from '../../core/capabilities.ts';
-import { listCapabilityCheckedCommandNames, listCliCommandNames } from '../../command-catalog.ts';
+import {
+  CLI_HELP_COMMAND,
+  INTERNAL_COMMANDS,
+  isKnownCliCommandName,
+  listCapabilityCheckedCommandNames,
+  listCliCommandNames,
+  listKnownCliCommandNames,
+} from '../../command-catalog.ts';
 import { getCliCommandSchema } from '../command-schema.ts';
 
 test('parseArgs recognizes command-specific flag combinations', async () => {
@@ -1932,6 +1940,40 @@ test('every CLI command has a derived or local parser schema entry', () => {
       () => getCliCommandSchema(command),
       `Missing schema for command: ${command}`,
     );
+  }
+});
+
+test('known CLI command predicate covers public, local, internal, and help commands', () => {
+  for (const command of listCliCommandNames()) {
+    assert.equal(isKnownCliCommandName(command), true, `${command} must be known`);
+  }
+  for (const command of Object.values(INTERNAL_COMMANDS)) {
+    assert.equal(isKnownCliCommandName(command), true, `${command} must be known`);
+  }
+  assert.equal(isKnownCliCommandName(CLI_HELP_COMMAND), true);
+  assert.equal(isKnownCliCommandName('tap'), false);
+});
+
+test('parser known-command check stays in sync with the catalog predicate', () => {
+  for (const command of listKnownCliCommandNames()) {
+    try {
+      parseArgs([command, '--session', 'parser-drift-check'], { strictFlags: true });
+    } catch (error) {
+      assert.ok(error instanceof Error);
+      assert.doesNotMatch(error.message, /Unknown command/, `${command} must not parse as unknown`);
+    }
+  }
+});
+
+test('catalog known-command predicate covers cli.ts literal command branches', () => {
+  const cliSource = fs.readFileSync(new URL('../../cli.ts', import.meta.url), 'utf8');
+  const branchCommands = [...cliSource.matchAll(/(?<!\.)\bcommand\s*===\s*'([^']+)'/g)].map(
+    (match) => match[1]!,
+  );
+  assert.ok(branchCommands.length > 0, 'expected cli.ts command branches');
+
+  for (const command of [...new Set(branchCommands)].sort()) {
+    assert.equal(isKnownCliCommandName(command), true, `${command} must be known`);
   }
 });
 

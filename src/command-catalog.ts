@@ -61,6 +61,8 @@ export const INTERNAL_COMMANDS = {
   sessionList: 'session_list',
 } as const;
 
+export const CLI_HELP_COMMAND = 'help';
+
 const LOCAL_CLI_COMMANDS = {
   cdp: 'cdp',
   auth: 'auth',
@@ -81,8 +83,10 @@ export type GestureKind = (typeof GESTURE_KINDS)[number];
 export const GESTURE_SUBCOMMAND_ERROR = `gesture requires one of: ${GESTURE_KINDS.join(', ')}`;
 
 export type PublicCommandName = (typeof PUBLIC_COMMANDS)[keyof typeof PUBLIC_COMMANDS];
+export type InternalCommandName = (typeof INTERNAL_COMMANDS)[keyof typeof INTERNAL_COMMANDS];
 export type LocalCliCommandName = (typeof LOCAL_CLI_COMMANDS)[keyof typeof LOCAL_CLI_COMMANDS];
 export type CliCommandName = PublicCommandName | LocalCliCommandName;
+export type KnownCliCommandName = CliCommandName | InternalCommandName | typeof CLI_HELP_COMMAND;
 export type ClientBackedCliCommandName =
   | PublicCommandName
   | typeof LOCAL_CLI_COMMANDS.debug
@@ -127,12 +131,27 @@ const CAPABILITY_EXEMPT_CLI_COMMANDS = commandSet(
   PUBLIC_COMMANDS.trace,
 );
 
+const KNOWN_CLI_COMMANDS = commandSet(
+  ...Object.values(PUBLIC_COMMANDS),
+  ...Object.values(LOCAL_CLI_COMMANDS),
+  ...Object.values(INTERNAL_COMMANDS),
+  CLI_HELP_COMMAND,
+);
+
 function commandSet(...commands: readonly string[]): ReadonlySet<string> {
   return new Set(commands);
 }
 
 export function listCliCommandNames(): CliCommandName[] {
   return [...Object.values(PUBLIC_COMMANDS), ...Object.values(LOCAL_CLI_COMMANDS)].sort();
+}
+
+export function listKnownCliCommandNames(): KnownCliCommandName[] {
+  return [...KNOWN_CLI_COMMANDS].sort() as KnownCliCommandName[];
+}
+
+export function isKnownCliCommandName(command: string): command is KnownCliCommandName {
+  return KNOWN_CLI_COMMANDS.has(command);
 }
 
 export function isClientBackedCliCommandName(
