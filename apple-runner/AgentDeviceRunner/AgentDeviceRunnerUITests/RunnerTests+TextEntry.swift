@@ -221,9 +221,9 @@ extension RunnerTests {
       }
     }
 
-    func typeIntoCurrentTarget(_ value: String) -> XCUIElement? {
+    func typeIntoCurrentTarget(_ value: String, allowBulkInput: Bool = true) -> XCUIElement? {
       if let currentTarget = resolveTextEntryElement(app: app, target: activeTarget) {
-        app.typeText(value)
+        typeTextIntoTarget(value, target: currentTarget, allowBulkInput: allowBulkInput)
         return currentTarget
       } else {
         app.typeText(value)
@@ -249,7 +249,7 @@ extension RunnerTests {
     if delaySeconds > 0 && characters.count > 1 {
       var typedTarget: XCUIElement?
       for (index, character) in characters.enumerated() {
-        typedTarget = typeIntoCurrentTarget(String(character)) ?? typedTarget
+        typedTarget = typeIntoCurrentTarget(String(character), allowBulkInput: false) ?? typedTarget
         if index + 1 < characters.count {
           sleepFor(delaySeconds)
         }
@@ -338,11 +338,28 @@ extension RunnerTests {
       observedText.count
     )
     clearTextInput(repairTarget)
-    app.typeText(expectedText)
+    typeTextIntoTarget(expectedText, target: repairTarget)
     return verifyTextEntry(app: app, target: target, expectedText: expectedText, repaired: true)
 #else
     return TextEntryResult(verified: nil, repaired: false, expectedText: expectedText, observedText: nil)
 #endif
+  }
+
+  private func typeTextIntoTarget(
+    _ value: String,
+    target: XCUIElement,
+    allowBulkInput: Bool = true
+  ) {
+#if os(iOS) && targetEnvironment(simulator)
+    if allowBulkInput, value.count > 1 {
+      if let error = RunnerTextEntry.typeText(value, intoElement: target, typingSpeed: 120.0) {
+        NSLog("AGENT_DEVICE_RUNNER_FAST_TEXT_ENTRY_FALLBACK=%@", error)
+      } else {
+        return
+      }
+    }
+#endif
+    target.typeText(value)
   }
 
   private func verifyTextEntry(
