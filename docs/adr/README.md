@@ -9,7 +9,7 @@
 | [0005 iOS Runner Interaction Lifecycle](0005-ios-runner-interaction-lifecycle.md) | XCTest runner sessions, leases, adoption, idle-stop |
 | [0006 Daemon RPC Protocol Version](0006-daemon-rpc-protocol-version.md) | remote daemon HTTP/JSON-RPC compatibility |
 | [0007 Remote Device Leases](0007-remote-device-leases.md) | leases, tenancy, provider-owned devices |
-| [0008 Command Descriptor Registry](0008-command-descriptor-registry.md) | adding/changing a command, any surface projection (CLI/MCP/client/batch), timeout policy |
+| [0008 Command Descriptor Registry](0008-command-descriptor-registry.md) | adding/changing a command, any surface projection (CLI/MCP/ACP/client/batch), timeout policy |
 | [0009 Apple Platform Consolidation](0009-apple-platform-consolidation.md) | Apple platform family, apple/appleOs axes, the apple-leak guard |
 | [0010 Error system conventions](0010-error-system.md) | error codes, hints, normalizeError, typed error signals |
 | [0011 Interaction Guarantee Contract](0011-interaction-guarantee-contract.md) | interaction dispatch paths, fast paths, guards, the guarantee matrix, parity tables |

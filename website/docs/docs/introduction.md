@@ -53,7 +53,7 @@ agent-device help cdp
 agent-device help dogfood
 ```
 
-Use [AI Agent Setup](/docs/agent-setup) for Cursor, Codex, Claude Code, Windsurf, Cline, Goose, skills, and MCP setup. Use [Commands](/docs/commands) for detailed command groups and platform behavior.
+Use [AI Agent Setup](/docs/agent-setup) for Cursor, Codex, Claude Code, Windsurf, Cline, Goose, skills, MCP setup, and ACP setup. Use [Commands](/docs/commands) for detailed command groups and platform behavior.
 
 ## Where it fits
 
@@ -62,6 +62,8 @@ Use [AI Agent Setup](/docs/agent-setup) for Cursor, Codex, Claude Code, Windsurf
 It complements scripted test frameworks such as Appium, Maestro, Detox, XCTest, and Espresso. Keep those for stable human-authored coverage. Use `agent-device` when an agent needs to explore, reproduce, debug, profile, collect evidence, or record a replay from live app behavior.
 
 MCP support exposes direct structured tools for installed `agent-device` commands. Tools use structured input contracts through `AgentDeviceClient`, so MCP clients can call device workflows directly while the daemon remains the execution source of truth.
+
+ACP support exposes a deterministic stdio agent for ACP-capable editors and agent clients. The ACP agent interprets prompt text as explicit `agent-device` command lines, including advertised slash commands such as `/devices`, and executes them through the same command contracts and `AgentDeviceClient` path. It is not an LLM and does not guess natural-language actions.
 
 ## Next steps
 

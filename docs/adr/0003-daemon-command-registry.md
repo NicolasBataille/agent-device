@@ -27,8 +27,8 @@ registry instead of recreating command string sets. Handler modules own executio
 not export duplicate coverage tables to prove route membership.
 
 The daemon registry is internal-only. It must not define CLI grammar, Node.js client options, MCP
-schemas, user-facing help, or platform capability support. Those remain owned by the command
-contract, projection, help, and capability modules.
+schemas, ACP slash/prompt-line behavior, user-facing help, or platform capability support. Those
+remain owned by the command contract, projection, help, and capability modules.
 
 ## Alternatives Considered
 
@@ -57,9 +57,9 @@ owns the rationale so future changes do not need to infer it from agent instruct
 ## Update (2026-06): single-declaration / derivation model
 
 A later proposal (the `CommandDescriptor` direction, now [ADR 0008](0008-command-descriptor-registry.md)) unifies a command's
-declarations so the public catalog, capability matrix, CLI/MCP projections, batch allowlist, and this
-daemon registry are *derived* from one registration site, to remove the cross-table drift that several
-of these surfaces are kept aligned against by convention.
+declarations so the public catalog, capability matrix, CLI/MCP/ACP projections, batch allowlist, and
+this daemon registry are *derived* from one registration site, to remove the cross-table drift that
+several of these surfaces are kept aligned against by convention.
 
 **This ADR's decision stands.** Its boundary is about *ownership* and the *predicate interface*, not
 about the physical file a trait is typed in. "Separate source of truth" means separately owned and
@@ -75,9 +75,10 @@ derived daemon registry is therefore permitted **only if** it preserves all of t
    predicates (`getDaemonCommandRoute`, `isLeaseAdmissionExempt`, `shouldLockSessionExecution`, …). The
    daemon registry remains their sole exposer; derivation changes how the backing table is *built*, not
    how it is *read*.
-3. **No leakage into public projections.** The catalog/CLI/MCP/help/capability projections must be
-   type-prevented from reading daemon-only traits, and the daemon registry must still not define CLI
-   grammar, Node.js options, MCP schemas, user-facing help, or capability support.
+3. **No leakage into public projections.** The catalog/CLI/MCP/ACP/help/capability projections must
+   be type-prevented from reading daemon-only traits, and the daemon registry must still not define
+   CLI grammar, Node.js options, MCP schemas, ACP prompt-line behavior, user-facing help, or
+   capability support.
 4. **One declaration per concern, enforced by types.** The single registration site must make a missing
    or duplicated daemon trait a *compile error* — replacing today's "aligned by convention". This is the
    structural improvement that justifies derivation over a separately hand-authored table.

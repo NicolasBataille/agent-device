@@ -32,6 +32,14 @@ agent-device mcp
 
 The MCP server exposes direct structured tools for installed commands. Tools use structured input contracts through `AgentDeviceClient`; local-only workflows stay CLI-only rather than subprocess fallbacks. It does not expose generic shell execution over MCP. MCP tools can target `platform: "web"` after `agent-device web setup`, but setup and doctor stay CLI-only.
 
+For ACP-aware clients that support Agent Client Protocol agents, run:
+
+```bash
+agent-device acp
+```
+
+The ACP agent exposes installed commands as a deterministic prompt-line interface. ACP clients send prompt text such as `/devices` or `snapshot -i`; `agent-device` parses one command per line, executes through the same command contracts and `AgentDeviceClient` path, streams ACP tool-call updates, and refuses natural-language prompts instead of guessing.
+
 ## Navigation
 
 ```bash

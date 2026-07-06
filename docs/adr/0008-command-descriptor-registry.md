@@ -10,14 +10,16 @@ A command's identity is restated, by hand, across roughly ten tables that must s
 convention: `PUBLIC_COMMANDS` (`src/command-catalog.ts`), the per-command metadata and family facets
 (`src/commands/**`), the capability matrix (`src/core/capabilities.ts`), the daemon command registry
 (`src/daemon/daemon-command-registry.ts`, ADR 0003), the structured-batch allowlist
-(`src/batch-policy.ts`), the MCP exposure sets, the Node client interface and impl (`src/client-types.ts`,
-`src/client.ts`), and the generic-dispatch `switch` (`src/core/dispatch.ts`, whose `default: throw` makes a
-missing or renamed command a runtime error, not a compile error). Adding one command touches ~24 files, the
-argument shape is (de)serialized ~4 times, and the gesture set is retyped in three places.
+(`src/batch-policy.ts`), the MCP exposure sets, ACP available-command projection, the Node client
+interface and impl (`src/client-types.ts`, `src/client.ts`), and the generic-dispatch `switch`
+(`src/core/dispatch.ts`, whose `default: throw` makes a missing or renamed command a runtime error,
+not a compile error). Adding one command touches ~24 files, the argument shape is (de)serialized
+~4 times, and the gesture set is retyped in three places.
 
 The codebase already proves the cure works for part of this: the `CommandFamilyFacet`
-(`src/commands/family/`) derives the MCP tools, the CLI schema, and the batch writer from a single array.
-It simply stops at the command-surface boundary; everything past it is hand-maintained.
+(`src/commands/family/`) derives the MCP tools, ACP runnable command list, CLI schema, and the batch
+writer from a single array. It simply stops at the command-surface boundary; everything past it is
+hand-maintained.
 
 ADR 0003 deliberately separated daemon route/policy into its own internally-owned registry with a small
 predicate interface, and its 2026-06 update set four invariants that any single-declaration/derivation
@@ -28,18 +30,25 @@ model must preserve. This ADR is that model.
 Introduce one `CommandDescriptor` per command that **composes facets owned by their domains** and from which
 every consumer table is **derived** by pure, parity-tested projection:
 
-- The descriptor composes a `surface` facet (owned by `src/commands/**`: identity, CLI schema/reader, MCP),
-  a `capability` facet (owned by `src/core/capabilities`), and a `daemon` facet (route + request-policy
-  traits, **owned under `src/daemon/`** per ADR 0003), plus a typed result.
+- The descriptor composes a `surface` facet (owned by `src/commands/**`: identity, CLI schema/reader,
+  MCP, and ACP prompt-line exposure), a `capability` facet (owned by `src/core/capabilities`), and a
+  `daemon` facet (route + request-policy traits, **owned under `src/daemon/`** per ADR 0003), plus a
+  typed result.
 - Narrow command traits that affect multiple projections, such as interaction post-action observation
   (`--settle` / `--verify`), live on the descriptor so CLI flags, command metadata, timeout policy, and
   tests derive from one fact instead of repeating command-name lists.
-- The public catalog, capability matrix, daemon command registry, batch allowlist, MCP tool list, CLI
-  schema, and the Node client surface become pure projections of the descriptor set. The
+- The public catalog, capability matrix, daemon command registry, batch allowlist, MCP tool list, ACP
+  available-command list, CLI schema, and the Node client surface become pure projections of the
+  descriptor set. The
   `src/core/dispatch.ts` `switch` is replaced by a total map keyed on the command-name union, so a missing
   handler is a compile error.
 - The cross-process `invoke` (client) and in-daemon `execute` seams stay distinct; the process boundary is
   never collapsed.
+
+ACP is a consumer of the command surface, not a new command registry. It advertises the same runnable
+commands through `available_commands_update` and parses prompt text into CLI-shaped command lines
+before executing through the existing command contracts and `AgentDeviceClient` path. Its slash-command
+syntax is an ACP transport affordance, not a separate command identity.
 
 This **composes with**, and is bound by, ADR 0003's four invariants: daemon-owned declaration (never inlined
 into the public surface), the predicate interface unchanged, no leakage of daemon-only traits into public
@@ -73,10 +82,10 @@ Each derived table must be asserted **byte-for-byte equivalent** to the hand-aut
 has ~95 importers and the family facet currently imports `AgentDeviceClient`, so the descriptor module must
 own the `Input`/`Result` types and the client must be derived as a view type, enforced by a lint boundary.
 As of 2026-07, the descriptor is live for the daemon registry, capability matrix, structured-batch
-allowlist, daemon-client timeout policy, MCP exposure list, and capability-checked CLI command list.
-The catalog still owns command identity and the command family facet still owns surface metadata, so
-future migration steps should keep deleting one live hand-maintained table at a time rather than
-introducing a parallel manifest.
+allowlist, daemon-client timeout policy, MCP exposure list, ACP available-command list, and
+capability-checked CLI command list. The catalog still owns command identity and the command family
+facet still owns surface metadata, so future migration steps should keep deleting one live
+hand-maintained table at a time rather than introducing a parallel manifest.
 
 This ADR owns the decision and its constraints; the roadmap that prototyped it has been retired, with
 the delivered end-state recorded in [CONTEXT.md](../../CONTEXT.md) (Architecture).

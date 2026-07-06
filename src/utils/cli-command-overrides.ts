@@ -11,8 +11,9 @@ type SchemaOnlyCliCommandName = Exclude<LocalCliCommandName, CommandName>;
 
 const SCHEMA_ONLY_CLI_COMMAND_SCHEMAS = {
   acp: {
-    helpDescription:
-      'Start the stdio ACP (Agent Client Protocol) agent. Prompts are interpreted as agent-device command lines, one per line, executed through the agent-device client.',
+    helpDescription: `Start the stdio ACP (Agent Client Protocol) agent.
+
+ACP is a deterministic agent interface for ACP-capable editors and agent clients. It does not add LLM behavior: each text prompt line is parsed as one agent-device command line, with optional ACP slash-command syntax such as /devices or /snapshot -i. Commands execute through the same command contracts and AgentDeviceClient path as CLI/MCP commands, while stdout remains newline-delimited JSON-RPC only.`,
     summary: 'Start ACP agent',
   },
   cdp: {

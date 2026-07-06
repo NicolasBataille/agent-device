@@ -26,7 +26,7 @@ agent-device help cdp
 
 Some agent clients run commands in an environment that differs from the user's normal install shell. If `agent-device` is missing in the agent terminal but was installed globally elsewhere, resolve the command the same way the user would from a normal terminal session, then use the absolute binary path for agent commands. This may require inspecting shell startup behavior or package-manager/global bin locations; do not assume the agent process `PATH` is the user's `PATH`.
 
-For Cursor, Codex, Claude Code, Windsurf, Cline, Goose, skills, and project rules, see [AI Agent Setup](/docs/agent-setup). For the first app automation commands, see [Quick Start](/docs/quick-start).
+For Cursor, Codex, Claude Code, Windsurf, Cline, Goose, skills, MCP, ACP, and project rules, see [AI Agent Setup](/docs/agent-setup). For the first app automation commands, see [Quick Start](/docs/quick-start).
 
 Interactive CLI runs periodically check for a newer published `agent-device` package in the background. When an upgrade is available, the CLI suggests reinstalling the package globally:
 
@@ -37,7 +37,7 @@ agent-device --version
 
 Set `AGENT_DEVICE_NO_UPDATE_NOTIFIER=1` to disable the notice.
 
-## Agent clients and MCP
+## Agent clients, MCP, and ACP
 
 The official MCP server exposes direct structured tools for installed `agent-device` commands. Tools use command contracts through `AgentDeviceClient`, so app and device automation still uses the same daemon implementation.
 
@@ -45,7 +45,13 @@ The official MCP server exposes direct structured tools for installed `agent-dev
 agent-device mcp
 ```
 
-Use [AI Agent Setup](/docs/agent-setup#mcp-server) for copy-paste MCP client configuration.
+The ACP agent exposes the same command surface to ACP-capable editors and agent clients as explicit prompt lines. It is deterministic: prompt text such as `/devices` or `snapshot -i` is parsed as command lines and executed through `AgentDeviceClient`; natural-language instructions are refused instead of guessed.
+
+```bash
+agent-device acp
+```
+
+Use [AI Agent Setup](/docs/agent-setup) for copy-paste MCP and ACP client configuration.
 
 ## Without installing
 

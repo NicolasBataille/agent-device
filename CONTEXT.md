@@ -43,6 +43,7 @@
   best-effort signaling. It must not own domain cleanup policy such as browser ownership markers,
   runner lease reclamation, daemon takeover checks, or app-log PID metadata verification.
 - Command surface: catalog of public command identity, interface exposure, adapter policy, and shared command metadata across CLI, Node.js, MCP, ACP, and batch entrypoints.
+- MCP/ACP adapters: MCP is the structured-tool projection of the command surface; ACP is the deterministic prompt-line projection for ACP clients. Both reuse command metadata and `AgentDeviceClient` execution, and neither owns daemon route policy.
 - Daemon command registry: daemon-side source of truth for command route ownership and request-policy traits, including admission exemptions, session locking, selector validation, replay-scoped actions, recording invalidation, Android dialog guards, and request provider device resolution.
 - Runner command traits: per-command-type classification for iOS/macOS runner lifecycle behavior, distinct from the public command surface and daemon command registry. The Swift runner traits classify interaction, read-only, and runner-lifecycle axes for XCTest execution; Swift resolves the alert command as read-only only for its `get` action. The TypeScript runner command traits classify daemon-side runner send/recovery policy such as read-only retry routing, readiness probes, and recent-healthy-mutation preflight skips; the TypeScript table is command-type keyed and currently classifies alert as read-only for daemon retry policy. Each side keeps one source of truth keyed by runner command type.
 - Coordinate-first resolved element activation: iOS/macOS runner interaction pattern where a selector or text query resolves the semantic `XCUIElement`, then activation uses the element's resolved center coordinate when a frame is available. This keeps target selection semantic while avoiding `XCUIElement.tap()` post-action element re-resolution after normal navigation. tvOS remains focus/remote-driven.
@@ -70,10 +71,10 @@ The perfect-shape refactor is complete and merged. Its end-state:
 
 - Two derivation registries. One `CommandDescriptor` per command
   (`src/core/command-descriptor/registry.ts`) is the single declaration site from which the
-  capability matrix, daemon command registry, batch allowlist, timeout policy, MCP exposure list, and
-  capability-checked CLI command list are *derived* by parity-tested projection. The command catalog
-  still owns identity, command families still own surface metadata/CLI schema, and the Node client
-  surface remains a deferred derivation target. One
+  capability matrix, daemon command registry, batch allowlist, timeout policy, MCP exposure list, ACP
+  available-command list, and capability-checked CLI command list are *derived* by parity-tested
+  projection. The command catalog still owns identity, command families still own surface
+  metadata/CLI schema, and the Node client surface remains a deferred derivation target. One
   `PlatformPlugin` per platform family (`src/core/platform-plugin/`) stops core/daemon from branching
   on platform, with the Apple plugin the first instance. See
   [ADR 0008](docs/adr/0008-command-descriptor-registry.md).

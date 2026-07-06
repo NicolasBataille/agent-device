@@ -7,9 +7,9 @@ description: Configure Cursor, Codex, Claude Code, Windsurf, Cline, Goose, Zed, 
 
 `agent-device` is built for AI agents, but humans usually install it, grant device permissions, and decide which agent client should use it.
 
-Use this page to wire Cursor, Codex, Claude Code, Windsurf, Cline, Goose, or another coding agent into mobile, TV, desktop, and web app verification. It covers skills, project rules, and MCP setup for React Native QA, Expo app verification, iOS Simulator automation, Android Emulator automation, tvOS checks, Android TV checks, web browser sessions, debugging, profiling, and exploratory QA.
+Use this page to wire Cursor, Codex, Claude Code, Windsurf, Cline, Goose, Zed, ACP clients, or another coding agent into mobile, TV, desktop, and web app verification. It covers skills, project rules, MCP setup, and ACP setup for React Native QA, Expo app verification, iOS Simulator automation, Android Emulator automation, tvOS checks, Android TV checks, web browser sessions, debugging, profiling, and exploratory QA.
 
-The short version: install the CLI, make the agent read version-matched help, and let the agent use either MCP tools or CLI commands. MCP tools use command contracts backed by the same `AgentDeviceClient` execution path as the CLI adapters.
+The short version: install the CLI, make the agent read version-matched help, and let the agent use CLI commands, MCP tools, or the ACP agent depending on what its client supports. MCP tools and ACP command turns use command contracts backed by the same `AgentDeviceClient` execution path as the CLI adapters.
 
 ## Prerequisite: install the CLI
 
@@ -295,7 +295,7 @@ If the client has project rules or custom instructions, add the recommended agen
 
 ## Why this setup works
 
-The CLI stays the auditable automation surface, installed help stays version-matched with the commands, skills and rules route agents toward the right help topics, and MCP gives compatible clients direct structured tools backed by the same daemon/client implementation.
+The CLI stays the auditable automation surface, installed help stays version-matched with the commands, skills and rules route agents toward the right help topics, MCP gives compatible clients direct structured tools, and ACP gives compatible clients a deterministic prompt-line agent backed by the same daemon/client implementation.
 
 For the broader positioning, supported targets, observability features, and how `agent-device` differs from scripted test frameworks, see [Introduction](/docs/introduction). For exact command groups and platform behavior, see [Commands](/docs/commands).
 
