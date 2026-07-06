@@ -53,14 +53,7 @@ export function createPromptRunner(deps: PromptRunnerDeps = {}): PromptRunner {
       for (const line of lines) {
         if (session.cancelled) return 'cancelled';
         if (line.kind === 'error') {
-          sendUpdate({
-            sessionUpdate: 'tool_call',
-            toolCallId: nextToolCallId(session),
-            title: line.line,
-            kind: 'other',
-            status: 'failed',
-            content: [textContent(line.error)],
-          });
+          sendParseErrorToolCall(session, line, sendUpdate);
           outcomes.push(`✗ ${line.line} — ${line.error}`);
           continue;
         }
@@ -124,7 +117,7 @@ async function runCommandToolCall(params: {
       toolCallId,
       status: 'completed',
       content: commandResultContent({ line, result, text: cliOutput?.text ?? undefined, deps }),
-      rawOutput: result,
+      ...rawOutputUpdate(line, result),
     });
     return `✓ ${line.line}`;
   } catch (error) {
@@ -138,6 +131,32 @@ async function runCommandToolCall(params: {
     });
     return `✗ ${line.line} — ${firstLine(message)}`;
   }
+}
+
+function sendParseErrorToolCall(
+  session: AcpSessionState,
+  line: { line: string; error: string },
+  sendUpdate: AcpUpdateSink,
+): void {
+  const toolCallId = nextToolCallId(session);
+  sendUpdate({
+    sessionUpdate: 'tool_call',
+    toolCallId,
+    title: line.line,
+    kind: 'other',
+    status: 'in_progress',
+  });
+  sendUpdate({
+    sessionUpdate: 'tool_call_update',
+    toolCallId,
+    status: 'failed',
+    content: [textContent(line.error)],
+  });
+}
+
+function rawOutputUpdate(line: RunnableLine, result: unknown): { rawOutput?: unknown } {
+  if (line.command === 'snapshot' || line.command === 'find') return {};
+  return { rawOutput: result };
 }
 
 function commandResultContent(params: {

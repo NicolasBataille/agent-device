@@ -145,8 +145,14 @@ test('unparseable lines fail individually while runnable lines still execute', a
   assert.equal(stopReason, 'end_turn');
   assert.deepEqual(executed, ['devices']);
   const failedCall = updates[0] as Extract<AcpSessionUpdate, { sessionUpdate: 'tool_call' }>;
-  assert.equal(failedCall.status, 'failed');
-  assert.match(JSON.stringify(failedCall.content), /Unknown command: frobnicate/);
+  assert.equal(failedCall.status, 'in_progress');
+  const failedUpdate = updates[1] as Extract<
+    AcpSessionUpdate,
+    { sessionUpdate: 'tool_call_update' }
+  >;
+  assert.equal(failedUpdate.toolCallId, failedCall.toolCallId);
+  assert.equal(failedUpdate.status, 'failed');
+  assert.match(JSON.stringify(failedUpdate.content), /Unknown command: frobnicate/);
 });
 
 test('sticky flags from one line carry into later lines of the same session', async () => {
@@ -211,6 +217,33 @@ test('screenshot results attach an inline image when the artifact is readable', 
   assert.equal(done.status, 'completed');
   const image = done.content?.find((entry) => entry.content.type === 'image');
   assert.ok(image, 'expected an inline image content block');
+});
+
+test('large ref-issuing command results omit rawOutput from completed tool updates', async () => {
+  const rawOutputs: unknown[] = [];
+  const runner = runnerWith({
+    runCommandLine: async ({ command }) => ({
+      result:
+        command === 'snapshot'
+          ? { nodes: [{ ref: 'e1', label: 'Checkout' }], refsGeneration: 7 }
+          : { ref: '@e1', label: 'Checkout', refsGeneration: 7 },
+      cliOutput: { data: {}, text: `${command} done` },
+    }),
+  });
+  const { updates, sendUpdate } = collectUpdates();
+
+  await runner.runPrompt({
+    session: makeSession(),
+    promptText: 'snapshot -i\nfind Checkout',
+    sendUpdate,
+  });
+
+  for (const update of updates) {
+    if (update.sessionUpdate === 'tool_call_update' && update.status === 'completed') {
+      rawOutputs.push(update.rawOutput);
+    }
+  }
+  assert.deepEqual(rawOutputs, [undefined, undefined]);
 });
 
 test('daemon progress events stream as in_progress tool call updates', async () => {

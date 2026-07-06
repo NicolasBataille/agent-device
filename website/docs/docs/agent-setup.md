@@ -9,7 +9,7 @@ description: Configure Cursor, Codex, Claude Code, Windsurf, Cline, Goose, Zed, 
 
 Use this page to wire Cursor, Codex, Claude Code, Windsurf, Cline, Goose, Zed, ACP clients, or another coding agent into mobile, TV, desktop, and web app verification. It covers skills, project rules, MCP setup, and ACP setup for React Native QA, Expo app verification, iOS Simulator automation, Android Emulator automation, tvOS checks, Android TV checks, web browser sessions, debugging, profiling, and exploratory QA.
 
-The short version: install the CLI, make the agent read version-matched help, and let the agent use CLI commands, MCP tools, or the ACP agent depending on what its client supports. MCP tools and ACP command turns use command contracts backed by the same `AgentDeviceClient` execution path as the CLI adapters.
+The short version: install the CLI, make the agent read version-matched help, and let the agent use CLI commands, MCP tools, or the ACP agent depending on what its client supports. MCP tools and ACP command turns share command contracts and the same daemon/client implementation; ACP reads CLI-shaped prompt lines while MCP receives structured tool input.
 
 ## Prerequisite: install the CLI
 
@@ -92,9 +92,11 @@ Registry metadata uses MCP name `io.github.callstackincubator/agent-device`, npm
 
 ## ACP agent (Zed and other ACP clients)
 
-`agent-device acp` starts a stdio [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) agent, so ACP clients such as Zed can drive devices from the agent panel. It is a deterministic agent, not an LLM: each line of a prompt is one agent-device command in CLI syntax (ACP slash commands such as `/devices` and an optional leading `agent-device` are accepted), executed through the same command contracts and `AgentDeviceClient` path as MCP tools. Command executions stream back as ACP tool calls with daemon progress updates, screenshots attach as inline images, and available commands are advertised per session.
+`agent-device acp` starts a stdio [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) agent, so ACP clients such as Zed can drive devices from the agent panel. It is a deterministic agent, not an LLM: each line of a prompt is one agent-device command in CLI syntax (ACP slash commands such as `/devices` and an optional leading `agent-device` are accepted), executed through the CLI command reader, shared command contracts, and `AgentDeviceClient`. Command executions stream back as ACP tool calls with daemon progress updates, screenshots attach as inline images, and available commands are advertised per session.
 
 Target selection sticks within a session: after `open com.example.app --platform ios`, later lines such as `snapshot -i` reuse the same `--platform`, `--device`, `--udid`, `--session`, and `--state-dir` values until a line overrides them. Project config resolution uses the working directory the ACP client passes on `session/new`.
+
+Refs follow CLI semantics in ACP prompts. MCP tools auto-pin plain refs across tool calls, but ACP prompt lines do not add MCP ref-generation pins; after another `snapshot` or `find`, use the current refs from the latest output or durable selectors.
 
 Zed `settings.json`:
 

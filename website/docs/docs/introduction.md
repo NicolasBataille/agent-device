@@ -63,7 +63,7 @@ It complements scripted test frameworks such as Appium, Maestro, Detox, XCTest, 
 
 MCP support exposes direct structured tools for installed `agent-device` commands. Tools use structured input contracts through `AgentDeviceClient`, so MCP clients can call device workflows directly while the daemon remains the execution source of truth.
 
-ACP support exposes a deterministic stdio agent for ACP-capable editors and agent clients. The ACP agent interprets prompt text as explicit `agent-device` command lines, including advertised slash commands such as `/devices`, and executes them through the same command contracts and `AgentDeviceClient` path. It is not an LLM and does not guess natural-language actions.
+ACP support exposes a deterministic stdio agent for ACP-capable editors and agent clients. The ACP agent interprets prompt text as explicit `agent-device` command lines, including advertised slash commands such as `/devices`, and executes them through the CLI command reader, shared command contracts, and `AgentDeviceClient`. It is not an LLM and does not guess natural-language actions.
 
 ## Next steps
 

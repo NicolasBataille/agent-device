@@ -47,8 +47,8 @@ every consumer table is **derived** by pure, parity-tested projection:
 
 ACP is a consumer of the command surface, not a new command registry. It advertises the same runnable
 commands through `available_commands_update` and parses prompt text into CLI-shaped command lines
-before executing through the existing command contracts and `AgentDeviceClient` path. Its slash-command
-syntax is an ACP transport affordance, not a separate command identity.
+before executing through the CLI command reader, existing command contracts, and `AgentDeviceClient`.
+Its slash-command syntax is an ACP transport affordance, not a separate command identity.
 
 This **composes with**, and is bound by, ADR 0003's four invariants: daemon-owned declaration (never inlined
 into the public surface), the predicate interface unchanged, no leakage of daemon-only traits into public

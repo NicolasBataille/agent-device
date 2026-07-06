@@ -38,7 +38,7 @@ For ACP-aware clients that support Agent Client Protocol agents, run:
 agent-device acp
 ```
 
-The ACP agent exposes installed commands as a deterministic prompt-line interface. ACP clients send prompt text such as `/devices` or `snapshot -i`; `agent-device` parses one command per line, executes through the same command contracts and `AgentDeviceClient` path, streams ACP tool-call updates, and refuses natural-language prompts instead of guessing.
+The ACP agent exposes installed commands as a deterministic prompt-line interface. ACP clients send prompt text such as `/devices` or `snapshot -i`; `agent-device` parses one command per line, executes through the CLI command reader, shared command contracts, and `AgentDeviceClient`, streams ACP tool-call updates, and refuses natural-language prompts instead of guessing.
 
 ## Navigation
 
