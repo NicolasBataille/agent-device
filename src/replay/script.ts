@@ -399,7 +399,7 @@ function isNumericToken(token: string | undefined): token is string {
   return !Number.isNaN(Number(token));
 }
 
-function tokenizeReplayLine(line: string): string[] {
+export function tokenizeReplayLine(line: string): string[] {
   const tokens: string[] = [];
   let cursor = 0;
   while (cursor < line.length) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added `agent-device acp`: a deterministic stdio ACP (Agent Client Protocol) agent for Zed and other ACP clients. Prompt lines are agent-device commands in CLI syntax, executed through the same client path as MCP tools, with tool-call streaming, sticky per-session target flags, and inline screenshot images.
+
 ## 0.15.0
 
 - Breaking: `apps` discovery and public app-list helpers now default to user-installed apps. Use `--all` or `filter: 'all'` to include system/OEM apps.

@@ -8,7 +8,7 @@ const SUPPORTED_PROTOCOL_VERSION = '2025-11-25';
 
 export type JsonRpcMessage = JsonRpcRequestEnvelope;
 
-type JsonRpcResponse =
+export type JsonRpcResponse =
   | { jsonrpc: '2.0'; id: JsonRpcId; result: unknown }
   | { jsonrpc: '2.0'; id: JsonRpcId; error: { code: number; message: string } };
 
@@ -67,9 +67,9 @@ async function callTool(params: unknown): Promise<ToolResult> {
   }
 }
 
-// Keep the full error contract (code + hint) visible to MCP agents; a bare
-// message string strips exactly the guidance the hint system exists to give.
-function formatToolError(error: unknown): string {
+// Keep the full error contract (code + hint) visible to MCP and ACP agents; a
+// bare message string strips exactly the guidance the hint system exists to give.
+export function formatToolError(error: unknown): string {
   const normalized = normalizeError(error);
   const lines = [`Error (${normalized.code}): ${normalized.message}`];
   if (normalized.hint) lines.push(`Hint: ${normalized.hint}`);
@@ -88,11 +88,11 @@ function textToolResult(text: string, isError = false): ToolResult {
   };
 }
 
-function successResponse(id: JsonRpcId, result: unknown): JsonRpcResponse {
+export function successResponse(id: JsonRpcId, result: unknown): JsonRpcResponse {
   return { jsonrpc: '2.0', id, result };
 }
 
-function errorResponse(id: JsonRpcId, code: number, message: string): JsonRpcResponse {
+export function errorResponse(id: JsonRpcId, code: number, message: string): JsonRpcResponse {
   return { jsonrpc: '2.0', id, error: { code, message } };
 }
 

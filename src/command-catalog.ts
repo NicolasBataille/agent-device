@@ -63,6 +63,7 @@ export const INTERNAL_COMMANDS = {
 } as const;
 
 const LOCAL_CLI_COMMANDS = {
+  acp: 'acp',
   cdp: 'cdp',
   auth: 'auth',
   connect: 'connect',

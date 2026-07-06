@@ -8,6 +8,10 @@ if (runFastPath(argv)) {
   import('./mcp/server.ts')
     .then(({ runAgentDeviceMcpServer }) => runAgentDeviceMcpServer())
     .catch(handleStartupError);
+} else if (argv[0] === 'acp' && !argv.includes('--help') && !argv.includes('-h')) {
+  import('./acp/server.ts')
+    .then(({ runAgentDeviceAcpServer }) => runAgentDeviceAcpServer())
+    .catch(handleStartupError);
 } else {
   runCli(argv);
 }

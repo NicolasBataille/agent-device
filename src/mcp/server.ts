@@ -8,16 +8,32 @@ type MessageWriter = (message: unknown) => void;
 
 export async function runAgentDeviceMcpServer(): Promise<void> {
   const payloadQueue = createMcpPayloadQueue();
-  const decoder = new McpMessageDecoder((payload) => {
-    payloadQueue.push(payload);
+  await runStdioJsonRpcServer({
+    sink: payloadQueue.push,
+    write: writeJsonRpcMessage,
+    idle: payloadQueue.idle,
   });
+}
+
+/**
+ * Shared newline-delimited JSON-RPC stdio loop: decode stdin lines into the
+ * sink, report undecodable lines as -32700 parse errors, and resolve once
+ * stdin closes and the sink's work drains. The ACP server reuses this
+ * transport with its own sink and router.
+ */
+export async function runStdioJsonRpcServer(options: {
+  sink: MessageSink;
+  write: MessageWriter;
+  idle: () => Promise<void>;
+}): Promise<void> {
+  const decoder = new McpMessageDecoder(options.sink);
 
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk: string) => {
     try {
       decoder.push(chunk);
     } catch (error) {
-      writeMessage({
+      options.write({
         jsonrpc: '2.0',
         id: null,
         error: {
@@ -33,7 +49,7 @@ export async function runAgentDeviceMcpServer(): Promise<void> {
     process.stdin.on('close', resolve);
     process.stdin.resume();
   });
-  await payloadQueue.idle();
+  await options.idle();
 }
 
 export function createMcpPayloadQueue(
@@ -46,7 +62,7 @@ export function createMcpPayloadQueue(
   idle: () => Promise<void>;
 } {
   const handlePayload = options.handlePayload ?? handleMcpPayload;
-  const write = options.write ?? writeMessage;
+  const write = options.write ?? writeJsonRpcMessage;
   let pending = Promise.resolve();
   return {
     push: (payload) => {
@@ -124,7 +140,7 @@ function bestEffortId(value: unknown): JsonRpcId {
   return null;
 }
 
-class McpMessageDecoder {
+export class McpMessageDecoder {
   private buffer = '';
   private readonly sink: MessageSink;
 
@@ -163,6 +179,6 @@ function responseArray(response: JsonRpcResponse | null): JsonRpcResponse[] {
   return response ? [response] : [];
 }
 
-function writeMessage(message: unknown): void {
+export function writeJsonRpcMessage(message: unknown): void {
   process.stdout.write(`${JSON.stringify(message)}\n`);
 }

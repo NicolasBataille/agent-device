@@ -1,6 +1,6 @@
 ---
 title: AI Agent Setup
-description: Configure Cursor, Codex, Claude Code, Windsurf, Cline, Goose, skills, and MCP for agent-device mobile, TV, desktop, and web app verification.
+description: Configure Cursor, Codex, Claude Code, Windsurf, Cline, Goose, Zed, skills, MCP, and ACP for agent-device mobile, TV, desktop, and web app verification.
 ---
 
 # AI Agent Setup
@@ -89,6 +89,38 @@ No global install variant. Pin a user- or project-selected package version for u
 ```
 
 Registry metadata uses MCP name `io.github.callstackincubator/agent-device`, npm package `agent-device`, stdio transport, `mcpName` package verification, `server.json`, `glama.json`, and `smithery.yaml`. Glama lists the server at [callstack/agent-device](https://glama.ai/mcp/servers/callstack/agent-device).
+
+## ACP agent (Zed and other ACP clients)
+
+`agent-device acp` starts a stdio [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) agent, so ACP clients such as Zed can drive devices from the agent panel. It is a deterministic agent, not an LLM: each line of a prompt is one agent-device command in CLI syntax (an optional leading `agent-device` is accepted), executed through the same command contracts and `AgentDeviceClient` path as MCP tools. Command executions stream back as ACP tool calls with daemon progress updates, screenshots attach as inline images, and available commands are advertised per session.
+
+Target selection sticks within a session: after `open com.example.app --platform ios`, later lines such as `snapshot -i` reuse the same `--platform`, `--device`, `--udid`, `--session`, and `--state-dir` values until a line overrides them. Project config resolution uses the working directory the ACP client passes on `session/new`.
+
+Zed `settings.json`:
+
+```json
+{
+  "agent_servers": {
+    "agent-device": {
+      "type": "custom",
+      "command": "agent-device",
+      "args": ["acp"]
+    }
+  }
+}
+```
+
+Prompts are literal command lines, one per line:
+
+```
+open com.example.app --platform ios
+snapshot -i
+press @e2
+screenshot
+close
+```
+
+Natural-language prompts are refused with guidance rather than guessed at; keep the reasoning in the ACP client's own model and send resolved commands here. `session/cancel` stops the turn between commands; the command already in flight runs to completion.
 
 ## Cursor
 

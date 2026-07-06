@@ -10,6 +10,11 @@ import {
 type SchemaOnlyCliCommandName = Exclude<LocalCliCommandName, CommandName>;
 
 const SCHEMA_ONLY_CLI_COMMAND_SCHEMAS = {
+  acp: {
+    helpDescription:
+      'Start the stdio ACP (Agent Client Protocol) agent. Prompts are interpreted as agent-device command lines, one per line, executed through the agent-device client.',
+    summary: 'Start ACP agent',
+  },
   cdp: {
     usageOverride: 'cdp [...args]',
     listUsageOverride: 'cdp',

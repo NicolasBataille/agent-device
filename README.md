@@ -88,7 +88,7 @@ Snapshots come from the app's accessibility tree, so high-quality labels, roles,
 
 ## Next Steps
 
-- **Set up your agent**: run the CLI from Cursor, Codex, Claude Code, Windsurf, or another agent terminal. For skills, rules, direct MCP tools, and client-specific setup, see [AI Agent Setup](https://oss.callstack.com/agent-device/docs/agent-setup).
+- **Set up your agent**: run the CLI from Cursor, Codex, Claude Code, Windsurf, or another agent terminal. For skills, rules, direct MCP tools (`agent-device mcp`), the ACP agent for Zed and other ACP clients (`agent-device acp`), and client-specific setup, see [AI Agent Setup](https://oss.callstack.com/agent-device/docs/agent-setup).
 - **Try the sample app**: clone the repo and run the bundled Expo fixture when you want a guided first dogfood run with screenshots, replay, and performance evidence. See [Quick Start](https://oss.callstack.com/agent-device/docs/quick-start).
 - **Go deeper**: use [Commands](https://oss.callstack.com/agent-device/docs/commands), [Replay & E2E](https://oss.callstack.com/agent-device/docs/replay-e2e), and [Debugging & Profiling](https://oss.callstack.com/agent-device/docs/debugging-profiling) for production workflows.
 
