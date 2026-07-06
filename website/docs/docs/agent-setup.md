@@ -114,7 +114,7 @@ Prompts are literal command lines, one per line:
 
 ```
 open com.example.app --platform ios
-/snapshot -i
+snapshot -i
 press @e2
 screenshot
 close
