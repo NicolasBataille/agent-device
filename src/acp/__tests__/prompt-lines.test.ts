@@ -25,6 +25,18 @@ test('strips an optional leading agent-device token', () => {
   assert.equal((line as RunnableLine).command, 'devices');
 });
 
+test('accepts ACP slash commands for advertised commands', () => {
+  const lines = parsePromptCommandLines('/devices\n/snapshot -i', { cwd: CWD });
+  assert.deepEqual(
+    lines.map((line) => {
+      assert.equal(line.kind, 'command');
+      return (line as RunnableLine).command;
+    }),
+    ['devices', 'snapshot'],
+  );
+  assert.equal((lines[1] as RunnableLine).flags.snapshotInteractiveOnly, true);
+});
+
 test('tokenizes quoted arguments with spaces like replay scripts', () => {
   const line = parseOne('fill "id:search" "hello world" --platform ios');
   assert.equal(line.kind, 'command');

@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { listMcpCommandMetadata } from '../commands/command-metadata.ts';
 import { jsonRpcRequestSchema, type JsonRpcId } from '../kernel/contracts.ts';
 import { errorResponse, successResponse, type JsonRpcResponse } from '../mcp/router.ts';
@@ -50,7 +51,7 @@ export function createAcpRouter(deps: {
   };
 
   const newSession = (params: unknown): { sessionId: string } => {
-    const cwd = stringField(asRecord(params), 'cwd');
+    const { cwd } = readSessionNewParams(params);
     const session = sessions.create(cwd);
     // The session/new response must reach the client before the first
     // notification for that session; the response is written when this handler
@@ -119,6 +120,27 @@ export function createAcpRouter(deps: {
       markCancelled(sessions.get.bind(sessions), params);
     },
   };
+}
+
+function readSessionNewParams(params: unknown): { cwd: string } {
+  const record = asRecord(params);
+  const cwd = stringField(record, 'cwd');
+  if (!isAbsolute(cwd)) {
+    throw new AcpInvalidParamsError('Expected cwd to be an absolute path.');
+  }
+  validateMcpServers(record.mcpServers);
+  return { cwd };
+}
+
+function validateMcpServers(value: unknown): void {
+  if (!Array.isArray(value)) {
+    throw new AcpInvalidParamsError('Expected mcpServers to be an array.');
+  }
+  for (const [index, entry] of value.entries()) {
+    if (!asOptionalRecord(entry)) {
+      throw new AcpInvalidParamsError(`Expected mcpServers[${index}] to be an object.`);
+    }
+  }
 }
 
 function markCancelled(

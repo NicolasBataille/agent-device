@@ -60,6 +60,7 @@ function parsePromptCommandLine(line: string, options: { cwd: string }): PromptL
     return { kind: 'error', line, error: error instanceof Error ? error.message : String(error) };
   }
   if (tokens[0] === 'agent-device') tokens = tokens.slice(1);
+  if (tokens[0]?.startsWith('/')) tokens = [tokens[0].slice(1), ...tokens.slice(1)];
   if (tokens.length === 0) {
     return { kind: 'error', line, error: 'Empty command line.' };
   }

@@ -200,6 +200,31 @@ test('unknown methods, unknown sessions, and bad params return JSON-RPC errors',
   assert.equal(unknownSession.error.code, -32602);
 });
 
+test('session/new requires protocol-shaped session params', async () => {
+  const harness = makeRouter();
+  const cases: Array<{ name: string; params: unknown; message: RegExp }> = [
+    { name: 'relative cwd', params: { cwd: 'relative', mcpServers: [] }, message: /absolute/ },
+    { name: 'missing mcpServers', params: { cwd: '/tmp' }, message: /mcpServers/ },
+    { name: 'non-array mcpServers', params: { cwd: '/tmp', mcpServers: {} }, message: /array/ },
+    {
+      name: 'non-object mcpServers entry',
+      params: { cwd: '/tmp', mcpServers: [42] },
+      message: /mcpServers\[0\]/,
+    },
+  ];
+
+  for (const [index, entry] of cases.entries()) {
+    const response = (await harness.router.handleAcpPayload({
+      jsonrpc: '2.0',
+      id: index + 1,
+      method: 'session/new',
+      params: entry.params,
+    })) as { error: { code: number; message: string } };
+    assert.equal(response.error.code, -32602, entry.name);
+    assert.match(response.error.message, entry.message, entry.name);
+  }
+});
+
 test('notifications get no response and cancel notifications mark the session', async () => {
   let observedCancelled = false;
   const harness = makeRouter(

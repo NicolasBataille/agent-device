@@ -92,7 +92,7 @@ Registry metadata uses MCP name `io.github.callstackincubator/agent-device`, npm
 
 ## ACP agent (Zed and other ACP clients)
 
-`agent-device acp` starts a stdio [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) agent, so ACP clients such as Zed can drive devices from the agent panel. It is a deterministic agent, not an LLM: each line of a prompt is one agent-device command in CLI syntax (an optional leading `agent-device` is accepted), executed through the same command contracts and `AgentDeviceClient` path as MCP tools. Command executions stream back as ACP tool calls with daemon progress updates, screenshots attach as inline images, and available commands are advertised per session.
+`agent-device acp` starts a stdio [ACP](https://agentclientprotocol.com/) (Agent Client Protocol) agent, so ACP clients such as Zed can drive devices from the agent panel. It is a deterministic agent, not an LLM: each line of a prompt is one agent-device command in CLI syntax (ACP slash commands such as `/devices` and an optional leading `agent-device` are accepted), executed through the same command contracts and `AgentDeviceClient` path as MCP tools. Command executions stream back as ACP tool calls with daemon progress updates, screenshots attach as inline images, and available commands are advertised per session.
 
 Target selection sticks within a session: after `open com.example.app --platform ios`, later lines such as `snapshot -i` reuse the same `--platform`, `--device`, `--udid`, `--session`, and `--state-dir` values until a line overrides them. Project config resolution uses the working directory the ACP client passes on `session/new`.
 
@@ -114,7 +114,7 @@ Prompts are literal command lines, one per line:
 
 ```
 open com.example.app --platform ios
-snapshot -i
+/snapshot -i
 press @e2
 screenshot
 close
