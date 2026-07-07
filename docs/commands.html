@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/static/js/index.37b20c78ec.js"></script>
+<script defer src="/agent-device/static/js/index.62e01c60fa.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -713,6 +713,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <li>In <code>--json</code> mode, each overlay ref also includes a screenshot-space <code>center</code> point for coordinate fallback like <code>press &lt;x&gt; &lt;y&gt;</code>.</li>
 <li>Burned-in touch overlays are exported only on macOS hosts, because the overlay pipeline depends on Swift + AVFoundation helpers.</li>
 <li>On Linux or other non-macOS hosts, <code>record stop</code> still succeeds and returns the raw video plus telemetry sidecar, and includes <code>overlayWarning</code> when burn-in overlays were skipped.</li>
+<li>Android uses <code>adb shell screenrecord</code>, which has a 180s platform limit. <code>record start</code> publishes a durable device manifest. Longer recordings are split into MP4 chunks while the daemon stays alive; after daemon restart, <code>record stop</code> recovers only manifest-owned chunks and warns when gesture overlay telemetry was lost.</li>
 </ul>
 <p><strong>Session app logs (token-efficient debugging):</strong> Logging is off by default in normal flows. Enable it on demand for debugging. Logs are written to a file so agents can grep instead of loading full output into context.</p>
 <div class="rp-codeblock language-bash"><div class="rp-codeblock__content"><div class="rp-codeblock__content__scroll-container rp-scrollbar rp-scrollbar--always"><pre class="shiki css-variables" style="background-color:var(--shiki-background);color:var(--shiki-foreground)" tabindex="0" data-lang="bash"><code><span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> logs</span><span style="color:var(--shiki-token-string)"> path</span><span style="color:var(--shiki-token-comment)">                  # Print session log file path (e.g. ~/.agent-device/sessions/default/app.log)</span></span>
