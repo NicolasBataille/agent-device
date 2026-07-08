@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1147/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1147/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1147/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1147/static/js/index.71d64e9622.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1147/static/js/index.190c6b6a74.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -190,7 +190,7 @@ non-simulator targets.</li>
 <ul>
 <li>AndroidTV app launch and app listing resolve TV launchable activities via <code>LEANBACK_LAUNCHER</code>.</li>
 <li>TV target selection supports both simulator/emulator and connected physical devices (AppleTV + AndroidTV).</li>
-<li>TV targets are focus-first. Use <code>tv-remote</code> (or the CLI alias <code>d-pad</code>) to move focus before selecting a control; avoid raw <code>adb shell input keyevent</code> in command plans.</li>
+<li>TV targets are focus-first. Use <code>tv-remote</code> to move D-pad/remote focus before selecting a control; avoid raw <code>adb shell input keyevent</code> in command plans.</li>
 <li>On Android TV, <code>tv-remote</code> maps to ADB keyevents. <code>--duration-ms</code> uses Android&#x27;s longpress keyevent form for any positive duration because the platform command does not expose exact hold timing.</li>
 <li>tvOS supports the same runner-driven interaction/snapshot flow as iOS (<code>snapshot</code>, <code>wait</code>, <code>press</code>, <code>fill</code>, <code>get</code>, <code>scroll</code>, <code>back</code>, <code>home</code>, <code>app-switcher</code>, <code>record</code>, and related selector flows).</li>
 <li>On tvOS, <code>tv-remote</code>, runner <code>back</code>/<code>home</code>/<code>app-switcher</code> map to Siri Remote actions (<code>back</code> is Menu, <code>home</code> is Home, app switcher is double-home). <code>--duration-ms</code> is an exact remote-button hold duration.</li>
