@@ -739,6 +739,27 @@ test('parseArgs recognizes connect aws-device-farm provider flags', () => {
   assert.equal(parsed.flags.awsInteractionMode, 'INTERACTIVE');
 });
 
+test('parseArgs recognizes connect roku provider flags', () => {
+  const parsed = parseArgs(
+    [
+      'connect',
+      'roku',
+      '--roku-webdriver-url',
+      'http://127.0.0.1:9000',
+      '--roku-device-ip',
+      '192.168.1.50',
+      '--provider-app',
+      'dev-channel',
+    ],
+    { strictFlags: true },
+  );
+  assert.equal(parsed.command, 'connect');
+  assert.deepEqual(parsed.positionals, ['roku']);
+  assert.equal(parsed.flags.rokuWebDriverUrl, 'http://127.0.0.1:9000');
+  assert.equal(parsed.flags.rokuDeviceIp, '192.168.1.50');
+  assert.equal(parsed.flags.providerApp, 'dev-channel');
+});
+
 test('parseArgs accepts auth management subcommands', () => {
   const status = parseArgs(['auth', 'status'], { strictFlags: true });
   assert.equal(status.command, 'auth');

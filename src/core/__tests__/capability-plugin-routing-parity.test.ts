@@ -174,6 +174,41 @@ const HINT_REF: Record<string, (device: DeviceInfo) => string | undefined> = {
   'rotate-gesture': synthesisGestureUnsupportedHint,
   'transform-gesture': synthesisGestureUnsupportedHint,
 };
+const WEB_TV_SUPPORTED_COMMANDS_REF = new Set([
+  'open',
+  'close',
+  'find',
+  'get',
+  'is',
+  'snapshot',
+  'wait',
+  'tv-remote',
+]);
+const WEB_TARGET_GATED_COMMANDS_REF = [
+  'audio',
+  'click',
+  'fill',
+  'focus',
+  'network',
+  'press',
+  'record',
+  'screenshot',
+  'scroll',
+  'type',
+  'viewport',
+  'tv-remote',
+];
+const supportsWebCommandByTargetRef = (command: string, device: DeviceInfo): boolean =>
+  device.target === 'tv' ? WEB_TV_SUPPORTED_COMMANDS_REF.has(command) : command !== 'tv-remote';
+const webUnsupportedHintByTargetRef = (command: string, device: DeviceInfo): string | undefined => {
+  if (!WEB_TARGET_GATED_COMMANDS_REF.includes(command)) return undefined;
+  if (command === 'tv-remote') {
+    return device.target === 'tv' ? undefined : 'tv-remote is supported only on TV targets.';
+  }
+  return device.target === 'tv'
+    ? `${command} is not supported on Roku WebDriver TV targets.`
+    : undefined;
+};
 
 // Independent reference for `isCommandSupportedOnDevice` over NON-WEB platforms,
 // reproducing the BEFORE pipeline exactly: descriptor-fold bucket selection (b.1
@@ -240,7 +275,11 @@ test('(b.2) unsupportedHint closures are verbatim across the full device matrix'
     for (const device of SAMPLE_DEVICES) {
       assert.equal(
         unsupportedHintForDevice(command, device),
-        reference ? reference(device) : undefined,
+        device.platform === 'web'
+          ? webUnsupportedHintByTargetRef(command, device)
+          : reference
+            ? reference(device)
+            : undefined,
         `${command} hint on ${device.id}`,
       );
     }
@@ -299,13 +338,41 @@ test('(b.2) non-Apple families only carry their own non-portable support gates',
   assert.deepEqual(Object.keys(getPlugin('android').capability.unsupportedHintByDefault ?? {}), [
     'tv-remote',
   ]);
-  for (const platform of ['linux', 'web'] as const) {
-    const capability = getPlugin(platform).capability;
-    assert.equal(capability.supportsByDefault, undefined, `${platform} has no supportsByDefault`);
-    assert.equal(
-      capability.unsupportedHintByDefault,
-      undefined,
-      `${platform} has no unsupportedHintByDefault`,
-    );
+  const linuxCapability = getPlugin('linux').capability;
+  assert.equal(linuxCapability.supportsByDefault, undefined, 'linux has no supportsByDefault');
+  assert.equal(
+    linuxCapability.unsupportedHintByDefault,
+    undefined,
+    'linux has no unsupportedHintByDefault',
+  );
+
+  const webCapability = getPlugin('web').capability;
+  assert.deepEqual(
+    Object.keys(webCapability.supportsByDefault ?? {}).sort(),
+    [...WEB_TARGET_GATED_COMMANDS_REF].sort(),
+    'web support gates are limited to target-sensitive web commands',
+  );
+  assert.deepEqual(
+    Object.keys(webCapability.unsupportedHintByDefault ?? {}).sort(),
+    [...WEB_TARGET_GATED_COMMANDS_REF].sort(),
+    'web hint gates are limited to target-sensitive web commands',
+  );
+  for (const command of WEB_TARGET_GATED_COMMANDS_REF) {
+    const supports = webCapability.supportsByDefault?.[command];
+    const hint = webCapability.unsupportedHintByDefault?.[command];
+    assert.ok(supports, `${command} web supports closure present`);
+    assert.ok(hint, `${command} web hint closure present`);
+    for (const device of SAMPLE_DEVICES.filter((sample) => sample.platform === 'web')) {
+      assert.equal(
+        supports(device),
+        supportsWebCommandByTargetRef(command, device),
+        `${command} web supports on ${device.id}`,
+      );
+      assert.equal(
+        hint(device),
+        webUnsupportedHintByTargetRef(command, device),
+        `${command} web hint on ${device.id}`,
+      );
+    }
   }
 });

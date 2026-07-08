@@ -59,6 +59,15 @@ const linuxDevice: DeviceInfo = {
 
 const webDevice = WEB_DESKTOP_DEVICE;
 
+const webTvDevice: DeviceInfo = {
+  platform: 'web',
+  id: 'roku:127.0.0.1',
+  name: 'Roku',
+  kind: 'device',
+  target: 'tv',
+  booted: true,
+};
+
 const tvOsSimulator: DeviceInfo = {
   platform: 'apple',
   id: 'tv-sim-1',
@@ -458,6 +467,33 @@ test('web supports only the initial browser interaction slice', () => {
       'trigger-app-event',
     ],
     [{ device: webDevice, expected: false, label: 'on web' }],
+  );
+});
+
+test('web TV exposes only Roku-supported commands', () => {
+  assertCommandSupport(
+    ['close', 'find', 'get', 'is', 'open', 'snapshot', 'tv-remote', 'wait'],
+    [{ device: webTvDevice, expected: true, label: 'on Roku web TV' }],
+  );
+  assertCommandSupport(
+    [
+      'audio',
+      'click',
+      'fill',
+      'focus',
+      'network',
+      'press',
+      'record',
+      'screenshot',
+      'scroll',
+      'type',
+      'viewport',
+    ],
+    [{ device: webTvDevice, expected: false, label: 'on Roku web TV' }],
+  );
+  assert.match(
+    unsupportedHintForDevice('click', webTvDevice) ?? '',
+    /click is not supported on Roku WebDriver TV targets/,
   );
 });
 

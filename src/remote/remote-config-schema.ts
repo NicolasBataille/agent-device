@@ -51,6 +51,8 @@ export type CloudProviderProfileFields = {
   awsAppArn?: string;
   awsRegion?: string;
   awsInteractionMode?: 'INTERACTIVE' | 'NO_VIDEO' | 'VIDEO_ONLY';
+  rokuWebDriverUrl?: string;
+  rokuDeviceIp?: string;
 };
 
 export type RemoteConfigProfile = RemoteConfigMetroOptions &
@@ -100,7 +102,7 @@ export const REMOTE_CONFIG_FIELD_SPECS = [
   {
     key: 'leaseBackend',
     type: 'enum',
-    enumValues: ['ios-simulator', 'ios-instance', 'android-instance'],
+    enumValues: ['ios-simulator', 'ios-instance', 'android-instance', 'web-instance'],
   },
   { key: 'platform', type: 'enum', enumValues: PLATFORM_SELECTORS },
   { key: 'target', type: 'enum', enumValues: ['mobile', 'tv', 'desktop'] },
@@ -129,6 +131,8 @@ export const REMOTE_CONFIG_FIELD_SPECS = [
     type: 'enum',
     enumValues: ['INTERACTIVE', 'NO_VIDEO', 'VIDEO_ONLY'],
   },
+  { key: 'rokuWebDriverUrl', type: 'string' },
+  { key: 'rokuDeviceIp', type: 'string' },
   { key: 'metroProjectRoot', type: 'string', path: true },
   { key: 'metroKind', type: 'enum', enumValues: ['auto', 'react-native', 'expo', 'repack'] },
   { key: 'metroPublicBaseUrl', type: 'string' },

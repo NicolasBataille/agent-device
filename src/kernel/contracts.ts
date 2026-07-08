@@ -47,7 +47,12 @@ export type DaemonInstallSource =
 
 const DAEMON_LOCK_POLICIES = ['reject', 'strip'] as const;
 export type DaemonLockPolicy = (typeof DAEMON_LOCK_POLICIES)[number];
-const LEASE_BACKENDS = ['ios-simulator', 'ios-instance', 'android-instance'] as const;
+const LEASE_BACKENDS = [
+  'ios-simulator',
+  'ios-instance',
+  'android-instance',
+  'web-instance',
+] as const;
 export type LeaseBackend = (typeof LEASE_BACKENDS)[number];
 const DAEMON_SERVER_MODES = ['socket', 'http', 'dual'] as const;
 export type DaemonServerMode = (typeof DAEMON_SERVER_MODES)[number];

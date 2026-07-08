@@ -20,6 +20,7 @@ import {
   uploadBrowserStackApp,
 } from './browserstack.ts';
 import { CLOUD_WEBDRIVER_PROVIDERS, type CloudWebDriverKnownProviderName } from './providers.ts';
+import { createRokuWebDriverRuntime } from './roku.ts';
 import {
   buildCloudWebDriverBaseCapabilities,
   createCloudWebDriverRuntime,
@@ -43,6 +44,8 @@ export type DefaultCloudWebDriverProviderRuntimeEnv = DefaultCloudWebDriverArtif
   AWS_DEVICE_FARM_DEVICE_ARN?: string;
   AGENT_DEVICE_AWS_DEVICE_FARM_APP_ARN?: string;
   AWS_DEVICE_FARM_APP_ARN?: string;
+  ROKU_WEBDRIVER_URL?: string;
+  ROKU_DEVICE_IP?: string;
 };
 
 export type CloudWebDriverProviderDefinition = {
@@ -203,6 +206,15 @@ export const CLOUD_WEBDRIVER_PROVIDER_DEFINITIONS: readonly CloudWebDriverProvid
         client,
       );
     },
+  },
+  {
+    provider: CLOUD_WEBDRIVER_PROVIDERS.roku,
+    createRuntime: (env) =>
+      createRokuWebDriverRuntime({
+        endpoint: env.ROKU_WEBDRIVER_URL,
+        deviceIp: env.ROKU_DEVICE_IP,
+      }),
+    listArtifactsFromEnv: async () => undefined,
   },
 ];
 

@@ -296,6 +296,8 @@ export function buildFlags(options: InternalRequestOptions): CommandFlags {
     awsAppArn: options.awsAppArn,
     awsRegion: options.awsRegion,
     awsInteractionMode: options.awsInteractionMode,
+    rokuWebDriverUrl: options.rokuWebDriverUrl,
+    rokuDeviceIp: options.rokuDeviceIp,
     sessionIsolation: options.sessionIsolation,
     platform: options.platform,
     target: options.target,

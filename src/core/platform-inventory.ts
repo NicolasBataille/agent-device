@@ -18,6 +18,8 @@ export type DeviceInventoryRequest = {
   leaseProvider?: string;
   deviceKey?: string;
   clientId?: string;
+  rokuWebDriverUrl?: string;
+  rokuDeviceIp?: string;
   iosSimulatorSetPath?: string;
   androidSerialAllowlist?: string[];
 };

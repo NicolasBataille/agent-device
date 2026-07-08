@@ -204,6 +204,38 @@ test('connect aws-device-farm generates local provider profile from flags', asyn
   }
 });
 
+test('connect roku generates local provider profile from flags', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-device-connect-roku-'));
+  const stateDir = path.join(tempRoot, '.state');
+
+  try {
+    await connectWithGeneratedProviderProfile({
+      stateDir,
+      positionals: ['roku'],
+      flags: {
+        rokuWebDriverUrl: 'http://127.0.0.1:9000',
+        rokuDeviceIp: '192.168.1.50',
+        providerApp: 'dev-channel',
+      },
+    });
+
+    const state = readRequiredActiveState(stateDir);
+    assert.equal(state.tenant, 'roku');
+    assert.equal(state.leaseProvider, 'roku');
+    assert.equal(state.daemon?.baseUrl, undefined);
+    assert.match(state.remoteConfigPath, /generated\/roku-[a-f0-9]{16}\.json$/);
+    const generated = readGeneratedConfig(state.remoteConfigPath);
+    assert.equal(generated.platform, 'web');
+    assert.equal(generated.target, 'tv');
+    assert.equal(generated.leaseBackend, 'web-instance');
+    assert.equal(generated.rokuWebDriverUrl, 'http://127.0.0.1:9000');
+    assert.equal(generated.rokuDeviceIp, '192.168.1.50');
+    assert.equal(generated.providerApp, 'dev-channel');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 function mockCloudConnectionProfile(connection: Record<string, unknown>): ReturnType<typeof vi.fn> {
   mockedResolveCloudAccessForConnect.mockResolvedValue({
     accessToken: 'adc_agent_cloud',
@@ -294,11 +326,16 @@ async function connectWithGeneratedProviderProfile(options: {
 function readGeneratedConfig(configPath: string): {
   tenant?: string;
   leaseProvider?: string;
+  leaseBackend?: string;
   clientId?: string;
+  platform?: string;
+  target?: string;
   providerApp?: string;
   providerOsVersion?: string;
   providerProject?: string;
   providerBuild?: string;
+  rokuWebDriverUrl?: string;
+  rokuDeviceIp?: string;
   awsProjectArn?: string;
   awsDeviceArn?: string;
   awsAppArn?: string;
@@ -308,11 +345,16 @@ function readGeneratedConfig(configPath: string): {
   return JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
     tenant?: string;
     leaseProvider?: string;
+    leaseBackend?: string;
     clientId?: string;
+    platform?: string;
+    target?: string;
     providerApp?: string;
     providerOsVersion?: string;
     providerProject?: string;
     providerBuild?: string;
+    rokuWebDriverUrl?: string;
+    rokuDeviceIp?: string;
     awsProjectArn?: string;
     awsDeviceArn?: string;
     awsAppArn?: string;

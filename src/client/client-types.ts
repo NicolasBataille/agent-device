@@ -128,6 +128,8 @@ export type AgentDeviceRequestOverrides = Pick<
   | 'awsAppArn'
   | 'awsRegion'
   | 'awsInteractionMode'
+  | 'rokuWebDriverUrl'
+  | 'rokuDeviceIp'
   | 'leaseTtlMs'
   | 'cwd'
   | 'debug'

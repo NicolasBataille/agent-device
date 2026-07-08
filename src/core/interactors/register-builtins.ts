@@ -78,10 +78,63 @@ const linuxPlugin = {
   },
 } as const satisfies PlatformPlugin;
 
+const WEB_TV_SUPPORTED_COMMANDS = new Set<string>([
+  PUBLIC_COMMANDS.open,
+  PUBLIC_COMMANDS.close,
+  PUBLIC_COMMANDS.find,
+  PUBLIC_COMMANDS.get,
+  PUBLIC_COMMANDS.is,
+  PUBLIC_COMMANDS.snapshot,
+  PUBLIC_COMMANDS.wait,
+  PUBLIC_COMMANDS.tvRemote,
+]);
+
+const WEB_TARGET_GATED_COMMANDS = [
+  PUBLIC_COMMANDS.audio,
+  PUBLIC_COMMANDS.click,
+  PUBLIC_COMMANDS.fill,
+  PUBLIC_COMMANDS.focus,
+  PUBLIC_COMMANDS.network,
+  PUBLIC_COMMANDS.press,
+  PUBLIC_COMMANDS.record,
+  PUBLIC_COMMANDS.screenshot,
+  PUBLIC_COMMANDS.scroll,
+  PUBLIC_COMMANDS.type,
+  PUBLIC_COMMANDS.viewport,
+  PUBLIC_COMMANDS.tvRemote,
+] as const;
+type WebTargetGatedCommand = (typeof WEB_TARGET_GATED_COMMANDS)[number];
+
+const supportsWebCommandByTarget: Record<WebTargetGatedCommand, (device: DeviceInfo) => boolean> =
+  {} as Record<WebTargetGatedCommand, (device: DeviceInfo) => boolean>;
+for (const command of WEB_TARGET_GATED_COMMANDS) {
+  supportsWebCommandByTarget[command] = (device) =>
+    device.target === 'tv' ? WEB_TV_SUPPORTED_COMMANDS.has(command) : command !== 'tv-remote';
+}
+
+const webUnsupportedHintByTarget: Record<
+  WebTargetGatedCommand,
+  (device: DeviceInfo) => string | undefined
+> = {} as Record<WebTargetGatedCommand, (device: DeviceInfo) => string | undefined>;
+for (const command of WEB_TARGET_GATED_COMMANDS) {
+  webUnsupportedHintByTarget[command] = (device) => {
+    if (command === PUBLIC_COMMANDS.tvRemote) {
+      return device.target === 'tv' ? undefined : 'tv-remote is supported only on TV targets.';
+    }
+    return device.target === 'tv'
+      ? `${command} is not supported on Roku WebDriver TV targets.`
+      : undefined;
+  };
+}
+
 const webPlugin = {
   id: 'web',
   platforms: ['web'],
-  capability: { bucket: 'web' },
+  capability: {
+    bucket: 'web',
+    supportsByDefault: supportsWebCommandByTarget,
+    unsupportedHintByDefault: webUnsupportedHintByTarget,
+  },
   // Wraps the web arm of `resolveRecordingBackendForDevice`: the web device resolves to
   // the web (agent-browser) recording backend.
   recording: { resolveBackendTag: () => 'web' },

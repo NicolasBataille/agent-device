@@ -41,12 +41,14 @@ const WEB_QUERY_COMMANDS = [
 ] as const;
 const WEB_INTERACTION_COMMANDS = ['click', 'fill', 'focus', 'press', 'scroll', 'type'] as const;
 const WEB_SETTING_COMMANDS = ['viewport'] as const;
+const WEB_TV_COMMANDS = ['tv-remote'] as const;
 const WEB_SUPPORTED_COMMANDS = new Set<string>([
   ...WEB_RUNTIME_COMMANDS,
   ...WEB_RECORDING_COMMANDS,
   ...WEB_QUERY_COMMANDS,
   ...WEB_INTERACTION_COMMANDS,
   ...WEB_SETTING_COMMANDS,
+  ...WEB_TV_COMMANDS,
 ]);
 // Built from the additive command-descriptor registry (ADR-0008, Phase 1 step 3).
 // The hand-authored literal was deleted after #906 proved deriveCapabilityMatrix is

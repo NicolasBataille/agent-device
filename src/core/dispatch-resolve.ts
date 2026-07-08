@@ -25,6 +25,8 @@ export type ResolveDeviceFlags = Pick<
   | 'leaseId'
   | 'iosSimulatorDeviceSet'
   | 'androidDeviceAllowlist'
+  | 'rokuWebDriverUrl'
+  | 'rokuDeviceIp'
 > & {
   leaseProvider?: string;
   deviceKey?: string;
@@ -205,6 +207,8 @@ export function buildDeviceInventoryRequestFromFlags(
     leaseProvider: flags.leaseProvider,
     deviceKey: flags.deviceKey,
     clientId: flags.clientId,
+    rokuWebDriverUrl: flags.rokuWebDriverUrl,
+    rokuDeviceIp: flags.rokuDeviceIp,
     iosSimulatorSetPath,
     androidSerialAllowlist: androidSerialAllowlist
       ? Array.from(androidSerialAllowlist).sort()

@@ -60,6 +60,10 @@ const CLOUD_WEBDRIVER_CONNECT_PROFILE_BUILDERS: readonly {
     provider: CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm,
     buildProfileFields: awsDeviceFarmProfileFields,
   },
+  {
+    provider: CLOUD_WEBDRIVER_PROVIDERS.roku,
+    buildProfileFields: rokuProfileFields,
+  },
 ];
 
 function requireConnectProfileBuilder(
@@ -139,6 +143,27 @@ function awsDeviceFarmProfileFields(options: {
   };
 }
 
+function rokuProfileFields(options: { flags: CliFlags; env?: EnvMap }): RemoteConfigProfile {
+  const rokuWebDriverUrl = requireFlag(
+    readRokuProfileValue(options.flags.rokuWebDriverUrl, options.env, 'ROKU_WEBDRIVER_URL'),
+    'connect roku requires --roku-webdriver-url <url> or ROKU_WEBDRIVER_URL.',
+  );
+  const rokuDeviceIp = requireFlag(
+    readRokuProfileValue(options.flags.rokuDeviceIp, options.env, 'ROKU_DEVICE_IP'),
+    'connect roku requires --roku-device-ip <ip> or ROKU_DEVICE_IP.',
+  );
+  return {
+    platform: 'web',
+    target: 'tv',
+    leaseBackend: options.flags.leaseBackend ?? 'web-instance',
+    device: options.flags.device,
+    providerApp: options.flags.providerApp,
+    providerSessionName: options.flags.providerSessionName,
+    rokuWebDriverUrl,
+    rokuDeviceIp,
+  };
+}
+
 function requireCloudWebDriverPlatform(
   platform: PlatformSelector | undefined,
   message: string,
@@ -174,6 +199,14 @@ function readAwsProfileValue(
 ): string | undefined {
   if (flagValue) return flagValue;
   return envNames.map((name) => env?.[name]).find((value): value is string => Boolean(value));
+}
+
+function readRokuProfileValue(
+  flagValue: string | undefined,
+  env: EnvMap | undefined,
+  envName: string,
+): string | undefined {
+  return flagValue ?? env?.[envName];
 }
 
 function buildCloudWebDriverClientId(
