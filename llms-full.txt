@@ -797,9 +797,12 @@ Additional CLI-backed methods are exposed on their domain groups with typed opti
 - `client.interactions.click()`, `press()`, `longPress()`, `swipe()`, `pan()`, `fling()`, `focus()`, `type()`, `fill()`, `scroll()`, `pinch()`, `rotateGesture()`, `transformGesture()`, `get()`, `is()`, `find()`
 - `client.replay.run()` and `client.replay.test()`
 - `client.batch.run()`
-- `client.observability.perf()`, `logs()`, `network()`, and `audio()`
+- `client.observability.perf()`, `logs()`, `events()`, `network()`, and `audio()`
 - `client.recording.record()` and `client.recording.trace()`
 - `client.settings.update()`
+
+`client.observability.events({ cursor, limit })` reads the session event timeline as paged JSON entries. Use `nextCursor` from the previous page to continue from the daemon-owned `events.ndjson` file without replaying already uploaded/displayed events.
+The event timeline keeps operational context such as command/status/timing, paths, session/device/app identifiers, refs/selectors, and coordinates. Typed text, clipboard writes, push/event payloads, raw unknown command arguments, and matching raw message fragments are replaced with length-only placeholders.
 
 `client.observability.audio()` mirrors `audio probe start|status|stop`. Use it to collect compact RMS/peak dBFS buckets while other session actions continue:
 
@@ -1799,6 +1802,8 @@ agent-device logs clear                 # Truncate app.log + remove rotated app.
 agent-device logs clear --restart       # Stop stream, clear log files, and start streaming again
 agent-device logs doctor                # Show logs backend/tool checks and readiness hints
 agent-device logs mark "before submit"  # Insert timeline marker into app.log
+agent-device events                     # Print recent session request/action events
+agent-device events 50 100              # Page 50 events starting at cursor 100
 agent-device network dump 25            # Parse recent HTTP(s) requests (method/url/status)
 agent-device network dump 25 --include all # Include parsed headers/body when available (truncated)
 agent-device network dump 25 --include headers --platform web # Browser requests via managed agent-browser
@@ -1807,8 +1812,9 @@ agent-device network dump 25 --include headers --platform web # Browser requests
 - Supported on iOS simulator, iOS physical device, and Android.
 - Preferred debug entrypoint: `logs clear --restart` for clean-window repro loops.
 - `logs start` appends to `app.log` and rotates to `app.log.1` when the file exceeds 5 MB.
-- `open` prints `Session state: <path>` and JSON includes `sessionStateDir`, `runnerLogPath`, and `requestLogPath`. Use the session directory to inspect concurrent runs without parsing global daemon logs.
-- `requests/<request-id>.ndjson` contains daemon request diagnostics for the session; `runner.log` contains Apple runner and `xcodebuild` output.
+- `open` prints `Session state: <path>` and JSON includes `sessionStateDir`, `runnerLogPath`, `requestLogPath`, and `eventLogPath`. Use the session directory to inspect concurrent runs without parsing global daemon logs.
+- `events.ndjson` contains the session event timeline; `requests/<request-id>.ndjson` contains daemon request diagnostics; `runner.log` contains Apple runner and `xcodebuild` output.
+- Event timeline entries keep operational context such as command names, status, durations, paths, session/device/app identifiers, refs/selectors, and coordinates. Typed text, clipboard writes, push/event payloads, raw unknown command arguments, and matching raw message fragments are replaced with length-only placeholders. `--no-record` suppresses `action.recorded` entries, but request start/finish entries still record command/status/timing.
 - `network dump [limit] [summary|headers|body|all]` parses recent HTTP(s) entries from `app.log` for app/device sessions and from managed `agent-browser` request history for web sessions; `network log ...` is an alias.
 - Prefer `--include headers|body|all` when you want explicit detail level without relying on positional ordering.
 - On macOS, `logs` and `network dump` are app-scoped and parse Unified Logging output associated with the active session app.
@@ -3519,8 +3525,15 @@ When a session is established, human output includes a `Session state: <path>` l
 Session artifact directories contain per-run evidence for concurrent agents:
 
 - `requests/<request-id>.ndjson` - daemon request diagnostics for this session.
+- `events.ndjson` - session event timeline for requests and recorded actions.
 - `runner.log` - Apple runner and `xcodebuild` build/start output for this session.
 - `app.log` - app/device logs when `logs start` or `logs clear --restart` is active.
+
+`events.ndjson` is privacy-shaped for automation timelines: it preserves command names, status,
+durations, paths, session/device/app identifiers, refs/selectors, and coordinates, while replacing
+typed text, clipboard writes, push/event payloads, raw unknown command arguments, and matching raw
+message fragments with length-only placeholders. `--no-record` suppresses recorded action entries;
+request start/finish entries still record command, status, and timing.
 
 The top-level daemon log is for daemon lifecycle/startup issues. Use the session artifact directory first when debugging a specific run.
 

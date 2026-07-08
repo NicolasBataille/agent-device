@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/static/js/index.f4bcf52136.js"></script>
+<script defer src="/agent-device/static/js/index.ed7b9a5692.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -278,10 +278,12 @@ idempotent for the same owner and rejects conflicting owners for the same local 
 <li><code>client.interactions.click()</code>, <code>press()</code>, <code>longPress()</code>, <code>swipe()</code>, <code>pan()</code>, <code>fling()</code>, <code>focus()</code>, <code>type()</code>, <code>fill()</code>, <code>scroll()</code>, <code>pinch()</code>, <code>rotateGesture()</code>, <code>transformGesture()</code>, <code>get()</code>, <code>is()</code>, <code>find()</code></li>
 <li><code>client.replay.run()</code> and <code>client.replay.test()</code></li>
 <li><code>client.batch.run()</code></li>
-<li><code>client.observability.perf()</code>, <code>logs()</code>, <code>network()</code>, and <code>audio()</code></li>
+<li><code>client.observability.perf()</code>, <code>logs()</code>, <code>events()</code>, <code>network()</code>, and <code>audio()</code></li>
 <li><code>client.recording.record()</code> and <code>client.recording.trace()</code></li>
 <li><code>client.settings.update()</code></li>
 </ul>
+<p><code>client.observability.events({ cursor, limit })</code> reads the session event timeline as paged JSON entries. Use <code>nextCursor</code> from the previous page to continue from the daemon-owned <code>events.ndjson</code> file without replaying already uploaded/displayed events.
+The event timeline keeps operational context such as command/status/timing, paths, session/device/app identifiers, refs/selectors, and coordinates. Typed text, clipboard writes, push/event payloads, raw unknown command arguments, and matching raw message fragments are replaced with length-only placeholders.</p>
 <p><code>client.observability.audio()</code> mirrors <code>audio probe start|status|stop</code>. Use it to collect compact RMS/peak dBFS buckets while other session actions continue:</p>
 <div class="rp-codeblock language-ts"><div class="rp-codeblock__content"><div class="rp-codeblock__content__scroll-container rp-scrollbar rp-scrollbar--always"><pre class="shiki css-variables" style="background-color:var(--shiki-background);color:var(--shiki-foreground)" tabindex="0" data-lang="ts"><code><span class="line"><span style="color:var(--shiki-token-keyword)">await</span><span style="color:var(--shiki-token-constant)"> client</span><span style="color:var(--shiki-token-function)">.</span><span style="color:var(--shiki-token-constant)">observability</span><span style="color:var(--shiki-token-function)">.audio</span><span style="color:var(--shiki-foreground)">({</span></span>
 <span class="line"><span style="color:var(--shiki-foreground)">  platform</span><span style="color:var(--shiki-token-keyword)">:</span><span style="color:var(--shiki-token-string-expression)"> &#x27;web&#x27;</span><span style="color:var(--shiki-token-punctuation)">,</span></span>
