@@ -2,7 +2,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { commandDescriptors } from '../../core/command-descriptor/registry.ts';
+import {
+  commandDescriptors,
+  commandDescriptorOwners,
+} from '../../core/command-descriptor/registry.ts';
 import { getDaemonRouteOwnerFiles } from '../../daemon/request-handler-chain.ts';
 import {
   explainCommand as explainCommandFromMetadata,
@@ -165,7 +168,7 @@ describe('explainCommand table-driven coverage', () => {
       const result = explainCommand(descriptor.name, { fileExists });
       expect(result.found).toBe(true);
       if (!result.found) continue;
-      for (const ownerFile of descriptor.ownerFiles) {
+      for (const ownerFile of commandDescriptorOwners[descriptor.name]) {
         expect(result.explanation.files).toContain(ownerFile);
       }
       for (const file of result.explanation.files) {
