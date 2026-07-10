@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1199/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1199/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1199/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1199/static/js/index.3fb6b5c5a6.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1199/static/js/index.5fd15028bb.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -685,8 +685,9 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <ul>
 <li><code>metro reload</code> triggers a dev-server reload, the same mechanism used by pressing <code>r</code> in the Metro terminal.</li>
 <li>Use it for React Native dev builds that are already connected to Metro when JS changes should be loaded without restarting the native app process.</li>
-<li>A flagless <code>metro reload --session &lt;s&gt;</code> resolves against the dev server that session last bound — via <code>metro prepare</code> or <code>open</code>&#x27;s <code>--metro-host</code>/<code>--metro-port</code>/<code>--bundle-url</code> hint flags — so it never silently reloads a different project&#x27;s server on the default port. It falls back to <code>http://localhost:8081/reload</code> only when the session never bound a dev server. The binding is cleared when the session closes, and a fresh <code>open</code> without hint flags also clears any leftover binding from a previous same-name session.</li>
-<li>The reload URL keeps the bound bundle URL&#x27;s mount prefix instead of collapsing to the host root (<code>http://host/tenant-42/index.bundle</code> → <code>http://host/tenant-42/reload</code>); the Expo virtual entry (<code>.expo/.virtual-metro-entry.bundle</code>) is an entry-module path, not a mount, so it maps to the server-root endpoints.</li>
+<li>A flagless <code>metro reload --session &lt;s&gt;</code> resolves against the dev server that session last bound — via <code>metro prepare</code> or <code>open</code>&#x27;s <code>--metro-host</code>/<code>--metro-port</code>/<code>--bundle-url</code> hint flags — so it never silently reloads a different project&#x27;s server on the default port. Resolution priority is per-call flags, then that session&#x27;s saved binding, then <code>http://localhost:8081/reload</code>; a host or port flag overrides only that field, while <code>--bundle-url</code> supplies the target bundle origin and route.</li>
+<li>Session bindings are updated by each hinted <code>open</code> or <code>metro prepare</code>, cleared by <code>close</code>, and also cleared when a fresh same-name <code>open</code> has no Metro hint flags. This prevents a reused session name from reloading a previous project&#x27;s dev server.</li>
+<li>The reload URL keeps the bound bundle URL&#x27;s mount prefix instead of collapsing to the host root. This applies to both <code>index.bundle</code> and Expo&#x27;s virtual entry: <code>http://host/tenant-42/.expo/.virtual-metro-entry.bundle</code> maps to <code>http://host/tenant-42/reload</code>.</li>
 <li>When the dev server has no HTTP <code>/reload</code> route and answers with the app page instead (Expo does this), <code>metro reload</code> broadcasts <code>{&quot;version&quot;:2,&quot;method&quot;:&quot;reload&quot;}</code> over the server&#x27;s <code>/message</code> websocket — the channel the dev-server CLIs use for the <code>r</code> key — instead of reporting the app-page response as a successful reload. The result&#x27;s <code>transport</code> field says which channel delivered the reload.</li>
 <li>Pass <code>--metro-host</code>, <code>--metro-port</code>, or <code>--bundle-url</code> when you need to target a specific Metro instance for one call; explicit flags override the session binding.</li>
 <li>Fall back to <code>open &lt;app&gt; --relaunch</code> when the app is not connected to Metro, reload fails, or the native process itself must restart.</li>
