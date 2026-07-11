@@ -88,7 +88,8 @@ import { runCmd } from '../../../../utils/exec.ts';
 import { retryWithPolicy } from '../../../../utils/retry.ts';
 import { parseIosDeviceAppsPayload, parseIosDeviceProcessesPayload } from '../devicectl.ts';
 import { PNG } from '../../../../utils/png.ts';
-import type { GesturePlan } from '../../../../contracts/gesture-plan.ts';
+import { buildGesturePlan, type GesturePlan } from '../../../../contracts/gesture-plan.ts';
+import { normalizePublicSwipeMotion } from '../../../../contracts/gesture-normalization.ts';
 
 const IOS_TEST_DEVICE: DeviceInfo = {
   platform: 'apple',
@@ -260,6 +261,99 @@ test('performGestureApple sends exact two-pointer pan samples through gesture', 
   assert.deepEqual(mockRunAppleRunnerCommand.mock.calls[0]?.[1], {
     command: 'gesture',
     gesturePlan: plan,
+    appBundleId: 'com.example.App',
+  });
+});
+
+test('performGestureApple keeps every two-pointer intent on the exact gesture route', async () => {
+  mockRunAppleRunnerCommand.mockResolvedValue({});
+  const plans = (['pan', 'pinch', 'rotate', 'transform'] as const).map((intent) => ({
+    ...twoFingerPanPlan(),
+    intent,
+  }));
+
+  for (const plan of plans) {
+    await performGestureApple(IOS_TEST_SIMULATOR, { appBundleId: 'com.example.App' }, {}, plan);
+  }
+
+  assert.deepEqual(
+    mockRunAppleRunnerCommand.mock.calls.map((call) => call[1]),
+    plans.map((gesturePlan) => ({
+      command: 'gesture',
+      gesturePlan,
+      appBundleId: 'com.example.App',
+    })),
+  );
+});
+
+test('performGestureApple lowers one-pointer fling and pan plans to synthesized drag profiles', async () => {
+  mockRunAppleRunnerCommand.mockResolvedValue({});
+
+  await performGestureApple(
+    IOS_TEST_SIMULATOR,
+    { appBundleId: 'com.example.App' },
+    {},
+    singleFlingPlan(),
+  );
+  await performGestureApple(
+    IOS_TEST_SIMULATOR,
+    { appBundleId: 'com.example.App' },
+    {},
+    singlePanPlan(),
+  );
+
+  assert.deepEqual(
+    mockRunAppleRunnerCommand.mock.calls.map((call) => call[1]),
+    [
+      {
+        command: 'drag',
+        x: 300,
+        y: 400,
+        x2: 100,
+        y2: 400,
+        durationMs: 100,
+        synthesized: true,
+        dragSemantics: 'swipe',
+        appBundleId: 'com.example.App',
+      },
+      {
+        command: 'drag',
+        x: 100,
+        y: 200,
+        x2: 180,
+        y2: 160,
+        durationMs: 500,
+        synthesized: true,
+        dragSemantics: 'pan',
+        appBundleId: 'com.example.App',
+      },
+    ],
+  );
+});
+
+test('performGestureApple keeps the fast profile for a duration-bearing public swipe', async () => {
+  mockRunAppleRunnerCommand.mockResolvedValue({});
+  const normalized = normalizePublicSwipeMotion({
+    from: { x: 362, y: 437 },
+    to: { x: 40, y: 437 },
+    durationMs: 100,
+  });
+  if (normalized.gesture.intent !== 'pan' || !('origin' in normalized.gesture)) {
+    throw new Error('Expected duration-bearing coordinate swipe to normalize to one-pointer pan');
+  }
+  const plan = buildGesturePlan(normalized.gesture, { x: 0, y: 0, width: 393, height: 852 }, 'ios');
+
+  await performGestureApple(IOS_TEST_SIMULATOR, { appBundleId: 'com.example.App' }, {}, plan);
+
+  assert.deepEqual(mockRunAppleRunnerCommand.mock.calls[0]?.[1], {
+    command: 'drag',
+    x: 362,
+    y: 437,
+    x2: 40,
+    y2: 437,
+    durationMs: 100,
+    synthesized: true,
+    dragSemantics: 'swipe',
     appBundleId: 'com.example.App',
   });
 });
@@ -3388,6 +3482,7 @@ function singlePanPlan(): Extract<GesturePlan, { topology: 'single' }> {
   return {
     topology: 'single',
     intent: 'pan',
+    executionProfile: 'timed-pan',
     durationMs: 500,
     viewport: { x: 0, y: 0, width: 400, height: 800 },
     pointers: [
@@ -3396,6 +3491,25 @@ function singlePanPlan(): Extract<GesturePlan, { topology: 'single' }> {
         samples: [
           { offsetMs: 0, point: { x: 100, y: 200 } },
           { offsetMs: 500, point: { x: 180, y: 160 } },
+        ],
+      },
+    ],
+  };
+}
+
+function singleFlingPlan(): Extract<GesturePlan, { topology: 'single' }> {
+  return {
+    topology: 'single',
+    intent: 'fling',
+    executionProfile: 'swipe',
+    durationMs: 100,
+    viewport: { x: 0, y: 0, width: 400, height: 800 },
+    pointers: [
+      {
+        pointerId: 0,
+        samples: [
+          { offsetMs: 0, point: { x: 300, y: 400 } },
+          { offsetMs: 100, point: { x: 100, y: 400 } },
         ],
       },
     ],

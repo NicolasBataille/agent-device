@@ -1,5 +1,6 @@
 import { RESPONSE_LEVELS } from '../../kernel/contracts.ts';
 import { RECORDING_SCOPE_VALUES } from '../../contracts/recording-scope.ts';
+import { SWIPE_PAUSE_MAX_MS, SWIPE_REPEAT_COUNT_MAX } from '../../contracts/scroll-gesture.ts';
 import type { FlagDefinition } from './flag-types.ts';
 
 export const ACTION_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
@@ -8,7 +9,7 @@ export const ACTION_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
     names: ['--count'],
     type: 'int',
     min: 1,
-    max: 200,
+    max: SWIPE_REPEAT_COUNT_MAX,
     usageLabel: '--count <n>',
     usageDescription: 'Repeat count for press/swipe series',
   },
@@ -172,7 +173,7 @@ export const ACTION_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
     names: ['--pause-ms'],
     type: 'int',
     min: 0,
-    max: 10_000,
+    max: SWIPE_PAUSE_MAX_MS,
     usageLabel: '--pause-ms <ms>',
     usageDescription: 'Delay between swipe iterations',
   },

@@ -1,7 +1,7 @@
 import type { Point } from '../kernel/snapshot.ts';
 import type { SwipePreset } from './scroll-gesture.ts';
 import { readGesturePayload, type GesturePayload } from './gesture-input.ts';
-import type { GestureSemanticInput } from './gesture-plan-types.ts';
+import type { GestureExecutionProfile, GestureSemanticInput } from './gesture-plan-types.ts';
 
 export type GestureCompatibilityRule = 'swipe-duration' | 'fling-duration' | 'rotate-velocity';
 
@@ -12,8 +12,16 @@ export type GestureDeprecation = {
 
 export type NormalizedGestureInput =
   | GestureSemanticInput
-  | { intent: 'fling'; preset: SwipePreset }
-  | { intent: 'pan'; preset: SwipePreset; durationMs: number };
+  | {
+      intent: 'fling';
+      preset: SwipePreset;
+    }
+  | {
+      intent: 'pan';
+      preset: SwipePreset;
+      durationMs: number;
+      executionProfile?: GestureExecutionProfile;
+    };
 
 export type NormalizedPublicGesture = {
   gesture: NormalizedGestureInput;
@@ -100,6 +108,7 @@ export function normalizePublicGesture(input: GesturePayload): NormalizedPublicG
             origin: input.origin,
             delta: directionDelta(input.direction, input.distance ?? 180),
             durationMs: input.durationMs,
+            executionProfile: 'swipe',
           },
           deprecations: [
             { rule: 'fling-duration', replacement: 'Use gesture pan for timed movement.' },
@@ -120,7 +129,12 @@ export function normalizePublicGesture(input: GesturePayload): NormalizedPublicG
       return input.durationMs === undefined
         ? { gesture: { intent: 'fling', preset: input.preset }, deprecations: [] }
         : {
-            gesture: { intent: 'pan', preset: input.preset, durationMs: input.durationMs },
+            gesture: {
+              intent: 'pan',
+              preset: input.preset,
+              durationMs: input.durationMs,
+              executionProfile: 'swipe',
+            },
             deprecations: [
               { rule: 'swipe-duration', replacement: 'Use gesture pan for timed movement.' },
             ],
@@ -175,6 +189,7 @@ export function normalizePublicSwipeMotion(input: {
       origin: input.from,
       delta: { x: input.to.x - input.from.x, y: input.to.y - input.from.y },
       durationMs: input.durationMs,
+      executionProfile: 'swipe',
     },
     deprecations: [{ rule: 'swipe-duration', replacement: 'Use gesture pan for timed movement.' }],
   };

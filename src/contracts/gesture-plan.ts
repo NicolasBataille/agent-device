@@ -3,6 +3,7 @@ import type { PublicPlatform } from '../kernel/device.ts';
 import type { Point, Rect } from '../kernel/snapshot.ts';
 import type { ScrollDirection } from './scroll-gesture.ts';
 import type {
+  GestureExecutionProfile,
   GesturePlan,
   GestureSemanticInput,
   MultiTouchGesturePlan,
@@ -112,6 +113,7 @@ function buildFlingPlan(
       input.to,
       FLING_DURATION_MS,
       viewport,
+      'swipe',
       platform,
     );
   }
@@ -123,6 +125,7 @@ function buildFlingPlan(
     offsetPointByDirection(start, input.direction, distance),
     FLING_DURATION_MS,
     viewport,
+    'swipe',
     platform,
   );
 }
@@ -146,6 +149,7 @@ function buildPanPlan(
       addPoints(start, delta),
       durationMs,
       viewport,
+      input.executionProfile ?? 'timed-pan',
       platform,
     );
   }
@@ -172,6 +176,7 @@ function buildSinglePointerPlan(
   to: Point,
   durationMs: number,
   viewport: Rect,
+  executionProfile: GestureExecutionProfile,
   platform?: PublicPlatform,
 ): SinglePointerGesturePlan {
   const start = finitePoint(from, `gesture ${intent} start`);
@@ -184,6 +189,7 @@ function buildSinglePointerPlan(
   return {
     topology: 'single',
     intent,
+    executionProfile,
     durationMs,
     viewport,
     pointers: [{ pointerId: 0, samples }],

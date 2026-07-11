@@ -166,7 +166,7 @@ export function iosRunnerOverrides(
   };
 }
 
-/** Executes the portable pointer plan without regenerating platform geometry. */
+/** Lowers canonical plans to Apple executors while keeping multi-touch samples lossless. */
 export async function performGestureApple(
   device: DeviceInfo,
   ctx: RunnerContext,
@@ -195,6 +195,24 @@ export async function performGestureApple(
     return await runAppleRunnerCommand(
       device,
       { command: 'swipe', direction: dominantDirection(first, last), appBundleId: ctx.appBundleId },
+      runnerOpts,
+    );
+  }
+  if (plan.topology === 'single') {
+    const { start: first, end: last } = singlePointerPlanEndpoints(plan);
+    return await runAppleRunnerCommand(
+      device,
+      {
+        command: 'drag',
+        x: first.x,
+        y: first.y,
+        x2: last.x,
+        y2: last.y,
+        durationMs: plan.durationMs,
+        synthesized: shouldUseSynthesizedIosGesture(device),
+        dragSemantics: plan.executionProfile === 'swipe' ? 'swipe' : 'pan',
+        appBundleId: ctx.appBundleId,
+      },
       runnerOpts,
     );
   }

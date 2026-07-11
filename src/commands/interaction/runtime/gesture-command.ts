@@ -4,7 +4,8 @@ import { buildGesturePlan } from '../../../contracts/gesture-plan.ts';
 import type { NormalizedGestureInput } from '../../../contracts/gesture-normalization.ts';
 import { buildSwipePresetGesturePlan } from '../../../contracts/scroll-gesture.ts';
 import type { Point, Rect } from '../../../kernel/snapshot.ts';
-import { AppError } from '../../../kernel/errors.ts';
+import { AppError, normalizeError } from '../../../kernel/errors.ts';
+import { emitDiagnostic } from '../../../utils/diagnostics.ts';
 import { successText } from '../../../utils/success-text.ts';
 import { toBackendContext } from '../../runtime-common.ts';
 import {
@@ -91,12 +92,48 @@ async function captureGestureViewport(
   runtime: AgentDeviceRuntime,
   options: GestureCommandOptions,
 ): Promise<Rect> {
-  const backendViewport = await runtime.backend.resolveGestureViewport?.(
-    toBackendContext(runtime, options),
-  );
-  if (backendViewport) return backendViewport;
+  let backendViewport: unknown;
+  try {
+    backendViewport = await runtime.backend.resolveGestureViewport?.(
+      toBackendContext(runtime, options),
+    );
+  } catch (error) {
+    emitDiagnostic({
+      level: 'warn',
+      phase: 'gesture_viewport_probe_failed',
+      data: {
+        platform: runtime.backend.platform,
+        error: normalizeError(error).message,
+      },
+    });
+  }
+  if (isUsableGestureViewport(backendViewport)) return backendViewport;
+  if (backendViewport !== undefined) {
+    emitDiagnostic({
+      level: 'warn',
+      phase: 'gesture_viewport_probe_unusable',
+      data: { platform: runtime.backend.platform },
+    });
+  }
   const capture = await captureInteractionSnapshot(runtime, options, false);
   return resolveVisibleSnapshotViewport(capture.snapshot.nodes, 'gesture');
+}
+
+function isUsableGestureViewport(value: unknown): value is Rect {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    isFiniteNumber(candidate.x) &&
+    isFiniteNumber(candidate.y) &&
+    isFiniteNumber(candidate.width) &&
+    isFiniteNumber(candidate.height) &&
+    candidate.width > 0 &&
+    candidate.height > 0
+  );
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function resolvePresetGesture(input: NormalizedGestureInput, viewport: Rect): GestureSemanticInput {
@@ -113,6 +150,7 @@ function resolvePresetGesture(input: NormalizedGestureInput, viewport: Rect): Ge
     origin: from,
     delta: { x: to.x - from.x, y: to.y - from.y },
     durationMs: input.durationMs,
+    ...(input.executionProfile ? { executionProfile: input.executionProfile } : {}),
   };
 }
 

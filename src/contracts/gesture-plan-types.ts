@@ -5,6 +5,12 @@ export type GesturePointerCount = 1 | 2;
 
 export type GestureIntent = 'fling' | 'pan' | 'pinch' | 'rotate' | 'transform';
 
+/**
+ * The single-pointer executor profile is independent from public intent so compatibility
+ * aliases can retain their proven swipe motion without turning a timed pan into a fling.
+ */
+export type GestureExecutionProfile = 'swipe' | 'timed-pan';
+
 export type GestureSemanticInput =
   | { intent: 'fling'; from: Point; to: Point }
   | {
@@ -13,13 +19,13 @@ export type GestureSemanticInput =
       origin: Point;
       distance?: number;
     }
-  | {
+  | ({
       intent: 'pan';
       origin: Point;
       delta: Point;
       pointerCount?: GesturePointerCount;
       durationMs?: number;
-    }
+    } & { executionProfile?: GestureExecutionProfile })
   | { intent: 'pinch'; origin?: Point; scale: number }
   | { intent: 'rotate'; origin?: Point; degrees: number }
   | {
@@ -41,6 +47,7 @@ export type PointerTrajectory = {
 export type SinglePointerGesturePlan = {
   topology: 'single';
   intent: 'fling' | 'pan';
+  executionProfile: GestureExecutionProfile;
   durationMs: number;
   viewport: Rect;
   pointers: readonly [PointerTrajectory];

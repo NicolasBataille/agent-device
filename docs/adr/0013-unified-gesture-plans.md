@@ -33,7 +33,9 @@ from motion:
 
 `swipe` is public sugar for a fixed-duration fling. Its historical optional duration remains a
 thin compatibility alias to pan and reports a deprecation. The same rule applies to the historical
-fling duration. Pinch fixes translation and rotation at zero; rotate fixes translation at zero and
+fling duration. Normalization also preserves an internal single-pointer execution profile so those
+aliases retain their established swipe motion while a genuine timed pan remains continuous. Pinch
+fixes translation and rotation at zero; rotate fixes translation at zero and
 scale at one; two-finger pan fixes scale at one and rotation at zero; transform can apply all three
 components atomically. Intent remains on the plan even when aliases share an executor.
 
@@ -59,9 +61,11 @@ Platform adapters consume the canonical plan:
   two-contact plan never falls back to `adb input swipe`; issue #690 separately owns removal of the
   existing one-contact fallback. The snapshot helper is stopped before local gesture
   instrumentation because Android permits only one instrumentation owner of `UiAutomation`.
-- iOS converts every planned point to native orientation and feeds the exact arrays to the existing
-  private XCTest event bridge. macOS lowers a one-contact plan to its drag executor and tvOS lowers
-  it to remote direction; multi-touch remains capability-gated to iOS simulators.
+- iOS lowers one-contact plans through the established synthesized-drag executor, preserving its
+  screenshot-based coordinate frame, keyboard/fallback policy, and swipe-versus-pan profile.
+  Two-contact plans convert every planned point to native orientation and feed the exact arrays to
+  the private XCTest event bridge. macOS lowers a one-contact plan to its drag executor and tvOS
+  lowers it to remote direction; multi-touch remains capability-gated to iOS simulators.
 - WebDriver lowers a supported plan to synchronized W3C pointer action sources. Multi-touch remains
   capability-gated until a provider proves it.
 
@@ -84,6 +88,7 @@ selectors or refs and therefore cannot claim element-targeting guarantees.
 
 - CLI, Node.js, MCP, runtime, and platform adapters share one normalization and planning model.
 - Adding an ergonomic gesture alias does not add a platform implementation.
+- Public compatibility aliases retain executor behavior without changing canonical pan/fling intent.
 - One-finger pan remains the default and explicit two-finger pan retains pan intent.
 - The active viewport is resolved for each gesture, so rotation, keyboard, and window changes do
   not use stale geometry.

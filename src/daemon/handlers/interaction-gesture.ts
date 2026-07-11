@@ -4,6 +4,7 @@ import {
   normalizePublicGesture,
   normalizePublicSwipeMotion,
 } from '../../contracts/gesture-normalization.ts';
+import { SWIPE_PAUSE_MAX_MS, SWIPE_REPEAT_COUNT_MAX } from '../../contracts/scroll-gesture.ts';
 import { requireGestureSupported } from '../../core/capabilities.ts';
 import { AppError, normalizeError } from '../../kernel/errors.ts';
 import { readOptionalInteger } from '../../kernel/input-validation.ts';
@@ -177,8 +178,8 @@ function readSwipeInput(input: unknown): SwipeInput {
     from: readSwipePoint(record.from, 'swipe from'),
     to: readSwipePoint(record.to, 'swipe to'),
     durationMs: readOptionalInteger(record, 'durationMs', { min: 0 }),
-    count: readOptionalInteger(record, 'count', { min: 1 }),
-    pauseMs: readOptionalInteger(record, 'pauseMs', { min: 0 }),
+    count: readOptionalInteger(record, 'count', { min: 1, max: SWIPE_REPEAT_COUNT_MAX }),
+    pauseMs: readOptionalInteger(record, 'pauseMs', { min: 0, max: SWIPE_PAUSE_MAX_MS }),
     pattern,
   };
 }

@@ -24,7 +24,12 @@ test('swipe is fling sugar unless legacy duration requests a pan', () => {
     deprecations: [],
   });
   assert.deepEqual(normalizePublicGesture({ kind: 'swipe', preset: 'left', durationMs: 400 }), {
-    gesture: { intent: 'pan', preset: 'left', durationMs: 400 },
+    gesture: {
+      intent: 'pan',
+      preset: 'left',
+      durationMs: 400,
+      executionProfile: 'swipe',
+    },
     deprecations: [{ rule: 'swipe-duration', replacement: 'Use gesture pan for timed movement.' }],
   });
 });
@@ -44,6 +49,7 @@ test('duration-bearing fling is an explicit compatibility alias for pan', () => 
         origin: { x: 200, y: 300 },
         delta: { x: -80, y: 0 },
         durationMs: 500,
+        executionProfile: 'swipe',
       },
       deprecations: [
         { rule: 'fling-duration', replacement: 'Use gesture pan for timed movement.' },

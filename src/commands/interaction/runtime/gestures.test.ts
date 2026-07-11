@@ -5,6 +5,8 @@ import { AppError } from '../../../kernel/errors.ts';
 import { makeSnapshotState } from '../../../__tests__/test-utils/index.ts';
 import type { AgentDeviceBackend } from '../../../backend.ts';
 import type { GesturePlan } from '../../../contracts/gesture-plan.ts';
+import type { Rect } from '../../../kernel/snapshot.ts';
+import { parseAndroidDisplayGeometry } from '../../../platforms/android/display-geometry.ts';
 import {
   createInteractionDevice,
   runtimeScrollSnapshot,
@@ -343,6 +345,114 @@ test('runtime directional swipe uses the visible viewport instead of off-screen 
       pointerCount: 1,
     },
   ]);
+});
+
+test('runtime coordinate swipe uses backend viewport geometry without accessibility capture', async () => {
+  let capturedViewport: unknown;
+  let executionCount = 0;
+  const device = createInteractionDevice(selectorSnapshot(), {
+    platform: 'android',
+    captureSnapshot: async () => {
+      throw new Error('coordinate swipe must not capture Android accessibility state');
+    },
+    resolveGestureViewport: async () => ({ x: 0, y: 0, width: 400, height: 800 }),
+    performGesture: async (_context, plan) => {
+      capturedViewport = plan.viewport;
+      executionCount += 1;
+    },
+  });
+
+  const result = await device.interactions.swipe({
+    from: { x: 300, y: 400 },
+    to: { x: 100, y: 400 },
+    session: 'default',
+  });
+
+  assert.equal(result.kind, 'fling');
+  assert.deepEqual(capturedViewport, { x: 0, y: 0, width: 400, height: 800 });
+  assert.equal(executionCount, 1);
+});
+
+test('runtime coordinate swipe keeps deterministic viewport bounds validation on the fast path', async () => {
+  let executionCount = 0;
+  const device = createInteractionDevice(selectorSnapshot(), {
+    platform: 'android',
+    captureSnapshot: async () => {
+      throw new Error('coordinate swipe must not capture Android accessibility state');
+    },
+    resolveGestureViewport: async () => ({ x: 0, y: 0, width: 400, height: 800 }),
+    performGesture: async () => {
+      executionCount += 1;
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      device.interactions.swipe({
+        from: { x: 400, y: 400 },
+        to: { x: 100, y: 400 },
+        session: 'default',
+      }),
+    (error: unknown) =>
+      error instanceof AppError &&
+      error.code === 'INVALID_ARGS' &&
+      error.details?.reason === 'GESTURE_TRAJECTORY_OUT_OF_BOUNDS',
+  );
+  assert.equal(executionCount, 0);
+});
+
+test('runtime coordinate swipe falls back to the snapshot viewport when display probing fails', async () => {
+  let snapshotCaptureCount = 0;
+  let capturedViewport: unknown;
+  const snapshot = selectorSnapshot();
+  const device = createInteractionDevice(snapshot, {
+    platform: 'android',
+    resolveGestureViewport: async () => {
+      throw parseAndroidDisplayGeometry('Displays:\n');
+    },
+    captureSnapshot: async () => {
+      snapshotCaptureCount += 1;
+      return { snapshot };
+    },
+    performGesture: async (_context, plan) => {
+      capturedViewport = plan.viewport;
+    },
+  });
+
+  const result = await device.interactions.swipe({
+    from: { x: 20, y: 30 },
+    to: { x: 90, y: 30 },
+    session: 'default',
+  });
+
+  assert.equal(result.kind, 'fling');
+  assert.equal(snapshotCaptureCount, 1);
+  assert.deepEqual(capturedViewport, { x: 10, y: 20, width: 100, height: 40 });
+});
+
+test('runtime gesture falls back when the backend returns an unusable viewport shape', async () => {
+  let snapshotCaptureCount = 0;
+  let capturedViewport: unknown;
+  const snapshot = selectorSnapshot();
+  const device = createInteractionDevice(snapshot, {
+    platform: 'android',
+    resolveGestureViewport: async () => ({ x: 0, y: 0, width: 0, height: 800 }) as unknown as Rect,
+    captureSnapshot: async () => {
+      snapshotCaptureCount += 1;
+      return { snapshot };
+    },
+    performGesture: async (_context, plan) => {
+      capturedViewport = plan.viewport;
+    },
+  });
+
+  await device.interactions.pan({
+    origin: { x: 20, y: 30 },
+    delta: { x: 10, y: 0 },
+  });
+
+  assert.equal(snapshotCaptureCount, 1);
+  assert.deepEqual(capturedViewport, { x: 10, y: 20, width: 100, height: 40 });
 });
 
 test('runtime gesture swipe presets use stable viewport lanes', async () => {

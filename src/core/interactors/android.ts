@@ -3,6 +3,7 @@ import {
   openAndroidApp,
   openAndroidDevice,
 } from '../../platforms/android/app-lifecycle.ts';
+import { getAndroidGestureViewport } from '../../platforms/android/display-geometry.ts';
 import {
   appSwitcherAndroid,
   backAndroid,
@@ -50,6 +51,7 @@ export function createAndroidInteractor(device: DeviceInfo): Interactor {
     type: (text, delayMs) => typeAndroid(device, text, delayMs),
     fill: (x, y, text, delayMs) => fillAndroid(device, x, y, text, delayMs),
     scroll: (direction, options) => scrollAndroid(device, direction, options),
+    gestureViewport: () => getAndroidGestureViewport(device),
     performGesture: (plan) => performGestureAndroid(device, plan),
     screenshot: (outPath, options) => screenshotAndroid(device, outPath, options),
     snapshot: async (options) => {

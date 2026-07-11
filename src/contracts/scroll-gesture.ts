@@ -8,6 +8,8 @@ export const SWIPE_PRESETS = ['left', 'right', 'left-edge', 'right-edge'] as con
 export type SwipePreset = (typeof SWIPE_PRESETS)[number];
 export const SWIPE_PATTERNS = ['one-way', 'ping-pong'] as const;
 export type SwipePattern = (typeof SWIPE_PATTERNS)[number];
+export const SWIPE_REPEAT_COUNT_MAX = 200;
+export const SWIPE_PAUSE_MAX_MS = 10_000;
 const SWIPE_PRESET_ENUM = defineStringEnum(SWIPE_PRESETS, {
   message: 'gesture swipe requires left, right, left-edge, or right-edge',
 });

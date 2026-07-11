@@ -795,7 +795,7 @@ extension RunnerTests {
     let frame = context.referenceFrame
     let start = nativeSynthesizedPoint(orientedX: x, orientedY: y, in: frame, interfaceOrientation: orientation)
     let end = nativeSynthesizedPoint(orientedX: x2, orientedY: y2, in: frame, interfaceOrientation: orientation)
-    let message = if semantics == .swipe {
+    let message = if usesFastSynthesizedDragProfile(semantics) {
       RunnerSynthesizedGesture.synthesizeSwipe(
         withApplication: app,
         x: Double(start.x),
@@ -832,6 +832,15 @@ extension RunnerTests {
       hint: "macOS automation has no touchscreen; use mouse-driven interactions instead."
     )
 #endif
+  }
+
+  func usesFastSynthesizedDragProfile(_ semantics: SynthesizedDragSemantics?) -> Bool {
+    switch semantics {
+    case .swipe, .fling:
+      return true
+    case .pan, .none:
+      return false
+    }
   }
 
   func synthesizedTapAt(
@@ -1426,6 +1435,13 @@ extension RunnerTests {
         screenshotSize: { CGSize(width: CGFloat.infinity, height: 932) }
       )
     )
+  }
+
+  func testFastSynthesizedDragProfileCoversFlingAndSwipeButNotTimedPan() {
+    XCTAssertTrue(usesFastSynthesizedDragProfile(.swipe))
+    XCTAssertTrue(usesFastSynthesizedDragProfile(.fling))
+    XCTAssertFalse(usesFastSynthesizedDragProfile(.pan))
+    XCTAssertFalse(usesFastSynthesizedDragProfile(nil))
   }
 
   func testPlannedMultiTouchGestureAcceptsMatchingInBoundsTrajectories() throws {
