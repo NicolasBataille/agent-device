@@ -332,8 +332,8 @@ agent-device type "query" --delay-ms 80
 agent-device press 300 500
 agent-device press 300 500 --count 12 --interval-ms 45
 agent-device press 300 500 --count 6 --hold-ms 120 --interval-ms 30 --jitter-px 2
-agent-device swipe 540 1500 540 500 120
-agent-device swipe 540 1500 540 500 120 --count 8 --pause-ms 30 --pattern ping-pong
+agent-device swipe 540 1500 540 500
+agent-device swipe 540 1500 540 500 --count 8 --pause-ms 30 --pattern ping-pong
 agent-device gesture pan 200 420 0 -80 500
 agent-device gesture pan 200 420 80 -40 700 --pointer-count 2
 agent-device gesture fling right 200 420 180
@@ -354,11 +354,14 @@ On Android, `fill` also verifies text and treats IME-owned capture as a terminal
 Android text entry is owned by `agent-device`: provider-native injection when available, then chunk-safe ASCII shell input. Do not switch to raw `adb`, clipboard, or paste as an agent fallback. If non-ASCII is unsupported in the current backend, report the tool/device gap.
 `click --button secondary` is the desktop context-menu flow on macOS.
 `click --button middle` is reserved for future runner support and currently returns an explicit unsupported-operation error on macOS.
-`swipe` accepts an optional `durationMs` argument (default `250ms`, range `16..10000`).
-On iOS, swipe duration is clamped to a safe range (`16..60ms`) to avoid longpress side effects.
+`swipe` is a quick, fixed-duration directional throw. Its historical optional `durationMs` remains
+accepted for compatibility but normalizes to a pan and reports a deprecation; use `gesture pan` for
+deliberate timed movement.
 `gesture pan` accepts `x y dx dy [durationMs]` for deliberate drags. It uses one pointer by default. Add `--pointer-count 2` for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
-`gesture fling` accepts `up|down|left|right x y [distance] [durationMs]` for fast directional throws.
-`gesture rotate` accepts `degrees [x] [y] [velocity]`; the degree sign controls direction and velocity controls speed.
+`gesture fling` accepts `up|down|left|right x y [distance]` for fast directional throws. Its
+historical duration is accepted as a deprecated alias to pan.
+`gesture rotate` accepts `degrees [x] [y]`; the degree sign controls direction. Its historical
+velocity is accepted but deprecated because pacing is derived from the requested rotation.
 `gesture transform` accepts `x y dx dy scale degrees [durationMs]` for one combined two-finger pan/zoom/rotate gesture on Android and iOS simulators. Pinch, rotate, two-finger pan, and transform use the same viewport-aware pointer planning; impossible paths fail before injection instead of clamping or distorting the requested motion.
 On iOS simulators it uses private XCTest synthesis for a continuous two-finger pan/scale/rotation path, so verify app-level metrics instead of assuming the requested values map exactly to recognizer output.
 On Android, `gesture transform` injects a geometric two-finger path. App recognizers may report non-exact pan, scale, and rotation values, so verify qualitative state such as `pan changed yes`, `pinch changed yes`, and `rotate changed yes` unless the app explicitly promises exact centroid metrics. If exact app-state values matter, prefer isolated `gesture pan`, `gesture pinch`, or `gesture rotate` commands.
@@ -380,7 +383,7 @@ done
 
 `longpress` is supported on iOS and Android.
 `gesture pinch` is supported on Android and iOS simulator app sessions.
-`gesture rotate` is supported on Android and iOS simulator app sessions. Use `rotate` for device orientation. On iOS the optional `velocity` argument is ignored — rotation is synthesized over a fixed duration and direction is taken from the sign of `degrees`.
+`gesture rotate` is supported on Android and iOS simulator app sessions. Use `rotate` for device orientation.
 Two-finger `gesture pan` and `gesture transform` are supported on Android and iOS simulator app sessions. One-finger `gesture pan` keeps the broader platform support of ordinary coordinate drags.
 
 ## Find (semantic)
@@ -418,7 +421,7 @@ agent-device open Settings --platform ios --session e2e --save-script [path]
 agent-device replay ./session.ad      # Run deterministic replay from .ad script
 agent-device test ./suite             # Run every .ad file in a folder or glob serially
 agent-device test ./suite --timeout 60000 --retries 1
-agent-device replay -u ./session.ad   # Update selector drift and rewrite .ad script in place
+agent-device replay ./session.ad --from 4 --plan-digest <sha256>   # Execute step 4; if already completed, use the next safe index with this digest
 ```
 
 - `replay` runs deterministic `.ad` scripts.
@@ -427,7 +430,8 @@ agent-device replay -u ./session.ad   # Update selector drift and rewrite .ad sc
 - `test --timeout <ms>` and `test --retries <n>` apply per script attempt; `context timeout=...` and `context retries=...` can be declared inside the `.ad` header. Retries are capped at `3`, duplicate metadata keys are rejected, and timeouts are cooperative.
 - `test --artifacts-dir <path>` overrides the default suite artifact root at `.agent-device/test-artifacts`.
 - `test` prints a short `Running replay suite...` line before dispatch, then streams one-line `pass`, `fail`, or `skip` progress on stderr as each suite entry finishes or retries. Each line includes current/total suite position and elapsed seconds such as `pass 3/6 ... duration=12.34s`. The final summary still prints failures and flaky passed-on-retry tests by default; add `--verbose` to print every final result.
-- `replay -u` updates stale recorded actions and rewrites the same script.
+- A failing step returns a `REPLAY_DIVERGENCE` report (screen digest, ranked selector suggestions, and a `resume` field); `replay --from <n> --plan-digest <sha256>` resumes at and executes plan step `n` without re-running `1..n-1`. If the failed action was completed manually, resume from the next safe plan index using the matching digest. `replay`-only; `test` rejects `--from`.
+- `replay -u`/`--update` no longer rewrites the script (retired — see [Replay & E2E](/agent-device/pr-preview/pr-1212/docs/replay-e2e.md)); it is a no-op kept for compatibility, since every divergence already carries the same ranked suggestions.
 - `--save-script` records a replay script on `close`; optional path is a file path and parent directories are created.
 
 See [Replay & E2E](/agent-device/pr-preview/pr-1212/docs/replay-e2e.md) for recording, Maestro compatibility, and CI workflow details.
