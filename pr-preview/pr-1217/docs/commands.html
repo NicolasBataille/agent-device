@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1217/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1217/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1217/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1217/static/js/index.a700bf3fd8.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1217/static/js/index.4acd3843bd.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -326,6 +326,8 @@ Android text entry is owned by <code>agent-device</code>: provider-native inject
 <code>swipe</code> is a quick, fixed-duration directional throw. Its historical optional <code>durationMs</code> remains
 accepted for compatibility but normalizes to a pan and reports a deprecation; use <code>gesture pan</code> for
 deliberate timed movement.
+Repeated coordinate swipes accept at most 200 repetitions and 10000ms pauses, and their combined
+gesture/pause schedule must fit within 60000ms.
 <code>gesture pan</code> accepts <code>x y dx dy [durationMs]</code> for deliberate drags. It uses one pointer by default. Add <code>--pointer-count 2</code> for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
 <code>gesture fling</code> accepts <code>up|down|left|right x y [distance]</code> for fast directional throws. Its
 historical duration is accepted as a deprecated alias to pan.
