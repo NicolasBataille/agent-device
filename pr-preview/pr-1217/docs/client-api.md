@@ -245,7 +245,7 @@ Supported command methods:
 - `appState`
 - `back`
 - `home`
-- `rotate`
+- `orientation`
 - `appSwitcher`
 - `keyboard`
 - `clipboard`
