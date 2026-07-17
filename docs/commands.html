@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/static/js/index.ed239be11c.js"></script>
+<script defer src="/agent-device/static/js/index.a1398d99a4.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -323,16 +323,12 @@ On Android, <code>fill</code> also verifies text and treats IME-owned capture as
 Android text entry is owned by <code>agent-device</code>: provider-native injection when available, then chunk-safe ASCII shell input. Do not switch to raw <code>adb</code>, clipboard, or paste as an agent fallback. If non-ASCII is unsupported in the current backend, report the tool/device gap.
 <code>click --button secondary</code> is the desktop context-menu flow on macOS.
 <code>click --button middle</code> is reserved for future runner support and currently returns an explicit unsupported-operation error on macOS.
-<code>swipe</code> is a quick, fixed-duration directional throw. Its historical optional <code>durationMs</code> remains
-accepted for compatibility but normalizes to a pan and reports a deprecation; use <code>gesture pan</code> for
-deliberate timed movement.
+<code>swipe</code> is a quick, fixed-duration directional throw. Use <code>gesture pan</code> for deliberate timed movement.
 Repeated coordinate swipes accept at most 200 repetitions and 10000ms pauses, and their combined
 gesture/pause schedule must fit within 60000ms.
 <code>gesture pan</code> accepts <code>x y dx dy [durationMs]</code> for deliberate drags. It uses one pointer by default. Add <code>--pointer-count 2</code> for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
-<code>gesture fling</code> accepts <code>up|down|left|right x y [distance]</code> for fast directional throws. Its
-historical duration is accepted as a deprecated alias to pan.
-<code>gesture rotate</code> accepts <code>degrees [x] [y]</code>; the degree sign controls direction. Its historical
-velocity is accepted but deprecated because pacing is derived from the requested rotation.
+<code>gesture fling</code> accepts <code>up|down|left|right x y [distance]</code> for fast directional throws.
+<code>gesture rotate</code> accepts <code>degrees [x] [y]</code>; the degree sign controls direction. Pacing is derived from the requested rotation.
 <code>gesture transform</code> accepts <code>x y dx dy scale degrees [durationMs]</code> for one combined two-finger pan/zoom/rotate gesture on Android and iOS simulators. Pinch, rotate, two-finger pan, and transform use the same viewport-aware pointer planning; impossible paths fail before injection instead of clamping or distorting the requested motion.
 On iOS simulators it uses private XCTest synthesis for a continuous two-finger pan/scale/rotation path, so verify app-level metrics instead of assuming the requested values map exactly to recognizer output.
 On Android, <code>gesture transform</code> injects a geometric two-finger path. App recognizers may report non-exact pan, scale, and rotation values, so verify qualitative state such as <code>pan changed yes</code>, <code>pinch changed yes</code>, and <code>rotate changed yes</code> unless the app explicitly promises exact centroid metrics. If exact app-state values matter, prefer isolated <code>gesture pan</code>, <code>gesture pinch</code>, or <code>gesture rotate</code> commands.
