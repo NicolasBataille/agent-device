@@ -9,13 +9,13 @@ export type ActiveSession = {
   recordingPath: string | null;
 };
 
-export type SavedReplay = {
+export type SavedScript = {
   lines: string[];
 };
 
 export type PrototypeState = {
   session: ActiveSession | null;
-  savedReplays: Record<string, SavedReplay>;
+  savedScripts: Record<string, SavedScript>;
   outcome: {
     kind: 'info' | 'success' | 'error';
     message: string;
@@ -24,10 +24,10 @@ export type PrototypeState = {
 
 export const initialState: PrototypeState = {
   session: null,
-  savedReplays: {},
+  savedScripts: {},
   outcome: {
     kind: 'info',
-    message: 'Open an app, perform some actions, then save a reusable replay.',
+    message: 'Open an app, perform some actions, then save a reusable script.',
   },
 };
 
@@ -57,7 +57,7 @@ function appendActions(state: PrototypeState, lines: string[], label: string): P
   };
 }
 
-function saveReplay(state: PrototypeState, parts: string[]): PrototypeState {
+function saveScript(state: PrototypeState, parts: string[]): PrototypeState {
   if (!state.session) {
     return outcome(state, 'error', 'No active session to save.');
   }
@@ -78,7 +78,7 @@ function saveReplay(state: PrototypeState, parts: string[]): PrototypeState {
 
   const path = state.session.recordingPath;
   const force = flags.includes('--force');
-  if (state.savedReplays[path] && !force) {
+  if (state.savedScripts[path] && !force) {
     return outcome(
       state,
       'error',
@@ -92,11 +92,20 @@ function saveReplay(state: PrototypeState, parts: string[]): PrototypeState {
     return outcome(state, 'error', 'There are no actions to save yet.');
   }
 
+  const lastAction = state.session.history.findLast((entry) => entry.kind === 'action');
+  if (!lastAction || !isDestinationGuard(lastAction.line)) {
+    return outcome(
+      state,
+      'error',
+      'Record a target-bearing `wait <selector>` destination guard before saving the script.',
+    );
+  }
+
   return {
     ...state,
     session: { ...state.session, recordingPath: null },
-    savedReplays: {
-      ...state.savedReplays,
+    savedScripts: {
+      ...state.savedScripts,
       [path]: { lines },
     },
     outcome: {
@@ -106,12 +115,16 @@ function saveReplay(state: PrototypeState, parts: string[]): PrototypeState {
   };
 }
 
+function isDestinationGuard(line: string): boolean {
+  return /^wait\s+(?!stable(?:\s|$)|\d+(?:\s|$))/.test(line);
+}
+
 function replay(state: PrototypeState, path: string | undefined): PrototypeState {
   if (!path) {
     return outcome(state, 'error', 'Usage: replay <path>');
   }
 
-  const artifact = state.savedReplays[path];
+  const artifact = state.savedScripts[path];
   if (!artifact) {
     return outcome(state, 'error', `${path} has not been saved in this prototype.`);
   }
@@ -177,19 +190,6 @@ export function applyInput(state: PrototypeState, rawInput: string): PrototypeSt
     };
   }
 
-  if (command === 'login') {
-    return appendActions(
-      state,
-      [
-        'fill "label=Email" "agent@example.com"',
-        'fill "label=Password" "correct-horse-battery-staple"',
-        'click "label=Log in"',
-        'wait "label=Home" 5000',
-      ],
-      'Login',
-    );
-  }
-
   if (command === 'navigate') {
     return appendActions(
       state,
@@ -208,8 +208,8 @@ export function applyInput(state: PrototypeState, rawInput: string): PrototypeSt
     return appendActions(state, [line], 'Custom action');
   }
 
-  if (command === 'session' && parts[0] === 'save-replay') {
-    return saveReplay(state, parts.slice(1));
+  if (command === 'session' && parts[0] === 'save-script') {
+    return saveScript(state, parts.slice(1));
   }
 
   if (command === 'replay') {
@@ -223,7 +223,7 @@ export function applyInput(state: PrototypeState, rawInput: string): PrototypeSt
       session: null,
       outcome: {
         kind: 'success',
-        message: 'Closed the session. Previously saved replay artifacts remain available.',
+        message: 'Closed the session. Previously saved scripts remain available.',
       },
     };
   }

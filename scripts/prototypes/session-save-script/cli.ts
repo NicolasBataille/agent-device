@@ -4,10 +4,9 @@ import { applyInput, initialState, type PrototypeState } from './model.ts';
 
 const COMMANDS = [
   'open [app] [--save-script=<path>]',
-  'login',
   'navigate',
   'action <one .ad command>',
-  'session save-replay [--force]',
+  'session save-script [--force]',
   'replay <path>',
   'close',
   'reset',
@@ -16,7 +15,7 @@ const COMMANDS = [
 
 function render(state: PrototypeState): void {
   stdout.write('\u001B[2J\u001B[H');
-  stdout.write('SESSION SAVE-REPLAY — THROWAWAY API LAB\n');
+  stdout.write('SESSION SAVE-SCRIPT — THROWAWAY API LAB\n');
   stdout.write('Question: does saving open-to-screen-X from the active session feel coherent?\n\n');
 
   stdout.write('ACTIVE SESSION\n');
@@ -33,8 +32,8 @@ function render(state: PrototypeState): void {
     });
   }
 
-  stdout.write('\nSAVED REPLAYS (in memory only)\n');
-  const artifacts = Object.entries(state.savedReplays);
+  stdout.write('\nSAVED SCRIPTS (in memory only)\n');
+  const artifacts = Object.entries(state.savedScripts);
   if (artifacts.length === 0) {
     stdout.write('  none\n');
   } else {
