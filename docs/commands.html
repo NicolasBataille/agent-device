@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/static/js/index.c762850e03.js"></script>
+<script defer src="/agent-device/static/js/index.c567be4773.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -62,6 +62,7 @@
 <li><code>shutdown</code> turns off the selected Apple simulator or Android emulator.</li>
 <li><code>shutdown</code> must not target an active session device; use <code>close --shutdown</code> to end the session and turn it off.</li>
 <li><code>daemon stop --state-dir &lt;path&gt;</code> verifies the daemon PID/start-time identity, requests graceful shutdown, and reports whether provider-release state is known. Use <code>daemon stop --clean</code> to also remove retained Apple runner processes and leases owned by that daemon.</li>
+<li><code>device status</code> reads host-local advisory device claims without starting or contacting a daemon. Scope it with <code>--platform</code> plus <code>--udid</code> (Apple) or <code>--serial</code> (Android) to inspect one target. Stage 1 claims are observational: a live claim is reported but does not yet block <code>open</code> or offer a release command.</li>
 <li><code>--platform apple</code> is an alias for the Apple automation backend (<code>ios</code>, <code>tvOS</code>, <code>macOS</code> selection).</li>
 <li>Use <code>--target mobile|tv|desktop</code> with <code>--platform</code> (required) to select phone/tablet vs TV-class vs desktop-class targets.</li>
 <li><code>boot</code> is mainly needed when starting a new session and <code>open</code> fails because no booted simulator/emulator is available.</li>
