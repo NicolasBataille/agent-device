@@ -8,7 +8,7 @@ const COMMANDS = [
   'action <one .ad command>',
   'session save-script [--force]',
   'replay <path>',
-  'close',
+  'close [--save-script=<path>]',
   'reset',
   'quit',
 ];
@@ -23,9 +23,10 @@ function render(state: PrototypeState): void {
     stdout.write('  none\n');
   } else {
     stdout.write(`  app: ${state.session.app}\n`);
-    stdout.write(
-      `  script recording: ${state.session.recordingPath ? `armed → ${state.session.recordingPath}` : 'not armed'}\n`,
-    );
+    const publication = state.session.publication;
+    stdout.write(`  script publication: ${publication.state}`);
+    if ('path' in publication) stdout.write(` → ${publication.path}`);
+    stdout.write('\n');
     stdout.write('  recorded history:\n');
     state.session.history.forEach((entry, index) => {
       stdout.write(`    ${String(index + 1).padStart(2, ' ')}. [${entry.kind}] ${entry.line}\n`);

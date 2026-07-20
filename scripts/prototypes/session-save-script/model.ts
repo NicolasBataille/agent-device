@@ -6,7 +6,7 @@ export type HistoryEntry = {
 export type ActiveSession = {
   app: string;
   history: HistoryEntry[];
-  recordingPath: string | null;
+  publication: { state: 'unarmed' } | { state: 'armed' | 'aborted' | 'published'; path: string };
 };
 
 export type SavedScript = {
@@ -62,11 +62,27 @@ function saveScript(state: PrototypeState, parts: string[]): PrototypeState {
     return outcome(state, 'error', 'No active session to save.');
   }
 
-  if (!state.session.recordingPath) {
+  if (state.session.publication.state === 'unarmed') {
     return outcome(
       state,
       'error',
       'This session was not opened with --save-script=<path>, so its actions lack recording-time identity evidence.',
+    );
+  }
+
+  if (state.session.publication.state === 'aborted') {
+    return outcome(
+      state,
+      'error',
+      'This recording was aborted by a second open. Close it and start a fresh session.',
+    );
+  }
+
+  if (state.session.publication.state === 'published') {
+    return outcome(
+      state,
+      'error',
+      'This session already published its script. Close it and start a fresh session to record another.',
     );
   }
 
@@ -76,7 +92,7 @@ function saveScript(state: PrototypeState, parts: string[]): PrototypeState {
     return outcome(state, 'error', `Unknown flag: ${unknownFlag}`);
   }
 
-  const path = state.session.recordingPath;
+  const path = state.session.publication.path;
   const force = flags.includes('--force');
   if (state.savedScripts[path] && !force) {
     return outcome(
@@ -97,13 +113,13 @@ function saveScript(state: PrototypeState, parts: string[]): PrototypeState {
     return outcome(
       state,
       'error',
-      'Record a target-bearing `wait <selector>` destination guard before saving the script.',
+      'Record a portable `wait <selector>` destination guard (not `wait @ref`) before saving the script.',
     );
   }
 
   return {
     ...state,
-    session: { ...state.session, recordingPath: null },
+    session: { ...state.session, publication: { state: 'published', path } },
     savedScripts: {
       ...state.savedScripts,
       [path]: { lines },
@@ -116,7 +132,7 @@ function saveScript(state: PrototypeState, parts: string[]): PrototypeState {
 }
 
 function isDestinationGuard(line: string): boolean {
-  return /^wait\s+(?!stable(?:\s|$)|\d+(?:\s|$))/.test(line);
+  return /^wait\s+(?!stable(?:\s|$)|\d+(?:\s|$)|@)/.test(line);
 }
 
 function replay(state: PrototypeState, path: string | undefined): PrototypeState {
@@ -143,7 +159,7 @@ function replay(state: PrototypeState, path: string | undefined): PrototypeState
     ...state,
     session: {
       app,
-      recordingPath: null,
+      publication: { state: 'unarmed' },
       history: [
         { kind: 'open', line: openLine ?? `open ${app}` },
         ...actionLines.map((line): HistoryEntry => ({ kind: 'action', line })),
@@ -163,23 +179,45 @@ export function applyInput(state: PrototypeState, rawInput: string): PrototypeSt
   const [command, ...parts] = input.split(/\s+/);
 
   if (command === 'open') {
-    if (state.session) {
-      return outcome(
-        state,
-        'error',
-        'A session is already active. Close it before opening another.',
-      );
-    }
-
     const recordingFlag = parts.find((part) => part.startsWith('--save-script='));
     const recordingPath = recordingFlag?.slice('--save-script='.length) || null;
     const app = parts.filter((part) => part !== recordingFlag).join(' ') || 'com.example.app';
+    if (state.session) {
+      if (recordingFlag) {
+        return outcome(
+          state,
+          'error',
+          '`open --save-script` requires a fresh session and was refused before app dispatch.',
+        );
+      }
+      const publication =
+        state.session.publication.state === 'armed'
+          ? { ...state.session.publication, state: 'aborted' as const }
+          : state.session.publication;
+      return {
+        ...state,
+        session: {
+          ...state.session,
+          app,
+          publication,
+          history: [...state.session.history, { kind: 'open', line: `open ${app}` }],
+        },
+        outcome: {
+          kind: 'success',
+          message:
+            publication.state === 'aborted'
+              ? `Opened ${app}; the second open aborted script publication. Start a fresh session to author another script.`
+              : `Opened ${app}; the existing publication state remains ${publication.state}.`,
+        },
+      };
+    }
+
     return {
       ...state,
       session: {
         app,
         history: [{ kind: 'open', line: `open ${app}` }],
-        recordingPath,
+        publication: recordingPath ? { state: 'armed', path: recordingPath } : { state: 'unarmed' },
       },
       outcome: {
         kind: 'success',
@@ -218,6 +256,20 @@ export function applyInput(state: PrototypeState, rawInput: string): PrototypeSt
 
   if (command === 'close') {
     if (!state.session) return outcome(state, 'error', 'There is no active session to close.');
+    const saveFlag = parts.find(
+      (part) => part === '--save-script' || part.startsWith('--save-script='),
+    );
+    if (
+      saveFlag &&
+      (state.session.publication.state === 'aborted' ||
+        state.session.publication.state === 'published')
+    ) {
+      return outcome(
+        state,
+        'error',
+        '`close --save-script` cannot re-arm or retarget a terminal recording. Retry with plain `close`.',
+      );
+    }
     return {
       ...state,
       session: null,

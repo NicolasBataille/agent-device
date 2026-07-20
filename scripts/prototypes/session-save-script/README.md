@@ -24,7 +24,9 @@ agent-device replay screen-x.ad
 interaction happens and cannot be reconstructed by an end-only save. `session save-script` publishes
 `open` plus all recorded actions, never adds `close`, and disarms close-time publication. Replaying the
 artifact therefore starts from scratch and leaves the session active at the destination. Publication
-requires a final target-bearing `wait`; an existing path is refused unless `--force` is present.
+requires a final portable selector-targeted `wait`; `wait @ref` is refused. A second successful plain
+`open` aborts publication, and ABORTED/PUBLISHED cannot be re-armed or retargeted through later save
+flags. An existing path is refused unless `--force` is present.
 
 ## Run
 
