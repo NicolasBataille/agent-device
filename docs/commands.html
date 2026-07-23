@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/static/js/index.5258764c6e.js"></script>
+<script defer src="/agent-device/static/js/index.fb3abd0ce4.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -85,7 +85,7 @@ non-simulator targets.</li>
 <li>Commands that omit <code>--session</code> use an implicit <code>default</code> session scoped to the caller&#x27;s current git worktree or working directory. This keeps independent local agents from accidentally attaching to each other&#x27;s default session.</li>
 <li><code>--session &lt;name&gt;</code> or <code>AGENT_DEVICE_SESSION</code> opt into an explicitly named session when a script intentionally wants to share or reuse that session name.</li>
 <li>A configured <code>AGENT_DEVICE_SESSION</code> implies bound-session lock mode by default. The CLI forwards that policy to the daemon, which enforces the same conflict handling for CLI, typed client, and direct RPC requests.</li>
-<li><code>--session-lock reject|strip</code> and <code>AGENT_DEVICE_SESSION_LOCK=reject|strip</code> remain available for explicit named-session automation. Older lock aliases remain accepted for compatibility.</li>
+<li><code>--session-lock reject|strip</code> and <code>AGENT_DEVICE_SESSION_LOCK=reject|strip</code> remain available for explicit named-session automation.</li>
 <li>Direct RPC callers can pass <code>meta.lockPolicy</code> and optional <code>meta.lockPlatform</code> on <code>agent_device.command</code> requests for the same daemon-enforced behavior.</li>
 <li>In <code>batch</code>, steps that omit <code>platform</code> still inherit the parent batch <code>--platform</code>; lock-mode defaults do not override that parent setting.</li>
 <li>Tenant-scoped daemon runs can pass <code>--tenant</code>, <code>--session-isolation tenant</code>, <code>--run-id</code>, and <code>--lease-id</code> to enforce lease admission.</li>
