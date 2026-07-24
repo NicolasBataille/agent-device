@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1395/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1395/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1395/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1395/static/js/index.1b798cbd8a.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1395/static/js/index.433ea0cc81.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -929,7 +929,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <h2 class="rp-toc-include" id="ios-springboard-widgets-and-system-ui-surfaces"><a href="#ios-springboard-widgets-and-system-ui-surfaces" class="rp-header-anchor rp-link" aria-hidden="true">#</a>iOS SpringBoard, widgets, and system-UI surfaces</h2>
 <p>For CLI-discoverable workflow guidance, run <code>agent-device help ios-system-ui</code>.</p>
 <ul>
-<li><code>agent-device open com.apple.springboard --platform ios</code> binds the session to SpringBoard on a simulator or physical device today; there is no separate widget/system command.</li>
+<li><code>agent-device open com.apple.springboard --platform ios</code> binds the session to SpringBoard today; this is verified on iOS simulator only. Physical-iPhone SpringBoard support is not yet verified — see <a href="https://github.com/callstack/agent-device/issues/1296" target="_blank" rel="noopener noreferrer" class="rp-link">#1296</a>.</li>
 <li>The full widget add/edit/remove flow is selector-driven from a fresh <code>snapshot -i</code>, except two coordinate-based steps: the empty-space long-press that enters edit mode, and (until fixed) the widget-gallery search-result rows, which currently return unlabeled accessibility nodes.</li>
 <li>SpringBoard labels vary by iOS version and locale; discover them from the current snapshot rather than hard-coding strings like <code>Edit</code> or <code>Add Widget</code>.</li>
 <li>Reopen the app bundle under test to return to normal app automation after a SpringBoard step.</li>
