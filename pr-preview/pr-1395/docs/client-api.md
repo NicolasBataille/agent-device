@@ -236,8 +236,18 @@ await client.command.tvRemote({
   button: 'select',
 });
 
+await client.command.tvRemote({
+  platform: 'vega',
+  target: 'tv',
+  serial: 'VirtualDevice',
+  button: 'select',
+  durationMs: 900,
+});
+
 await client.command.appSwitcher();
 ```
+
+Vega OS client support is currently VVD-only and covers device discovery, app open/close, `back`, `home`, and `tvRemote`. Physical Fire TV, capture, selector, install, logging, and performance methods report unsupported for Vega targets.
 
 Supported command methods:
 
