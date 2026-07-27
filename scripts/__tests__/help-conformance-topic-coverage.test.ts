@@ -12,6 +12,8 @@ const WAIVED_TOPICS: Record<string, string> = {
   cdp: 'JS-heap forensics niche; add cases when heap-guidance regressions show up in practice.',
   macos: 'macOS surface guidance is thin and stable; no observed planning regressions yet.',
   maestro: 'Compatibility reference, not a planning loop; conformance is oracle-tested instead.',
+  'ios-system-ui':
+    'Simulator-only workflow with known coordinate-fallback and sparse-a11y gaps; add cases once the gallery capture gap closes and physical-device support is verified.',
   'physical-device': 'Needs device-specific setup guidance; no portable planning task defined yet.',
   'react-devtools':
     'Profiling-window guidance; add cases when render-diagnosis planning regresses.',
