@@ -4,7 +4,7 @@ url: /agent-device/pr-preview/pr-1375/docs/introduction.md
 
 # Introduction
 
-`agent-device` is an agent-native CLI for app verification and QA from coding agents. It gives agents structured UI access, deterministic interactions, debugging evidence, performance signals, and replayable flows across iOS, Android, tvOS, Android TV, macOS, Linux desktop targets, and a minimal managed web browser surface.
+`agent-device` is an agent-native CLI for app verification and QA from coding agents. Across iOS, Android, tvOS, Android TV, Amazon Vega OS TV apps in the Vega Virtual Device, macOS, Linux desktop targets, and a minimal managed web browser surface, it provides the interactions and target-dependent structured UI, evidence, performance, and replay capabilities each backend supports.
 
 Use it when an agent needs to inspect and operate a real app, not just reason about source code or screenshots.
 
@@ -92,7 +92,7 @@ url: /agent-device/pr-preview/pr-1375/docs/agent-setup.md
 
 `agent-device` is built for AI agents, but humans usually install it, grant device permissions, and decide which agent client should use it.
 
-Use this page to wire Cursor, Codex, Claude Code, Windsurf, Cline, Goose, or another coding agent into mobile, TV, desktop, and web app verification. It covers skills, project rules, and MCP setup for React Native QA, Expo app verification, iOS Simulator automation, Android Emulator automation, tvOS checks, Android TV checks, web browser sessions, debugging, profiling, and exploratory QA.
+Use this page to wire Cursor, Codex, Claude Code, Windsurf, Cline, Goose, or another coding agent into mobile, TV, desktop, and web app verification. It covers skills, project rules, and MCP setup for React Native QA, Expo app verification, iOS Simulator automation, Android Emulator automation, tvOS checks, Android TV checks, Vega OS VVD control, web browser sessions, debugging, profiling, and exploratory QA.
 
 The short version: install the CLI, make the agent read version-matched help, and let the agent use either MCP tools or CLI commands. MCP tools use command contracts backed by the same `AgentDeviceClient` execution path as the CLI adapters.
 
@@ -132,9 +132,9 @@ The bundled [agent-device skill](https://github.com/callstack/agent-device/blob/
 Add this as a project rule, custom instruction, or skill equivalent when your agent client supports it:
 
 ```text
-Use agent-device only for app/device automation tasks. Before planning commands, run `agent-device --version` and read `agent-device help workflow`. For exploratory QA, read `agent-device help dogfood`. For logs, network, audio, traces, or runtime failures, read `agent-device help debugging`. For React Native component trees, props/state/hooks, slow renders, or rerenders, read `agent-device help react-devtools`. For React Native JavaScript heap growth, heap snapshots, or retained-object leaks, read `agent-device help cdp`. For React Native apps, overlays, Metro/Fast Refresh blockers, and routing to React DevTools or debugging evidence, read `agent-device help react-native`.
+Use agent-device only for app/device automation tasks. Before planning commands, run `agent-device --version` and read `agent-device help workflow`. For TV, Fire TV, or Vega OS tasks, read `agent-device help tv`. For exploratory QA, read `agent-device help dogfood`. For logs, network, audio, traces, or runtime failures, read `agent-device help debugging`. For React Native component trees, props/state/hooks, slow renders, or rerenders, read `agent-device help react-devtools`. For React Native JavaScript heap growth, heap snapshots, or retained-object leaks, read `agent-device help cdp`. For React Native apps, overlays, Metro/Fast Refresh blockers, and routing to React DevTools or debugging evidence, read `agent-device help react-native`.
 
-Use MCP tools or the CLI in the integrated terminal. If `agent-device` is not on PATH but the user installed it globally in another shell, resolve the command the same way the user would from a normal terminal session and run that absolute path instead. This may require inspecting shell startup behavior or package-manager/global bin locations; do not assume the agent process `PATH` is the user's `PATH`. Do not silently fall back to `npx -y agent-device@latest`; ask or use an exact version. MCP exposes structured tools backed by the agent-device client; it does not expose generic shell execution. Prefer `open -> snapshot -i -> act -> re-snapshot -> verify -> close`. Use current refs such as `@e3` for exploration and selectors for durable replay. Keep mutating commands against one session serial. Capture screenshots, logs, network, audio, perf, traces, recordings, and `.ad` replay scripts only when they add evidence.
+Use MCP tools or the CLI in the integrated terminal. If `agent-device` is not on PATH but the user installed it globally in another shell, resolve the command the same way the user would from a normal terminal session and run that absolute path instead. This may require inspecting shell startup behavior or package-manager/global bin locations; do not assume the agent process `PATH` is the user's `PATH`. Do not silently fall back to `npx -y agent-device@latest`; ask or use an exact version. MCP exposes structured tools backed by the agent-device client; it does not expose generic shell execution. Prefer `open -> snapshot -i -> act -> re-snapshot -> verify -> close` where the target supports capture and selectors; otherwise follow target-specific help. Use current refs such as `@e3` for exploration and selectors for durable replay. Keep mutating commands against one session serial. Capture screenshots, logs, network, audio, perf, traces, recordings, and `.ad` replay scripts only when they add evidence.
 ```
 
 ## MCP server
@@ -193,6 +193,7 @@ alwaysApply: true
 
 Use agent-device only for app/device automation tasks.
 Before planning device work, run `agent-device --version` and read `agent-device help workflow`.
+For TV, Fire TV, or Vega OS tasks, read `agent-device help tv`.
 For exploratory QA, read `agent-device help dogfood`.
 For logs, network, audio, traces, or runtime failures, read `agent-device help debugging`.
 For React Native component trees, props/state/hooks, slow renders, or rerenders, read `agent-device help react-devtools`.
@@ -201,7 +202,7 @@ For React Native apps, overlays, Metro/Fast Refresh blockers, and routing to Rea
 
 Use the CLI in Cursor's integrated terminal.
 If `agent-device` is not on PATH but the user installed it globally in another shell, resolve the absolute binary path instead of using `npx -y agent-device@latest`.
-Prefer `open -> snapshot -i -> act -> re-snapshot -> verify -> close`.
+Prefer `open -> snapshot -i -> act -> re-snapshot -> verify -> close` where supported; otherwise follow target-specific help.
 Keep mutating commands against one session serial.
 EOF
 ```
@@ -282,6 +283,7 @@ cat > CLAUDE.md <<'EOF'
 
 Use agent-device only for app/device automation tasks.
 Before planning device work, run `agent-device --version` and read `agent-device help workflow`.
+For TV, Fire TV, or Vega OS tasks, read `agent-device help tv`.
 For exploratory QA, read `agent-device help dogfood`.
 For logs, network, audio, traces, or runtime failures, read `agent-device help debugging`.
 For React Native component trees, props/state/hooks, slow renders, or rerenders, read `agent-device help react-devtools`.
@@ -290,7 +292,7 @@ For React Native apps, overlays, Metro/Fast Refresh blockers, and routing to Rea
 
 Use the CLI in the integrated terminal.
 If `agent-device` is not on PATH but the user installed it globally in another shell, resolve the absolute binary path instead of using `npx -y agent-device@latest`.
-Prefer `open -> snapshot -i -> act -> re-snapshot -> verify -> close`.
+Prefer `open -> snapshot -i -> act -> re-snapshot -> verify -> close` where supported; otherwise follow target-specific help.
 Keep mutating commands against one session serial.
 EOF
 ```
@@ -770,8 +772,18 @@ await client.command.tvRemote({
   button: 'select',
 });
 
+await client.command.tvRemote({
+  platform: 'vega',
+  target: 'tv',
+  serial: 'VirtualDevice',
+  button: 'select',
+  durationMs: 900,
+});
+
 await client.command.appSwitcher();
 ```
+
+Vega OS client support is currently VVD-only and covers device discovery, app open/close, `back`, `home`, and `tvRemote`. Physical Fire TV, capture, selector, install, logging, and performance methods report unsupported for Vega targets.
 
 Supported command methods:
 
@@ -1146,6 +1158,7 @@ agent-device devices --platform android --android-device-allowlist emulator-5554
 agent-device devices
 agent-device devices --platform ios
 agent-device devices --platform android
+agent-device devices --platform vega --target tv
 agent-device devices --platform ios --ios-simulator-device-set /tmp/tenant-a/simulators
 agent-device devices --platform android --android-device-allowlist emulator-5554,device-1234
 agent-device capabilities --platform android
@@ -1153,7 +1166,7 @@ agent-device capabilities --session checkout --json
 ```
 
 - `devices` lists available targets after applying any platform selector or isolation scope flags.
-- Use `--platform` to narrow discovery to Apple-family (`ios`, `tvOS`, `macOS`) or Android targets.
+- Use `--platform` to narrow discovery to Apple-family (`ios`, `tvOS`, `macOS`), Android, or Vega OS targets.
 - Use `--ios-simulator-device-set` and `--android-device-allowlist` when you need tenant- or lab-scoped discovery.
 - `capabilities` reports the command names supported by the selected session device or an explicit `--platform`/`--device`/`--udid`/`--serial` target.
 - In JSON output, `capabilities` returns `{ device, availableCommands }`. Use `availableCommands` for dynamic integrations instead of maintaining a separate platform support table.
@@ -1187,15 +1200,26 @@ agent-device tv-remote press select --duration-ms 900 --platform android --targe
 agent-device screenshot tv-focus.png --overlay-refs --platform android --target tv
 agent-device open Settings --platform ios --target tv
 agent-device screenshot apple-tv.png --platform ios --target tv
+vega virtual-device start
+agent-device devices --platform vega --target tv
+agent-device open com.example.app.main --platform vega --target tv --session vega-tv
+agent-device tv-remote press down --platform vega --target tv --session vega-tv
+agent-device tv-remote press select --duration-ms 900 --platform vega --target tv --session vega-tv
+agent-device close com.example.app.main --session vega-tv
+vega virtual-device stop
 ```
 
 - AndroidTV app launch and app listing resolve TV launchable activities via `LEANBACK_LAUNCHER`.
-- TV target selection supports both simulator/emulator and connected physical devices (AppleTV + AndroidTV).
+- TV target selection supports Apple TV and Android TV simulators/emulators and connected devices. Initial Vega OS support is limited to the Vega Virtual Device.
 - TV targets are focus-first. Use `tv-remote` to move D-pad/remote focus before selecting a control; avoid raw `adb shell input keyevent` in command plans.
 - On Android TV, `tv-remote` maps to ADB keyevents. `tv-remote longpress <button>` is CLI sugar for a 500ms hold; `--duration-ms` overrides the preset and uses Android's longpress keyevent form for any positive duration because the platform command does not expose exact hold timing.
 - tvOS supports the same runner-driven interaction/snapshot flow as iOS (`snapshot`, `wait`, `press`, `fill`, `get`, `scroll`, `back`, `home`, `app-switcher`, `record`, and related selector flows).
 - On tvOS, `tv-remote`, runner `back`/`home`/`app-switcher` map to Siri Remote actions (`back` is Menu, `home` is Home, app switcher is double-home). `--duration-ms` is an exact remote-button hold duration.
-- Use `screenshot --overlay-refs` when visual focus evidence is useful or when focus metadata is unavailable/transient.
+- Vega OS discovery and remote input use the SDK-matched Vega CLI and VDA. Initial support is VVD-only; use `--platform vega --target tv`, and use Vega component IDs such as `com.example.app.main`.
+- Use `--serial VirtualDevice` for explicit VVD selection.
+- The Vega VVD supports app open/close, `back`, `home`, and all shared `tv-remote` buttons. Exact holds are sent through `inputd-cli`.
+- Physical Fire TV, app inventory, snapshot, screenshot, selector, install, touch/text/gesture, logs, and performance backends are not part of the initial support and report unsupported.
+- On Android TV and tvOS, use `screenshot --overlay-refs` when visual focus evidence is useful or when focus metadata is unavailable/transient. On Vega OS, use the VVD display as visual truth.
 - tvOS follows iOS simulator-only command semantics for helpers like `gesture pinch`, `settings`, and `push`.
 
 ## Desktop targets
@@ -1340,6 +1364,8 @@ Android text entry is owned by `agent-device`: provider-native injection when av
 `click --button secondary` is the desktop context-menu flow on macOS.
 `click --button middle` is reserved for future runner support and currently returns an explicit unsupported-operation error on macOS.
 `swipe` is a quick, fixed-duration directional throw. Use `gesture pan` for deliberate timed movement.
+Neither `swipe` nor `gesture fling` takes a duration, and `gesture rotate` takes no velocity — see
+[Migrating Gestures](/agent-device/pr-preview/pr-1375/docs/migrating-gestures.md) if you have scripts or recordings that still pass one.
 Repeated coordinate swipes accept at most 200 repetitions and 10000ms pauses, and their combined
 gesture/pause schedule must fit within 60000ms.
 `gesture pan` accepts `x y dx dy [durationMs]` for deliberate drags. It uses one pointer by default. Add `--pointer-count 2` for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
@@ -1446,7 +1472,7 @@ agent-device install com.example.app ./build/MyApp.app --platform ios
 ```
 
 - `install <app> <path>` installs from binary path without uninstalling first.
-- Supports Android devices/emulators, iOS simulators, and iOS physical devices.
+- Supports Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices. On xctrace-only devices, install the app with Xcode before opening it by bundle ID.
 - Useful for upgrade flows where you want to keep existing app data when supported by the platform.
 - Remote daemons automatically upload local app artifacts for `install`; prefix the path with `remote:` to use a daemon-side path verbatim.
 - Supported binary formats: Android `.apk`/`.aab`, iOS `.app`/`.ipa`.
@@ -1462,7 +1488,7 @@ agent-device reinstall com.example.app ./build/MyApp.app --platform ios
 ```
 
 - `reinstall <app> <path>` uninstalls and installs in one command.
-- Supports Android devices/emulators, iOS simulators, and iOS physical devices.
+- Supports Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices. XCTest-backed xctrace-only devices do not expose install or app inventory operations.
 - Useful for login/logout reset flows and deterministic test setup.
 - Remote daemons automatically upload local app artifacts for `reinstall`; prefix the path with `remote:` to use a daemon-side path verbatim.
 - Supported binary formats: Android `.apk`/`.aab`, iOS `.app`/`.ipa`.
@@ -1480,7 +1506,7 @@ agent-device install-from-source --github-actions-artifact thymikee/RNCLI83:6635
 - `install-from-source <url>` installs from a URL source through the normal daemon artifact flow.
 - `install-from-source --github-actions-artifact <owner/repo:artifact>` passes a typed GitHub Actions artifact source through to a compatible remote daemon. Numeric artifacts are sent as `artifactId`; non-numeric artifacts are sent as `artifactName`.
 - Repeat `--header <name:value>` for authenticated or signed artifact requests.
-- Supports the same device coverage as `install`: Android devices/emulators, iOS simulators, and iOS physical devices.
+- Supports the same device coverage as `install`: Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices.
 - Use `install` or `reinstall` for local `.apk`, `.aab`, `.app`, and `.ipa` paths; use `install-from-source` when the artifact already exists at a URL reachable by the daemon.
 - Direct Android URL sources may be `.apk` or `.aab`.
 - Trusted artifact service URLs may resolve to archives containing one installable `.apk`, `.aab`, `.ipa`, or iOS `.app` tar archive. Prefer `--github-actions-artifact` for GitHub Actions artifacts that a compatible remote daemon can resolve with its own credentials.
@@ -1684,7 +1710,7 @@ agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 - Android URL/deep-link opens infer the foreground package after launch when possible, including Expo Go/dev-client shells. If the session still has no app package/bundle ID, package-bound metrics remain unavailable until you `open <app>`.
 - Android frame health is reset after each successful `perf metrics` or `perf frames` read and after `open <app>`, so run `perf frames`, perform the interaction, then run `perf frames` again for a focused window.
 - Android Simpleperf and Perfetto collectors require an active Android app session with a running package process. They return artifact paths, sizes, and compact state summaries; they do not print profile or trace contents into the agent context. iOS native Simpleperf/Perfetto support is not provided by these commands.
-- On physical iOS devices, `perf metrics` and `perf frames` record short `xcrun xctrace` samples. Keep the device unlocked, connected, and the app active in the foreground while sampling.
+- On CoreDevice-backed physical iOS devices, `perf metrics` and `perf frames` record short `xcrun xctrace` samples. Keep the device unlocked, connected, and the app active in the foreground while sampling.
 - Interpretation note: this startup metric is command round-trip timing and does not represent true first frame / first interactive app instrumentation.
 - CPU data is a lightweight process snapshot, so an idle app may legitimately read as `0`.
 
@@ -1871,7 +1897,7 @@ tail -50 ~/.agent-device/sessions/default/app.log
 
 - `logs mark "before submit"` lines are prefixed with `[agent-device][mark][...]`, so grep for `agent-device.*mark` when you need timing markers back quickly.
 
-- iOS `record` works on simulators and physical devices.
+- iOS `record` works on simulators and CoreDevice-backed physical devices.
 
 - iOS simulator recording uses native `simctl io ... recordVideo`.
 
@@ -1999,6 +2025,7 @@ For CLI-discoverable setup guidance, run `agent-device help physical-device`.
 - Xcode with `xcrun devicectl` and `xcrun xctrace` available.
 - Paired/trusted physical device, connected, unlocked when needed, with Developer Mode enabled.
 - Older devices discovered only through `xctrace` use the XCTest backend automatically; its runner commands travel through macOS `usbmuxd`, so keep the device connected by cable.
+- XCTest-backed devices support open/close, interactions, snapshots, and screenshots. App inventory, install/reinstall, logs, performance sampling, recording, deep links, and launch arguments require CoreDevice.
 - The `AgentDeviceRunner` XCTest host must be signed before commands can run on a physical device.
 - Start with Automatic Signing and only these env vars:
   - `AGENT_DEVICE_IOS_TEAM_ID`
@@ -2480,6 +2507,8 @@ agent-device disconnect
 
 AWS Device Farm uses the AWS CLI credential provider chain. `agent-device` does not require `aws login`; it shells out to `aws devicefarm ...`, so any non-interactive AWS CLI credential source that works in CI works here. The AWS CLI documents environment variables such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_REGION`, `AWS_PROFILE`, `AWS_ROLE_ARN`, and `AWS_WEB_IDENTITY_TOKEN_FILE` in the [AWS CLI environment variable reference](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html).
 
+The current agent-device AWS Device Farm adapter supports hosted Android and iOS WebDriver sessions only. It does not route Vega OS or accept a Vega Fire TV ARN; the initial Vega workflow uses a local VVD only.
+
 Prefer short-lived CI credentials over long-lived IAM user keys. In GitHub Actions, use OIDC to assume an IAM role and let the action export the standard AWS environment variables; AWS documents IAM OIDC providers in the [IAM OIDC provider guide](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html), and the official `aws-actions/configure-aws-credentials` action documents the GitHub Actions setup in its [configure-aws-credentials repository](https://github.com/aws-actions/configure-aws-credentials). For other CI systems, use the platform's AWS federation support when available. If static keys are unavoidable, store them as CI secrets and scope their IAM policy to the needed Device Farm project/actions.
 
 Typical CI environment after federation or secret injection:
@@ -2667,6 +2696,7 @@ agent-device help workflow
 agent-device help debugging
 agent-device help react-devtools
 agent-device help cdp
+agent-device help tv
 ```
 
 Some agent clients run commands in an environment that differs from the user's normal install shell. If `agent-device` is missing in the agent terminal but was installed globally elsewhere, resolve the command the same way the user would from a normal terminal session, then use the absolute binary path for agent commands. This may require inspecting shell startup behavior or package-manager/global bin locations; do not assume the agent process `PATH` is the user's `PATH`.
@@ -2708,7 +2738,24 @@ One-off `npx` usage is fine for humans and scripts that intentionally fetch from
 - Node.js 22+
 - Xcode for iOS simulator/device automation (`simctl` + `devicectl`)
 - Android SDK / ADB for Android
+- Amazon Vega Developer Tools and an SDK-matched Vega Virtual Device for Vega OS TV
 - On macOS desktop targets, Swift 5.9+ / Xcode command-line tools are used to build the local `agent-device-macos-helper` on first use from source checkouts
+
+## Vega OS TV prerequisites
+
+Install the latest Amazon Vega Developer Tools and matching Vega SDK/VVD through Amazon's supported installer, then load its environment and verify the tools:
+
+```bash
+source ~/vega/env
+vega --version
+vega doctor
+vega device list
+```
+
+- Start and stop the local emulator with `vega virtual-device start` and `vega virtual-device stop`; `agent-device` does not boot it implicitly.
+- Initial Vega OS support is VVD-only; physical Fire TV discovery and control are not admitted until hardware evidence is validated.
+- Use `agent-device devices --platform vega --target tv`, then select the VVD explicitly with `--serial VirtualDevice`.
+- Appium is optional evidence tooling; it is not required for agent-device discovery, app lifecycle, or remote-button control.
 
 ## macOS desktop notes
 
@@ -2857,6 +2904,208 @@ This is an Apple platform constraint that affects all XCUITest-based automation 
 - **Real devices**: pass `--test-ime` to `open` to opt in (off by default on real hardware, since a stuck helper IME leaves the real keyboard unavailable until restored — `agent-device` restores the previous IME on session close and on daemon startup if a prior session crashed, and `agent-device doctor` flags a stuck test IME with the exact `adb shell ime set <id>` command to fix it manually if needed).
 
 If the helper cannot be installed (locked-down managed devices, some cloud providers), text entry falls back to the existing ASCII-only `adb shell input text` path and non-ASCII `fill`/`type` reports the gap.
+
+
+
+---
+url: /agent-device/pr-preview/pr-1375/docs/migrating-gestures.md
+---
+
+# Migrating Gestures
+
+`agent-device` 0.20.0 removed the timed forms of `swipe`, `gesture fling`, and `gesture swipe`, and
+the `velocity` argument of `gesture rotate`. Nothing is silently reinterpreted: every removed form
+now fails with an `INVALID_ARGS` error that names its replacement.
+
+This page is the migration for all four public surfaces — CLI, Node.js, MCP, and saved `.ad`
+recordings — plus the policy that governs the next such removal.
+
+## What changed
+
+Gesture vocabulary now separates a _throw_ from a _deliberate drag_:
+
+- `swipe` and `gesture fling` are quick, fixed-duration directional throws. They do not take a
+  duration, because a caller-supplied duration made them something else.
+- `gesture pan` is the deliberate timed translation. It keeps `durationMs`.
+- `gesture rotate` derives its pacing from the requested `degrees`.
+
+`durationMs` remains on `gesture pan` and `gesture transform`.
+
+## CLI
+
+| Removed                                             | Use instead                              |
+| --------------------------------------------------- | ---------------------------------------- |
+| `swipe x1 y1 x2 y2 durationMs`                      | `gesture pan x1 y1 dx dy durationMs`     |
+| `gesture fling <direction> x y distance durationMs` | `gesture fling <direction> x y distance` |
+| `gesture swipe <preset> durationMs`                 | `gesture swipe <preset>`                 |
+| `gesture rotate degrees x y velocity`               | `gesture rotate degrees x y`             |
+
+`gesture pan` takes an origin plus a **delta**, where `swipe` took two absolute points, so
+`dx = x2 - x1` and `dy = y2 - y1`:
+
+```bash
+# before
+agent-device swipe 197 650 197 300 300
+# after — same motion, same 300ms
+agent-device gesture pan 197 650 0 -350 300
+```
+
+Drop the duration instead when the timing was incidental and a throw is what you wanted. The
+resulting gesture is a 100ms fling, which travels further on a scrollable list than a 300ms drag
+over the same distance:
+
+```bash
+agent-device swipe 197 650 197 300
+```
+
+The error message computes this for you:
+
+```
+swipe accepts 4 arguments: x1 y1 x2 y2. The trailing durationMs positional was removed:
+use "gesture pan 197 650 0 -350 300" for the same timed drag, or "swipe 197 650 197 300"
+for a default-duration swipe.
+```
+
+## Node.js
+
+`interactions.swipe`, `interactions.fling`, and `interactions.swipeGesture` no longer accept
+`durationMs`; `interactions.rotateGesture` no longer accepts `velocity`. Passing them is a type
+error at compile time and an `INVALID_ARGS` rejection at runtime — the rejection happens
+client-side, before the request reaches the daemon, so a plain JavaScript caller or a stale
+compiled build gets the error rather than a silently retimed gesture.
+
+```ts
+// before
+await device.interactions.swipe({
+  from: { x: 197, y: 650 },
+  to: { x: 197, y: 300 },
+  durationMs: 300,
+});
+
+// after — same motion, same 300ms
+await device.interactions.pan({ x: 197, y: 650, dx: 0, dy: -350, durationMs: 300 });
+
+// after — a default-duration throw
+await device.interactions.swipe({ from: { x: 197, y: 650 }, to: { x: 197, y: 300 } });
+```
+
+`interactions.pan` and `interactions.transformGesture` keep `durationMs`.
+
+## MCP
+
+The `swipe`, `gesture` (`fling`, `swipe` kinds), and `gesture rotate` tool schemas no longer
+advertise `durationMs` or `velocity`, so an agent reading the schema will not produce the removed
+form. An agent that sends one anyway — from a cached schema or a memorized example — gets an
+`INVALID_ARGS` rejection that names the removed key and the command to use instead, for example
+`gesture fling does not accept durationMs; use gesture pan for timed movement`. This is the
+structured-input equivalent of the CLI error; it names the replacement command but, unlike the CLI
+and `.ad` messages, does not echo a fully-substituted rewrite, because the structured request
+carries no positional string to rewrite.
+
+No MCP server configuration changes.
+
+## Saved `.ad` recordings
+
+`.ad` scripts keep their positional syntax: it is the same vocabulary as the CLI, and it is not
+scheduled for removal (see [Positional `.ad` syntax](#positional-ad-syntax) below). Only the removed
+arguments have to go.
+
+A script that still carries one fails **when it is parsed**, before the replay executes any device
+action, and the error names the line:
+
+```
+Error (INVALID_ARGS): swipe accepts 4 arguments: x1 y1 x2 y2 (line 6). The trailing durationMs
+positional was removed: use "gesture pan 197 650 0 -350 300" for the same timed drag, or
+"swipe 197 650 197 300" for a default-duration swipe.
+```
+
+Apply the same rewrites as the CLI table above. Flags are unaffected: `--count`, `--pause-ms`, and
+`--pattern` stay on `swipe`, and `--pointer-count` stays on `gesture pan`.
+
+```
+# before
+swipe 206 650 206 300 300 --count 2 --pause-ms 200 --pattern one-way
+# after
+swipe 206 650 206 300 --count 2 --pause-ms 200 --pattern one-way
+```
+
+A duration held in a variable (`swipe 197 650 197 300 ${DURATION}`) is reported the same way — the
+preflight counts arguments, so it does not need the value.
+
+**The authoritative check is the parser itself.** Every retired form is rejected when the script is
+parsed, before the replay runs any device action, so running the suite (`agent-device test <glob>`,
+or `agent-device replay <file>.ad`) finds every stale line by construction and names it — a missed
+grep can never let one reach execution. The patterns below are a bulk pre-flight to locate them
+without a device. They follow the `.ad` tokenizer: tokens are separated by any whitespace (space or
+tab), and the numeric slots accept a bare or double-quoted number or `${VAR}` — so
+`swipe\t…\t"300"` is flagged like `swipe … 300`. They still stop short of the tokenizer's rarer
+encodings (a quoted command word, backslash escapes inside a quoted token), which is why the parser,
+not the grep, is the gate.
+
+```bash
+# a numeric slot: bare/quoted number (optionally signed) or ${VAR}. Requiring a
+# digit keeps a following flag like --count from being read as the retired slot.
+num='("-?[0-9][0-9.]*"|"\$\{[^}]*\}"|-?[0-9][0-9.]*|\$\{[^}]*\})'
+# swipe x1 y1 x2 y2 durationMs
+grep -rnE "\\bswipe([[:space:]]+$num){5}" --include='*.ad' .
+# gesture fling <direction> x y distance durationMs
+grep -rnE "\\bgesture[[:space:]]+fling[[:space:]]+\"?[a-z]+\"?([[:space:]]+$num){4}" --include='*.ad' .
+# gesture swipe <preset> durationMs
+grep -rnE "\\bgesture[[:space:]]+swipe[[:space:]]+\"?[a-z-]+\"?[[:space:]]+$num" --include='*.ad' .
+# gesture rotate degrees x y velocity
+grep -rnE "\\bgesture[[:space:]]+rotate([[:space:]]+$num){4}" --include='*.ad' .
+```
+
+Re-recording also produces a migrated script: the recorder writes the canonical form, so a fresh
+`open` → interact → `close --save-script` run is a valid alternative to editing by hand.
+
+### Maestro flows
+
+Maestro `swipe` with a `duration` is **not** affected. `agent-device` runs Maestro YAML through its
+own compatibility engine, which normalizes a timed Maestro swipe to the canonical `gesture pan`
+input and preserves Maestro's fast-swipe-then-hold execution profile. Maestro flows need no
+migration.
+
+`replay export` writes an explicit `duration: 100` — the canonical fling duration — so an exported
+flow runs at the speed the `.ad` script ran, rather than picking up Maestro's own 400ms default.
+
+## Deprecation policy
+
+This is the process a public gesture input follows on its way out, and the bar the next removal has
+to clear:
+
+1. **Announce.** The input is documented as deprecated and recorded in `CHANGELOG.md` under
+   `Unreleased`, together with the replacement.
+2. **Warn for one minor release.** The input keeps working and normalizes to the replacement, with a
+   `deprecations` entry in the response so an agent sees the migration while the call still
+   succeeds.
+3. **Publish the migration.** A section on this page covers CLI, Node.js, MCP, and `.ad`, with a
+   concrete before/after per surface.
+4. **Prove the repository is clean.** A repository-wide search for the removed shape returns no hits
+   in fixtures, examples, skills, docs, or tests. `agent-device` has no usage telemetry, so this
+   search — plus the migration guide's publication — is the evidence, and it is the reason the
+   removal cannot be inferred from "nobody complained".
+5. **Remove.** The input is rejected with an `INVALID_ARGS` error that states the replacement, and
+   the normalization branch and its compatibility tests are deleted in the same change. For an input
+   that can appear in a saved recording, the rejection must fire at parse time and name the line, so
+   a stale script never half-executes.
+
+The 0.20.0 removal completed all five steps.
+
+## Positional `.ad` syntax
+
+Positional gesture parsing in `.ad` is **not** a compatibility shim and is not scheduled for
+removal.
+
+`.ad` is a line-based script format whose syntax is the CLI's syntax. Its gesture codec —
+`gesturePayloadFromPositionals` / `gesturePayloadToPositionals` — is what defines the file format,
+not a bridge to an older one. CLI, Node.js, and MCP already send structured input directly; the
+codec's only remaining jobs are parsing CLI argv and reading and writing `.ad` lines, and both are
+the current public syntax. Replacing it with a structured payload would make recordings
+unreadable and ungreppable for no behavioral gain.
+
+See [ADR 0013](https://github.com/callstack/agent-device/blob/main/docs/adr/0013-unified-gesture-plans.md)
+for the gesture normalization and planning model this rests on.
 
 
 
@@ -3477,7 +3726,7 @@ url: /agent-device/pr-preview/pr-1375/docs/security-trust.md
 
 ## Local control
 
-- Device automation runs through the installed CLI and platform tooling such as Xcode, ADB, macOS accessibility APIs, and Linux AT-SPI.
+- Device automation runs through the installed CLI and platform tooling such as Xcode, ADB, Amazon Vega CLI/VDA, macOS accessibility APIs, and Linux AT-SPI.
 - The MCP server exposes direct structured tools for `agent-device` commands. Tools use command contracts through `AgentDeviceClient`; local-only workflows stay CLI-only rather than subprocess fallbacks. It does not expose generic shell execution over MCP.
 - Mutating commands should run serially against one session. Use separate sessions/devices for parallel work.
 
@@ -3504,6 +3753,7 @@ Some targets require local permissions or developer setup:
 
 - iOS/tvOS/macOS automation uses Xcode tooling and may require signing or Developer Mode for physical devices.
 - Android automation uses ADB and connected emulator/device trust.
+- Initial Vega OS automation uses Vega CLI/VDA only with the local Vega Virtual Device; physical Fire TV control is not yet admitted.
 - macOS desktop automation requires Accessibility permission, and screen capture workflows may require Screen Recording permission.
 
 ## Network and updates
@@ -3717,10 +3967,10 @@ url: /agent-device/pr-preview/pr-1375/index.md
 
 ## Features
 
-- **One CLI, many app surfaces**: Control iOS, Android, tvOS, Android TV, macOS, and Linux desktop targets with consistent snapshot and interaction commands.
-- **Accessibility-first snapshots**: Accessibility trees give agents structured UI context without forcing screenshot-only reasoning.
+- **One CLI, many app surfaces**: Control iOS, Android, tvOS, Android TV, Amazon Vega OS TV apps in the Vega Virtual Device, macOS, and Linux desktop targets through one CLI.
+- **Accessibility-first snapshots**: On supported targets, accessibility trees give agents structured UI context without forcing screenshot-only reasoning.
 - **Agent-native interactions**: Tap, pan, fling, pinch, rotate, scroll, focus, type, assert, and find visible UI through refs, selectors, and semantic finders.
-- **Built-in debugging and profiling**: Collect session logs, inspect recent HTTP traffic, capture screenshots and recordings, and sample CPU, memory, startup, and frame-health metrics.
+- **Built-in debugging and profiling**: Use each target's supported backends to collect logs, inspect traffic, capture screens and recordings, and sample performance.
 - **Session and replay**: Open apps, keep stateful context, and replay recorded `.ad` actions to reproduce flows without AI at runtime.
 - **React Native internals**: Use agent-device react-devtools for component trees and render profiles, and agent-device cdp for React Native JS heap snapshots, diffs, and leak retainers.
 

@@ -163,6 +163,7 @@ agent-device devices --platform android --android-device-allowlist emulator-5554
 agent-device devices
 agent-device devices --platform ios
 agent-device devices --platform android
+agent-device devices --platform vega --target tv
 agent-device devices --platform ios --ios-simulator-device-set /tmp/tenant-a/simulators
 agent-device devices --platform android --android-device-allowlist emulator-5554,device-1234
 agent-device capabilities --platform android
@@ -170,7 +171,7 @@ agent-device capabilities --session checkout --json
 ```
 
 - `devices` lists available targets after applying any platform selector or isolation scope flags.
-- Use `--platform` to narrow discovery to Apple-family (`ios`, `tvOS`, `macOS`) or Android targets.
+- Use `--platform` to narrow discovery to Apple-family (`ios`, `tvOS`, `macOS`), Android, or Vega OS targets.
 - Use `--ios-simulator-device-set` and `--android-device-allowlist` when you need tenant- or lab-scoped discovery.
 - `capabilities` reports the command names supported by the selected session device or an explicit `--platform`/`--device`/`--udid`/`--serial` target.
 - In JSON output, `capabilities` returns `{ device, availableCommands }`. Use `availableCommands` for dynamic integrations instead of maintaining a separate platform support table.
@@ -204,15 +205,26 @@ agent-device tv-remote press select --duration-ms 900 --platform android --targe
 agent-device screenshot tv-focus.png --overlay-refs --platform android --target tv
 agent-device open Settings --platform ios --target tv
 agent-device screenshot apple-tv.png --platform ios --target tv
+vega virtual-device start
+agent-device devices --platform vega --target tv
+agent-device open com.example.app.main --platform vega --target tv --session vega-tv
+agent-device tv-remote press down --platform vega --target tv --session vega-tv
+agent-device tv-remote press select --duration-ms 900 --platform vega --target tv --session vega-tv
+agent-device close com.example.app.main --session vega-tv
+vega virtual-device stop
 ```
 
 - AndroidTV app launch and app listing resolve TV launchable activities via `LEANBACK_LAUNCHER`.
-- TV target selection supports both simulator/emulator and connected physical devices (AppleTV + AndroidTV).
+- TV target selection supports Apple TV and Android TV simulators/emulators and connected devices. Initial Vega OS support is limited to the Vega Virtual Device.
 - TV targets are focus-first. Use `tv-remote` to move D-pad/remote focus before selecting a control; avoid raw `adb shell input keyevent` in command plans.
 - On Android TV, `tv-remote` maps to ADB keyevents. `tv-remote longpress <button>` is CLI sugar for a 500ms hold; `--duration-ms` overrides the preset and uses Android's longpress keyevent form for any positive duration because the platform command does not expose exact hold timing.
 - tvOS supports the same runner-driven interaction/snapshot flow as iOS (`snapshot`, `wait`, `press`, `fill`, `get`, `scroll`, `back`, `home`, `app-switcher`, `record`, and related selector flows).
 - On tvOS, `tv-remote`, runner `back`/`home`/`app-switcher` map to Siri Remote actions (`back` is Menu, `home` is Home, app switcher is double-home). `--duration-ms` is an exact remote-button hold duration.
-- Use `screenshot --overlay-refs` when visual focus evidence is useful or when focus metadata is unavailable/transient.
+- Vega OS discovery and remote input use the SDK-matched Vega CLI and VDA. Initial support is VVD-only; use `--platform vega --target tv`, and use Vega component IDs such as `com.example.app.main`.
+- Use `--serial VirtualDevice` for explicit VVD selection.
+- The Vega VVD supports app open/close, `back`, `home`, and all shared `tv-remote` buttons. Exact holds are sent through `inputd-cli`.
+- Physical Fire TV, app inventory, snapshot, screenshot, selector, install, touch/text/gesture, logs, and performance backends are not part of the initial support and report unsupported.
+- On Android TV and tvOS, use `screenshot --overlay-refs` when visual focus evidence is useful or when focus metadata is unavailable/transient. On Vega OS, use the VVD display as visual truth.
 - tvOS follows iOS simulator-only command semantics for helpers like `gesture pinch`, `settings`, and `push`.
 
 ## Desktop targets
@@ -357,6 +369,8 @@ Android text entry is owned by `agent-device`: provider-native injection when av
 `click --button secondary` is the desktop context-menu flow on macOS.
 `click --button middle` is reserved for future runner support and currently returns an explicit unsupported-operation error on macOS.
 `swipe` is a quick, fixed-duration directional throw. Use `gesture pan` for deliberate timed movement.
+Neither `swipe` nor `gesture fling` takes a duration, and `gesture rotate` takes no velocity — see
+[Migrating Gestures](/agent-device/pr-preview/pr-1375/docs/migrating-gestures.md) if you have scripts or recordings that still pass one.
 Repeated coordinate swipes accept at most 200 repetitions and 10000ms pauses, and their combined
 gesture/pause schedule must fit within 60000ms.
 `gesture pan` accepts `x y dx dy [durationMs]` for deliberate drags. It uses one pointer by default. Add `--pointer-count 2` for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
@@ -463,7 +477,7 @@ agent-device install com.example.app ./build/MyApp.app --platform ios
 ```
 
 - `install <app> <path>` installs from binary path without uninstalling first.
-- Supports Android devices/emulators, iOS simulators, and iOS physical devices.
+- Supports Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices. On xctrace-only devices, install the app with Xcode before opening it by bundle ID.
 - Useful for upgrade flows where you want to keep existing app data when supported by the platform.
 - Remote daemons automatically upload local app artifacts for `install`; prefix the path with `remote:` to use a daemon-side path verbatim.
 - Supported binary formats: Android `.apk`/`.aab`, iOS `.app`/`.ipa`.
@@ -479,7 +493,7 @@ agent-device reinstall com.example.app ./build/MyApp.app --platform ios
 ```
 
 - `reinstall <app> <path>` uninstalls and installs in one command.
-- Supports Android devices/emulators, iOS simulators, and iOS physical devices.
+- Supports Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices. XCTest-backed xctrace-only devices do not expose install or app inventory operations.
 - Useful for login/logout reset flows and deterministic test setup.
 - Remote daemons automatically upload local app artifacts for `reinstall`; prefix the path with `remote:` to use a daemon-side path verbatim.
 - Supported binary formats: Android `.apk`/`.aab`, iOS `.app`/`.ipa`.
@@ -497,7 +511,7 @@ agent-device install-from-source --github-actions-artifact thymikee/RNCLI83:6635
 - `install-from-source <url>` installs from a URL source through the normal daemon artifact flow.
 - `install-from-source --github-actions-artifact <owner/repo:artifact>` passes a typed GitHub Actions artifact source through to a compatible remote daemon. Numeric artifacts are sent as `artifactId`; non-numeric artifacts are sent as `artifactName`.
 - Repeat `--header <name:value>` for authenticated or signed artifact requests.
-- Supports the same device coverage as `install`: Android devices/emulators, iOS simulators, and iOS physical devices.
+- Supports the same device coverage as `install`: Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices.
 - Use `install` or `reinstall` for local `.apk`, `.aab`, `.app`, and `.ipa` paths; use `install-from-source` when the artifact already exists at a URL reachable by the daemon.
 - Direct Android URL sources may be `.apk` or `.aab`.
 - Trusted artifact service URLs may resolve to archives containing one installable `.apk`, `.aab`, `.ipa`, or iOS `.app` tar archive. Prefer `--github-actions-artifact` for GitHub Actions artifacts that a compatible remote daemon can resolve with its own credentials.
@@ -701,7 +715,7 @@ agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 - Android URL/deep-link opens infer the foreground package after launch when possible, including Expo Go/dev-client shells. If the session still has no app package/bundle ID, package-bound metrics remain unavailable until you `open <app>`.
 - Android frame health is reset after each successful `perf metrics` or `perf frames` read and after `open <app>`, so run `perf frames`, perform the interaction, then run `perf frames` again for a focused window.
 - Android Simpleperf and Perfetto collectors require an active Android app session with a running package process. They return artifact paths, sizes, and compact state summaries; they do not print profile or trace contents into the agent context. iOS native Simpleperf/Perfetto support is not provided by these commands.
-- On physical iOS devices, `perf metrics` and `perf frames` record short `xcrun xctrace` samples. Keep the device unlocked, connected, and the app active in the foreground while sampling.
+- On CoreDevice-backed physical iOS devices, `perf metrics` and `perf frames` record short `xcrun xctrace` samples. Keep the device unlocked, connected, and the app active in the foreground while sampling.
 - Interpretation note: this startup metric is command round-trip timing and does not represent true first frame / first interactive app instrumentation.
 - CPU data is a lightweight process snapshot, so an idle app may legitimately read as `0`.
 
@@ -888,7 +902,7 @@ tail -50 ~/.agent-device/sessions/default/app.log
 
 - `logs mark "before submit"` lines are prefixed with `[agent-device][mark][...]`, so grep for `agent-device.*mark` when you need timing markers back quickly.
 
-- iOS `record` works on simulators and physical devices.
+- iOS `record` works on simulators and CoreDevice-backed physical devices.
 
 - iOS simulator recording uses native `simctl io ... recordVideo`.
 
@@ -1016,6 +1030,7 @@ For CLI-discoverable setup guidance, run `agent-device help physical-device`.
 - Xcode with `xcrun devicectl` and `xcrun xctrace` available.
 - Paired/trusted physical device, connected, unlocked when needed, with Developer Mode enabled.
 - Older devices discovered only through `xctrace` use the XCTest backend automatically; its runner commands travel through macOS `usbmuxd`, so keep the device connected by cable.
+- XCTest-backed devices support open/close, interactions, snapshots, and screenshots. App inventory, install/reinstall, logs, performance sampling, recording, deep links, and launch arguments require CoreDevice.
 - The `AgentDeviceRunner` XCTest host must be signed before commands can run on a physical device.
 - Start with Automatic Signing and only these env vars:
   - `AGENT_DEVICE_IOS_TEAM_ID`
