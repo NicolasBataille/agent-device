@@ -28,6 +28,7 @@
     "examples/test-app/**",
     "scripts/perf/**",
     "scripts/layering/**",
+    "scripts/depgraph/**",
     "scripts/maestro-conformance/**",
     "apple/runner/AgentDeviceRunner/AgentDeviceRunnerUITests.xctestplan",
     "scripts/write-xcuitest-cache-metadata.mjs"

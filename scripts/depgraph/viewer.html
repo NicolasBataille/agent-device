@@ -1,0 +1,125 @@
+<title>agent-device — module dependency graph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<style>
+  /*__STYLES__*/
+</style>
+
+<div id="stage">
+  <canvas id="canvas"></canvas>
+</div>
+
+<header id="strip">
+  <h1>agent-device <span id="commit"></span></h1>
+  <div class="stats" id="stats"></div>
+</header>
+
+<button id="rail-toggle" type="button" aria-expanded="false" aria-controls="rail">Controls</button>
+
+<aside id="rail" aria-label="Graph controls">
+  <div class="sheet-head">
+    <span>Controls</span>
+    <button type="button" class="close" id="rail-done" aria-label="Hide controls">×</button>
+  </div>
+
+  <div class="group">
+    <h2>Find a file</h2>
+    <input
+      id="search"
+      type="search"
+      placeholder="core/interactors/tap"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Filter files by path"
+    />
+    <p class="hint" id="search-hint">
+      Drag to pan, pinch or scroll to zoom, tap a node for detail.
+    </p>
+  </div>
+
+  <div class="group">
+    <h2>Layout</h2>
+    <div class="segmented" id="layout-mode" role="group" aria-label="Layout">
+      <button type="button" data-layout="cluster" aria-pressed="true">Clusters</button>
+      <button type="button" data-layout="layered" aria-pressed="false">Layers</button>
+    </div>
+    <p class="hint" id="layout-hint"></p>
+  </div>
+
+  <div class="group">
+    <h2>Size nodes by</h2>
+    <div class="segmented" id="size-mode" role="group" aria-label="Node size metric">
+      <button type="button" data-size="degree" aria-pressed="true">Coupling</button>
+      <button type="button" data-size="in" aria-pressed="false">Dependents</button>
+      <button type="button" data-size="loc" aria-pressed="false">Lines</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Overlay</h2>
+    <div class="checks" id="overlays">
+      <label class="check"
+        ><input type="checkbox" id="show-back" /><span
+          class="swatch"
+          style="background: var(--critical)"
+        ></span
+        >Spine back-edges (R5)</label
+      >
+      <label class="check"
+        ><input type="checkbox" id="show-cycles" /><span
+          class="swatch"
+          style="background: var(--critical)"
+        ></span
+        >Import cycles</label
+      >
+      <label class="check"
+        ><input type="checkbox" id="show-type-inversion" /><span
+          class="swatch"
+          style="background: var(--warning)"
+        ></span
+        >Type-only inversions (R6)</label
+      >
+      <label class="check"
+        ><input type="checkbox" id="show-redundant" /><span
+          class="swatch"
+          style="background: var(--warning)"
+        ></span
+        >Redundant edges</label
+      >
+      <label class="check"><input type="checkbox" id="hide-weak" />Static value edges only</label>
+      <label class="check"
+        ><input type="checkbox" id="show-labels" checked />Labels when zoomed</label
+      >
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Zones — rank ◄ colour</h2>
+    <div class="legend" id="legend"></div>
+    <p class="hint">
+      Colour is the layering gate's spine rank: <b>kernel</b> sink through <b>cli</b>. Grey zones
+      are intentionally unranked — R1–R4 still apply, but the gate asserts no ordering over them.
+    </p>
+  </div>
+
+  <div class="group">
+    <h2>Hotspots — most depended on</h2>
+    <div class="hotspots" id="hotspots"></div>
+  </div>
+</aside>
+
+<section id="detail" aria-live="polite"></section>
+
+<div id="zoom">
+  <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+  <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+  <button type="button" id="zoom-fit" aria-label="Fit graph to screen">⤢</button>
+</div>
+
+<div id="tooltip" role="status"></div>
+
+<script id="graph-data" type="application/json">
+  "__DATA__"
+</script>
+<script>
+  /*__SCRIPT__*/
+</script>

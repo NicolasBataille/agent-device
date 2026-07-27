@@ -52,6 +52,15 @@ const TARGET_DAG_RANK = new Map([
 
 export const RANKED_ZONES: ReadonlySet<string> = new Set(TARGET_DAG_RANK.keys());
 
+/**
+ * Spine rank of a zone, or `null` when the zone is intentionally unranked. Exported for the
+ * dependency-graph viewer, which colours nodes by rank so an inversion is visible as an edge
+ * pointing the wrong way down the ramp. The gate itself compares ranks internally.
+ */
+export function zoneRank(zone: string): number | null {
+  return TARGET_DAG_RANK.get(zone) ?? null;
+}
+
 // The one zone deliberately left OUT of the ranked spine. It is NOT unenforced: every file
 // in it is still subject to the global production value-import cycle rejection (R4) and the
 // R1-R3 move rules. It opts out of spine back-edge ranking because `(root)` holds the
@@ -144,7 +153,7 @@ export function topFolder(file: string): string {
   return match ? match[1]! : '(root)';
 }
 
-function targetDagZone(file: string): string {
+export function targetDagZone(file: string): string {
   if (file.startsWith('src/daemon/client/')) return 'daemon-client';
   if (file.startsWith('src/daemon/')) return 'daemon-server';
   return topFolder(file);
