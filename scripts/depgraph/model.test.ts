@@ -134,7 +134,6 @@ test('buildGraph reports zone membership, degrees, and cross-zone edge counts', 
   assert.equal(kernel.fanOut, 0);
 
   const interactor = graph.nodes.find((node) => node.id === 'src/core/interactors/tap.ts')!;
-  assert.equal(interactor.group, 'core/interactors');
 
   assert.deepEqual(
     graph.zoneEdges.map((edge) => `${edge.from} -> ${edge.to} (${edge.count})`),

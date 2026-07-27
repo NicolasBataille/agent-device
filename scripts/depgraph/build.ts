@@ -1,20 +1,22 @@
-// Dependency graph generator — emits a single self-contained HTML file.
+// Dependency-graph report — the numbers the layering gate does not enforce.
 //
 //   node --experimental-strip-types scripts/depgraph/build.ts [--out <path>]
 //
-// The output has no external requests of any kind: data, styles, and viewer script are
-// inlined, so it works from `file://`, from a static host, or inside a sandboxed page.
+// Emits a JSON graph plus a short text summary. It reuses scripts/layering/model.ts, the same
+// module check.ts uses in CI, so the file set, zone partition, edge kinds and cycle definition
+// are the ones actually enforced — a second extractor would describe a graph nobody gates.
+//
+// What it adds over `pnpm check:layering`: transitively redundant value edges, cycles that are
+// deliberately outside R4 (type-only and dynamic), per-zone size, and per-file fan-in/fan-out.
+// See README.md for which question each field answers.
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { listSourceFiles } from '../layering/check.ts';
 import { resolveImportEdges, zoneRank } from '../layering/model.ts';
-import { clusterLayout, computeLevels, layeredLayout } from './layout.ts';
-import { buildGraph, type GraphData } from './model.ts';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
+import { buildGraph, computeLevels, type GraphData } from './model.ts';
 
 const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
   encoding: 'utf8',
@@ -33,12 +35,8 @@ type Payload = {
     out: number;
     lvl: number;
     cyc: number;
-    cx: number;
-    cy: number;
-    lx: number;
-    ly: number;
   }[];
-  /**
+/**
    * `[fromIndex, toIndex, kind, flags]`; kind 0=value 1=type 2=dynamic,
    * flags bit0=R5 back-edge, bit1=transitively redundant, bit2=R6 type inversion.
    */
@@ -57,7 +55,19 @@ function headCommit(): string {
   }
 }
 
-export function buildPayload(): Payload {
+const EDGE_KIND_CODES = { value: 0, type: 1, dynamic: 2 } as const;
+
+/** Wire code for an edge kind, so the payload carries a number rather than a string per edge. */
+function edgeKindCode(kind: GraphData['edges'][number]['kind']): number {
+  return EDGE_KIND_CODES[kind];
+}
+
+/** Bitfield: 1 = spine back-edge (R5), 2 = transitively redundant, 4 = type-only inversion (R6). */
+function edgeFlags(edge: GraphData['edges'][number]): number {
+  return (edge.backEdge ? 1 : 0) | (edge.redundant ? 2 : 0) | (edge.typeInversion ? 4 : 0);
+}
+
+function buildPayload(): Payload {
   const files = listSourceFiles();
   const sources = new Map(
     files.map((file) => [file, fs.readFileSync(path.join(repoRoot, file), 'utf8')]),
@@ -65,12 +75,9 @@ export function buildPayload(): Payload {
   const resolved = resolveImportEdges(sources);
   const graph = buildGraph(sources, resolved);
   const levels = computeLevels(graph.nodes, graph.edges);
-  const cluster = clusterLayout(graph);
-  const layered = layeredLayout(graph, levels);
 
   const zoneIndex = new Map(graph.zones.map((zone, index) => [zone.id, index]));
   const nodeIndex = new Map(graph.nodes.map((node, index) => [node.id, index]));
-  const round = (value: number): number => Math.round(value * 10) / 10;
 
   return {
     generated: { commit: headCommit(), files: graph.nodes.length, edges: graph.edges.length },
@@ -84,16 +91,12 @@ export function buildPayload(): Payload {
       out: node.fanOut,
       lvl: levels.get(node.id) ?? 0,
       cyc: node.cycle,
-      cx: round(cluster.get(node.id)!.x),
-      cy: round(cluster.get(node.id)!.y),
-      lx: round(layered.get(node.id)!.x),
-      ly: round(layered.get(node.id)!.y),
     })),
     edges: graph.edges.map((edge) => [
       nodeIndex.get(edge.from)!,
       nodeIndex.get(edge.to)!,
-      edge.kind === 'value' ? 0 : edge.kind === 'type' ? 1 : 2,
-      (edge.backEdge ? 1 : 0) | (edge.redundant ? 2 : 0) | (edge.typeInversion ? 4 : 0),
+      edgeKindCode(edge.kind),
+      edgeFlags(edge),
     ]),
     cycles: graph.cycles.map((cycle) => ({
       kind: cycle.kind,
@@ -102,35 +105,15 @@ export function buildPayload(): Payload {
   };
 }
 
-function renderHtml(payload: Payload): string {
-  const template = fs.readFileSync(path.join(here, 'viewer.html'), 'utf8');
-  const script = fs.readFileSync(path.join(here, 'viewer.js'), 'utf8');
-  const styles = fs.readFileSync(path.join(here, 'viewer.css'), 'utf8');
-  // `</script>` inside JSON would close the inline tag early; `<!--` would open a comment.
-  const data = JSON.stringify(payload)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-  return template
-    .replace('/*__STYLES__*/', () => styles)
-    .replace('"__DATA__"', () => data)
-    .replace('/*__SCRIPT__*/', () => script);
-}
-
-export function main(argv: readonly string[]): number {
+function main(argv: readonly string[]): number {
   const outFlag = argv.indexOf('--out');
-  const outPath =
+  const jsonPath =
     outFlag >= 0 && argv[outFlag + 1]
       ? path.resolve(argv[outFlag + 1]!)
-      : path.join(repoRoot, '.tmp/depgraph/index.html');
+      : path.join(repoRoot, '.tmp/depgraph/graph.json');
 
   const payload = buildPayload();
-  const html = renderHtml(payload);
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, html);
-
-  const jsonPath = outPath.replace(/\.html$/, '.json');
+  fs.mkdirSync(path.dirname(jsonPath), { recursive: true });
   fs.writeFileSync(jsonPath, `${JSON.stringify(payload, null, 2)}\n`);
 
   const valueCycles = payload.cycles.filter((cycle) => cycle.kind === 'value').length;
@@ -146,7 +129,7 @@ export function main(argv: readonly string[]): number {
       `  spine back-edges (R5): ${backEdges}\n` +
       `  type-only spine inversions (R6): ${typeInversions}\n` +
       `  transitively redundant value edges: ${redundant}\n` +
-      `  wrote ${path.relative(repoRoot, outPath)} and ${path.relative(repoRoot, jsonPath)}\n`,
+      `  wrote ${path.relative(repoRoot, jsonPath)}\n`,
   );
   return 0;
 }
