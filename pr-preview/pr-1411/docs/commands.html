@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1411/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1411/static/js/lib-router.853fe4366e.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1411/static/js/56.538ceb78eb.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1411/static/js/index.cdfc17777f.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1411/static/js/index.686ba3e822.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -423,7 +423,7 @@ Two-finger <code>gesture pan</code> and <code>gesture transform</code> are suppo
 <span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> install</span><span style="color:var(--shiki-token-string)"> com.example.app</span><span style="color:var(--shiki-token-string)"> ./build/MyApp.app</span><span style="color:var(--shiki-token-string)"> --platform</span><span style="color:var(--shiki-token-string)"> ios</span></span></code></pre></div><div class="rp-code-button-group"><button class="rp-code-button-group__button rp-code-wrap-button" title="Toggle code wrap"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="rp-code-button-group__icon rp-code-button-group__icon--wrapped"><path fill="currentColor" d="M21 5H3v2h18zM3 19h7v-2H3zm0-6h15c1 0 2 .43 2 2s-1 2-2 2h-2v-2l-4 3 4 3v-2h2c2.95 0 4-1.27 4-4 0-2.72-1-4-4-4H3z"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="rp-code-button-group__icon rp-code-button-group__icon--wrap"><path fill="currentColor" d="M16 7H3V5h13zM3 19h13v-2H3zm19-7-4-3v2H3v2h15v2z"></path></svg></button><button class="rp-code-button-group__button rp-code-copy-button" title="Copy code"><svg xmlns="http://www.w3.org/2000/svg" width="272" height="272" viewBox="0 0 272 272" class="rp-code-button-group__icon rp-code-copy-button__icon rp-code-copy-button__icon--copy"><path fill="currentColor" fill-rule="evenodd" d="M45.883 23.368h123.823v22.514H68.396v146.336H45.883zm45.026 45.027H225.99v180.107H90.91zm22.514 22.513v135.08h90.053V90.908z" clip-rule="evenodd"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="271" height="271" viewBox="0 0 271 271" class="rp-code-button-group__icon rp-code-copy-button__icon rp-code-copy-button__icon--success"><path fill="currentColor" d="M112.687 203.223H90.174v-22.514h22.512v-22.514h22.512v22.514h-22.511zm-22.514-22.514H67.66v-22.514h22.513zm-22.514-22.514H45.146v-22.512H67.66zm90.054 0h-22.514v-22.512h22.514zm22.514-22.512h-22.514v-22.514h22.514zm22.513-22.514h-22.513V90.655h22.513zm22.514-22.514H202.74V68.143h22.514z"></path></svg></button></div></div></div>
 <ul>
 <li><code>install &lt;app&gt; &lt;path&gt;</code> installs from binary path without uninstalling first.</li>
-<li>Supports Android devices/emulators, iOS simulators, and iOS physical devices.</li>
+<li>Supports Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices. On xctrace-only devices, install the app with Xcode before opening it by bundle ID.</li>
 <li>Useful for upgrade flows where you want to keep existing app data when supported by the platform.</li>
 <li>Remote daemons automatically upload local app artifacts for <code>install</code>; prefix the path with <code>remote:</code> to use a daemon-side path verbatim.</li>
 <li>Supported binary formats: Android <code>.apk</code>/<code>.aab</code>, iOS <code>.app</code>/<code>.ipa</code>.</li>
@@ -436,7 +436,7 @@ Two-finger <code>gesture pan</code> and <code>gesture transform</code> are suppo
 <span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> reinstall</span><span style="color:var(--shiki-token-string)"> com.example.app</span><span style="color:var(--shiki-token-string)"> ./build/MyApp.app</span><span style="color:var(--shiki-token-string)"> --platform</span><span style="color:var(--shiki-token-string)"> ios</span></span></code></pre></div><div class="rp-code-button-group"><button class="rp-code-button-group__button rp-code-wrap-button" title="Toggle code wrap"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="rp-code-button-group__icon rp-code-button-group__icon--wrapped"><path fill="currentColor" d="M21 5H3v2h18zM3 19h7v-2H3zm0-6h15c1 0 2 .43 2 2s-1 2-2 2h-2v-2l-4 3 4 3v-2h2c2.95 0 4-1.27 4-4 0-2.72-1-4-4-4H3z"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="rp-code-button-group__icon rp-code-button-group__icon--wrap"><path fill="currentColor" d="M16 7H3V5h13zM3 19h13v-2H3zm19-7-4-3v2H3v2h15v2z"></path></svg></button><button class="rp-code-button-group__button rp-code-copy-button" title="Copy code"><svg xmlns="http://www.w3.org/2000/svg" width="272" height="272" viewBox="0 0 272 272" class="rp-code-button-group__icon rp-code-copy-button__icon rp-code-copy-button__icon--copy"><path fill="currentColor" fill-rule="evenodd" d="M45.883 23.368h123.823v22.514H68.396v146.336H45.883zm45.026 45.027H225.99v180.107H90.91zm22.514 22.513v135.08h90.053V90.908z" clip-rule="evenodd"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="271" height="271" viewBox="0 0 271 271" class="rp-code-button-group__icon rp-code-copy-button__icon rp-code-copy-button__icon--success"><path fill="currentColor" d="M112.687 203.223H90.174v-22.514h22.512v-22.514h22.512v22.514h-22.511zm-22.514-22.514H67.66v-22.514h22.513zm-22.514-22.514H45.146v-22.512H67.66zm90.054 0h-22.514v-22.512h22.514zm22.514-22.512h-22.514v-22.514h22.514zm22.513-22.514h-22.513V90.655h22.513zm22.514-22.514H202.74V68.143h22.514z"></path></svg></button></div></div></div>
 <ul>
 <li><code>reinstall &lt;app&gt; &lt;path&gt;</code> uninstalls and installs in one command.</li>
-<li>Supports Android devices/emulators, iOS simulators, and iOS physical devices.</li>
+<li>Supports Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices. XCTest-backed xctrace-only devices do not expose install or app inventory operations.</li>
 <li>Useful for login/logout reset flows and deterministic test setup.</li>
 <li>Remote daemons automatically upload local app artifacts for <code>reinstall</code>; prefix the path with <code>remote:</code> to use a daemon-side path verbatim.</li>
 <li>Supported binary formats: Android <code>.apk</code>/<code>.aab</code>, iOS <code>.app</code>/<code>.ipa</code>.</li>
@@ -451,7 +451,7 @@ Two-finger <code>gesture pan</code> and <code>gesture transform</code> are suppo
 <li><code>install-from-source &lt;url&gt;</code> installs from a URL source through the normal daemon artifact flow.</li>
 <li><code>install-from-source --github-actions-artifact &lt;owner/repo:artifact&gt;</code> passes a typed GitHub Actions artifact source through to a compatible remote daemon. Numeric artifacts are sent as <code>artifactId</code>; non-numeric artifacts are sent as <code>artifactName</code>.</li>
 <li>Repeat <code>--header &lt;name:value&gt;</code> for authenticated or signed artifact requests.</li>
-<li>Supports the same device coverage as <code>install</code>: Android devices/emulators, iOS simulators, and iOS physical devices.</li>
+<li>Supports the same device coverage as <code>install</code>: Android devices/emulators, iOS simulators, and CoreDevice-backed iOS physical devices.</li>
 <li>Use <code>install</code> or <code>reinstall</code> for local <code>.apk</code>, <code>.aab</code>, <code>.app</code>, and <code>.ipa</code> paths; use <code>install-from-source</code> when the artifact already exists at a URL reachable by the daemon.</li>
 <li>Direct Android URL sources may be <code>.apk</code> or <code>.aab</code>.</li>
 <li>Trusted artifact service URLs may resolve to archives containing one installable <code>.apk</code>, <code>.aab</code>, <code>.ipa</code>, or iOS <code>.app</code> tar archive. Prefer <code>--github-actions-artifact</code> for GitHub Actions artifacts that a compatible remote daemon can resolve with its own credentials.</li>
@@ -646,7 +646,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <li>Android URL/deep-link opens infer the foreground package after launch when possible, including Expo Go/dev-client shells. If the session still has no app package/bundle ID, package-bound metrics remain unavailable until you <code>open &lt;app&gt;</code>.</li>
 <li>Android frame health is reset after each successful <code>perf metrics</code> or <code>perf frames</code> read and after <code>open &lt;app&gt;</code>, so run <code>perf frames</code>, perform the interaction, then run <code>perf frames</code> again for a focused window.</li>
 <li>Android Simpleperf and Perfetto collectors require an active Android app session with a running package process. They return artifact paths, sizes, and compact state summaries; they do not print profile or trace contents into the agent context. iOS native Simpleperf/Perfetto support is not provided by these commands.</li>
-<li>On physical iOS devices, <code>perf metrics</code> and <code>perf frames</code> record short <code>xcrun xctrace</code> samples. Keep the device unlocked, connected, and the app active in the foreground while sampling.</li>
+<li>On CoreDevice-backed physical iOS devices, <code>perf metrics</code> and <code>perf frames</code> record short <code>xcrun xctrace</code> samples. Keep the device unlocked, connected, and the app active in the foreground while sampling.</li>
 <li>Interpretation note: this startup metric is command round-trip timing and does not represent true first frame / first interactive app instrumentation.</li>
 <li>CPU data is a lightweight process snapshot, so an idle app may legitimately read as <code>0</code>.</li>
 </ul>
@@ -811,7 +811,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <p><code>logs mark &quot;before submit&quot;</code> lines are prefixed with <code>[agent-device][mark][...]</code>, so grep for <code>agent-device.*mark</code> when you need timing markers back quickly.</p>
 </li>
 <li>
-<p>iOS <code>record</code> works on simulators and physical devices.</p>
+<p>iOS <code>record</code> works on simulators and CoreDevice-backed physical devices.</p>
 </li>
 <li>
 <p>iOS simulator recording uses native <code>simctl io ... recordVideo</code>.</p>
@@ -918,8 +918,10 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <h2 class="rp-toc-include" id="ios-physical-device-prerequisites"><a href="#ios-physical-device-prerequisites" class="rp-header-anchor rp-link" aria-hidden="true">#</a>iOS physical-device prerequisites</h2>
 <p>For CLI-discoverable setup guidance, run <code>agent-device help physical-device</code>.</p>
 <ul>
-<li>Xcode + <code>xcrun devicectl</code> available.</li>
+<li>Xcode with <code>xcrun devicectl</code> and <code>xcrun xctrace</code> available.</li>
 <li>Paired/trusted physical device, connected, unlocked when needed, with Developer Mode enabled.</li>
+<li>Older devices discovered only through <code>xctrace</code> use the XCTest backend automatically; its runner commands travel through macOS <code>usbmuxd</code>, so keep the device connected by cable.</li>
+<li>XCTest-backed devices support open/close, interactions, snapshots, and screenshots. App inventory, install/reinstall, logs, performance sampling, recording, deep links, and launch arguments require CoreDevice.</li>
 <li>The <code>AgentDeviceRunner</code> XCTest host must be signed before commands can run on a physical device.</li>
 <li>Start with Automatic Signing and only these env vars:
 <ul>
