@@ -130,5 +130,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_PR_NUMBER: ${{ steps.producers.outputs.pr_number }}
         run: |
-          node scripts/size-report.mjs --post-comment .tmp/quality-delta.md \
+          pnpm size --post-comment .tmp/quality-delta.md \
             --expect-head "${{ github.event.workflow_run.head_sha }}"

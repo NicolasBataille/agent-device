@@ -129,7 +129,7 @@ A push can also land *after* that gate, while setup, artifact download, and rend
 write path re-reads the head itself and **fails closed**:
 
 ```
-node scripts/size-report.mjs --post-comment .tmp/quality-delta.md --expect-head <rendered sha>
+pnpm size --post-comment .tmp/quality-delta.md --expect-head <rendered sha>
 ```
 
 If the PR's head is no longer that commit — or the lookup does not answer — nothing is written and

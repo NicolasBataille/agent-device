@@ -80,9 +80,9 @@ jobs:
         run: cat .tmp/size-report.md >> "$GITHUB_STEP_SUMMARY"
 
       # The size table itself is job-summary output now: the sticky PR comment it used to post is
-      # the quality-delta comment (#1424), rendered from the repo-health snapshot in the CI
-      # workflow's Coverage job under the SAME marker, so a PR still carries exactly one comment.
-      # Size rows reach it through this artifact rather than a second base/head measurement.
+      # the quality-delta comment (#1424), rendered by quality-delta.yml under the SAME marker once
+      # this workflow and CI have both finished, so a PR still carries exactly one comment. Size rows
+      # reach it through this artifact rather than a second base/head measurement.
       - name: Upload size report JSON
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
