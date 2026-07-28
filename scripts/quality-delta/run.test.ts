@@ -2,8 +2,10 @@
 // exercised through argument handling and the files they write), which is why this file lives in
 // the `subprocess-stub` vitest project rather than `unit-core` — see #1412 coordination rule 4.
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
@@ -41,6 +43,67 @@ test('the sticky-comment marker stays the one scripts/size-report.mjs posts', ()
   expect(sizeReport).toContain(`const COMMENT_MARKER = '${STICKY_COMMENT_MARKER}'`);
   // The pre-#1424 marker stays recognized, or PRs that already carry that comment get a second one.
   expect(sizeReport).toContain("LEGACY_COMMENT_MARKERS = ['<!-- agent-device-size-report -->']");
+});
+
+/**
+ * Post through a stand-in GitHub API that reports `currentHead` and records every call, so an
+ * attempted write cannot pass unnoticed. The child is spawned asynchronously on purpose: a blocking
+ * spawn would stall the event loop this stub server answers on.
+ */
+async function postCommentAgainst(
+  currentHead: string,
+  expectHead: string,
+): Promise<{ calls: string[]; code: number | null; stdout: string }> {
+  const calls: string[] = [];
+  const server = createServer((request, response) => {
+    calls.push(`${request.method} ${request.url}`);
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(request.url?.includes('/pulls/') ? `{"head":{"sha":"${currentHead}"}}` : '[]');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const markdown = join(workdir(), 'comment.md');
+  writeFileSync(markdown, `${STICKY_COMMENT_MARKER}\nQuality delta\n`);
+
+  const child = spawn(
+    process.execPath,
+    [
+      'scripts/size-report.mjs',
+      '--post-comment',
+      markdown,
+      '--pr',
+      '7',
+      '--expect-head',
+      expectHead,
+    ],
+    {
+      env: {
+        ...process.env,
+        GITHUB_API_URL: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+        GITHUB_TOKEN: 'stub-token',
+        GITHUB_REPOSITORY: 'callstack/agent-device',
+      },
+    },
+  );
+  let stdout = '';
+  child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
+  const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  return { calls, code, stdout };
+}
+
+test('a head that advances before the write refuses the comment instead of overwriting it', async () => {
+  const rendered = 'a'.repeat(40);
+
+  // The gate passed minutes ago; the PR was pushed to while this run built the report.
+  const moved = await postCommentAgainst('b'.repeat(40), rendered);
+  expect(moved.code).toBe(0);
+  expect(moved.stdout).toContain('Refusing to comment');
+  expect(moved.calls.some((call) => /^(POST|PATCH)/.test(call))).toBe(false);
+
+  // Same head: the write happens exactly as before.
+  const current = await postCommentAgainst(rendered, rendered);
+  expect(current.code).toBe(0);
+  expect(current.calls).toContain('POST /repos/callstack/agent-device/issues/7/comments');
 });
 
 test('the CLI writes a marker-prefixed comment and prints the full summary', () => {

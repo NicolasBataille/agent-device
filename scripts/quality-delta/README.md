@@ -125,6 +125,16 @@ cancel across heads, so a producer run for an older head could otherwise complet
 comment with obsolete metrics. A superseded head renders nothing, and the PR number the comment is
 posted to comes from that same verified lookup.
 
+A push can also land *after* that gate, while setup, artifact download, and rendering run. So the
+write path re-reads the head itself and **fails closed**:
+
+```
+node scripts/size-report.mjs --post-comment .tmp/quality-delta.md --expect-head <rendered sha>
+```
+
+If the PR's head is no longer that commit — or the lookup does not answer — nothing is written and
+the existing comment keeps its newer metrics.
+
 `producers.test.ts` owns both policies, including the assertion that no other workflow contains
 `--post-comment`.
 

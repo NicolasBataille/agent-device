@@ -120,11 +120,15 @@ jobs:
             --markdown .tmp/quality-delta.md
 
       # ONE comment per PR: the marker machinery in scripts/size-report.mjs updates it in place, and
-      # no other workflow posts a comment.
+      # no other workflow posts a comment. `--expect-head` re-reads the PR head inside the write path
+      # and refuses the write if it moved during setup/download/render — the gate above cannot cover
+      # that window, and sha-scoped concurrency does not cancel this run when a newer head starts.
       - name: Comment on the PR
         if: steps.producers.outputs.ready == 'true'
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_PR_NUMBER: ${{ steps.producers.outputs.pr_number }}
-        run: node scripts/size-report.mjs --post-comment .tmp/quality-delta.md
+        run: |
+          node scripts/size-report.mjs --post-comment .tmp/quality-delta.md \
+            --expect-head "${{ github.event.workflow_run.head_sha }}"

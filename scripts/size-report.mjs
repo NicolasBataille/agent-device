@@ -18,6 +18,7 @@ const VALUE_ARGS = new Map([
   ['--compare', 'compare'],
   ['--post-comment', 'postComment'],
   ['--pr', 'pr'],
+  ['--expect-head', 'expectHead'],
   ['--startup-runs', 'startupRuns'],
 ]);
 
@@ -30,7 +31,7 @@ const args = parseArgs(process.argv.slice(2));
 const cwd = path.resolve(args.cwd ?? process.cwd());
 
 if (args.postComment) {
-  await postGitHubComment(args.postComment, args.pr);
+  await postGitHubComment(args.postComment, args.pr, args.expectHead);
   process.exit(0);
 }
 
@@ -84,6 +85,7 @@ Options:
   --startup-runs <count>   Measure startup medians for side-effect-free CLI commands.
   --post-comment <path>    Post or update the markdown report on the current PR.
   --pr <number>            Pull request number for --post-comment.
+  --expect-head <sha>      Refuse to write unless the PR's head is still this commit.
 `);
   process.exit(0);
 }
@@ -366,8 +368,40 @@ function writeFile(filePath, contents) {
   fs.writeFileSync(filePath, contents);
 }
 
-async function postGitHubComment(markdownPath, explicitPrNumber) {
+/**
+ * Re-read the PR's head immediately before writing, and refuse the write unless it is still the
+ * commit this report describes. Any doubt — a moved head, or a lookup that did not answer — refuses:
+ * the comment keeps whatever newer metrics are already there. The producer gate checks the same
+ * thing minutes earlier, but a push during setup, artifact download, and rendering lands inside that
+ * window, and workflow concurrency is sha-scoped so it cannot cancel the older run.
+ */
+async function fetchCurrentHead(repository, prNumber, headers) {
+  const [owner, repo] = repository.split('/');
+  const response = await fetch(`${apiBaseUrl()}/repos/${owner}/${repo}/pulls/${prNumber}`, {
+    headers,
+  });
+  if (!response.ok) return `unreadable (HTTP ${response.status})`;
+  return (await response.json())?.head?.sha ?? 'unknown';
+}
+
+async function headIsStill(repository, prNumber, expectedHead, headers) {
+  const currentHead = await fetchCurrentHead(repository, prNumber, headers);
+  if (currentHead === expectedHead) return true;
+  process.stdout.write(
+    `Refusing to comment: PR #${prNumber} head is ${currentHead}, not the ${expectedHead} ` +
+      'this report describes.\n',
+  );
+  return false;
+}
+
+async function postGitHubComment(markdownPath, explicitPrNumber, expectedHead) {
   const config = readGitHubCommentConfig(explicitPrNumber);
+  if (
+    expectedHead &&
+    !(await headIsStill(config.repository, config.prNumber, expectedHead, config.headers))
+  ) {
+    return;
+  }
   const body = fs.readFileSync(markdownPath, 'utf8');
   const commentsUrl = buildCommentsUrl(config.repository, config.prNumber);
   const comments = await listGitHubComments(commentsUrl, config.headers);
@@ -409,9 +443,14 @@ function buildGitHubHeaders(token) {
   };
 }
 
+/** Actions sets GITHUB_API_URL; it is also the seam the comment tests point at a local stub. */
+function apiBaseUrl() {
+  return process.env.GITHUB_API_URL ?? 'https://api.github.com';
+}
+
 function buildCommentsUrl(repository, prNumber) {
   const [owner, repo] = repository.split('/');
-  return `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`;
+  return `${apiBaseUrl()}/repos/${owner}/${repo}/issues/${prNumber}/comments`;
 }
 
 async function listGitHubComments(commentsUrl, headers) {

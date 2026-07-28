@@ -103,6 +103,8 @@ test('the rendering workflow triggers on both producers and gates every step on 
   const post = job.steps.find((step) => step.name === 'Comment on the PR')!;
   expect(post.if).toContain("steps.producers.outputs.ready == 'true'");
   expect(JSON.stringify(post)).toContain('steps.producers.outputs.pr_number');
+  // …and the write path re-verifies the head itself, covering the gap between gate and write.
+  expect(JSON.stringify(post)).toContain('--expect-head');
 });
 
 test('no other workflow posts a PR comment', () => {
