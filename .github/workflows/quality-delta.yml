@@ -23,11 +23,13 @@ permissions:
   actions: read
   pull-requests: write
 
-# One render per head sha at a time. This cannot serialize ACROSS heads (the PR number is not known
-# at trigger time), so the render gate below additionally refuses to post for a sha that is no longer
-# the PR's head — that, not this group, is what keeps a late run from overwriting newer metrics.
+# Serialized by PULL REQUEST, so a renderer for an older head is cancelled the moment the newer
+# head's renderer starts — a sha-keyed group could not do that, and the loser could still be inside
+# its comment write. `pull_requests` is empty for fork triggers (skipped below anyway), hence the
+# sha fallback. The `--expect-head` check in the write path stays as defense in depth for the
+# cancellation window itself.
 concurrency:
-  group: quality-delta-${{ github.event.workflow_run.head_sha }}
+  group: quality-delta-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:

@@ -119,14 +119,23 @@ lands a minute later never reaches it. So the render runs on `workflow_run` for 
 earlier firings exit cleanly because the later completion fires the trigger again. A re-run of one
 producer supersedes its earlier run.
 
-The same gate answers the other half of "may this run post": the sha must still be the **current head
-of an open PR** (`selectRenderTarget`). Workflow concurrency is keyed by head sha and therefore cannot
-cancel across heads, so a producer run for an older head could otherwise complete late and replace the
-comment with obsolete metrics. A superseded head renders nothing, and the PR number the comment is
-posted to comes from that same verified lookup.
+Writing the comment is serialized **per pull request**, not per head sha:
 
-A push can also land *after* that gate, while setup, artifact download, and rendering run. So the
-write path re-reads the head itself and **fails closed**:
+```yaml
+concurrency:
+  group: quality-delta-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+```
+
+so the renderer for an older head is cancelled the moment the newer head's renderer starts, even if
+it is already inside its comment write. (`pull_requests` is empty for fork triggers, which are
+skipped anyway — hence the sha fallback.)
+
+Two checks back that up. The gate answers the other half of "may this run post": the sha must still be
+the **current head of an open PR** (`selectRenderTarget`), so a superseded head renders nothing and
+the PR number posted to comes from that same verified lookup. And because a push can land *after* the
+gate, while setup, artifact download, and rendering run, the write path re-reads the head itself and
+**fails closed**:
 
 ```
 pnpm size --post-comment .tmp/quality-delta.md --expect-head <rendered sha>

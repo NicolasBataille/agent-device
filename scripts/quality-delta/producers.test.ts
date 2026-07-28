@@ -84,10 +84,17 @@ test('a superseded head renders nothing, so a late run cannot overwrite newer me
 test('the rendering workflow triggers on both producers and gates every step on readiness', () => {
   const workflow = parse(readFileSync('.github/workflows/quality-delta.yml', 'utf8')) as {
     on: { workflow_run: { workflows: string[]; types: string[] } };
+    concurrency: { group: string; 'cancel-in-progress': boolean };
     jobs: Record<string, { if: string; steps: { name: string; if?: string }[] }>;
   };
   expect(workflow.on.workflow_run.workflows.toSorted()).toEqual([...PRODUCER_WORKFLOWS].toSorted());
   expect(workflow.on.workflow_run.types).toEqual(['completed']);
+
+  // Serialized per PR (sha fallback for fork triggers), so a newer head cancels an older renderer
+  // even while it is mid-write; a sha-keyed group could not.
+  expect(workflow.concurrency.group).toContain('workflow_run.pull_requests[0].number');
+  expect(workflow.concurrency.group).toContain('workflow_run.head_sha');
+  expect(workflow.concurrency['cancel-in-progress']).toBe(true);
 
   const job = workflow.jobs.comment!;
   // Fork PRs must not be checked out by a write-token workflow, and get job summaries instead.
