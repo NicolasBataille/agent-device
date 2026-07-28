@@ -2,39 +2,20 @@ import { deflateSync, inflateSync } from 'node:zlib';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-type PngColorType = 0 | 2 | 3 | 4 | 6;
+type PngColorType = 0 | 2 | 4 | 6;
 
 const COLOR_CHANNELS: ReadonlyMap<PngColorType, number> = new Map([
   [0, 1],
   [2, 3],
-  [3, 1],
   [4, 2],
   [6, 4],
 ] as const);
-const VALID_BIT_DEPTHS: ReadonlyMap<PngColorType, ReadonlySet<number>> = new Map([
-  [0, new Set([1, 2, 4, 8, 16])],
-  [2, new Set([8, 16])],
-  [3, new Set([1, 2, 4, 8])],
-  [4, new Set([8, 16])],
-  [6, new Set([8, 16])],
-] as const);
-const ADAM7_PASSES = [
-  { x: 0, y: 0, dx: 8, dy: 8 },
-  { x: 4, y: 0, dx: 8, dy: 8 },
-  { x: 0, y: 4, dx: 4, dy: 8 },
-  { x: 2, y: 0, dx: 4, dy: 4 },
-  { x: 0, y: 2, dx: 2, dy: 4 },
-  { x: 1, y: 0, dx: 2, dy: 2 },
-  { x: 0, y: 1, dx: 1, dy: 2 },
-] as const;
 
 type PngMetadata = {
   width: number;
   height: number;
-  bitDepth: number;
   colorType: PngColorType;
   interlace: 0 | 1;
-  palette?: Buffer;
   transparency?: Buffer;
 };
 
@@ -68,14 +49,12 @@ function readPng(buffer: Buffer): PNG {
   const { metadata, idatChunks } = collectPngChunks(buffer);
   if (!metadata) throw new Error('PNG is missing IHDR');
   if (idatChunks.length === 0) throw new Error('PNG is missing IDAT');
+  if (metadata.interlace === 1) throw new Error('Interlaced PNG not supported');
   const inflated = inflatePngData(idatChunks, metadata);
   return new PNG({
     width: metadata.width,
     height: metadata.height,
-    data:
-      metadata.interlace === 1
-        ? decodeInterlacedPixels(inflated, metadata)
-        : decodePixels(unfilterPng(inflated, metadata), metadata),
+    data: decodePixels(unfilterPng(inflated, metadata), metadata),
   });
 }
 
@@ -86,25 +65,14 @@ function collectPngChunks(buffer: Buffer): { metadata?: PngMetadata; idatChunks:
   for (const chunk of iteratePngChunks(buffer)) {
     if (chunk.type === 'IHDR') metadata = parseIhdr(chunk.data);
     else if (chunk.type === 'IDAT') idatChunks.push(Buffer.from(chunk.data));
-    else metadata = applyMetadataChunk(chunk, metadata);
+    else if (chunk.type === 'tRNS') {
+      if (!metadata) throw new Error('PNG tRNS appeared before IHDR');
+      metadata.transparency = Buffer.from(chunk.data);
+    }
     if (chunk.type === 'IEND') break;
   }
 
   return { metadata, idatChunks };
-}
-
-function applyMetadataChunk(
-  chunk: PngChunk,
-  metadata: PngMetadata | undefined,
-): PngMetadata | undefined {
-  if (chunk.type === 'PLTE') {
-    if (!metadata) throw new Error('PNG PLTE appeared before IHDR');
-    metadata.palette = Buffer.from(chunk.data);
-  } else if (chunk.type === 'tRNS') {
-    if (!metadata) throw new Error('PNG tRNS appeared before IHDR');
-    metadata.transparency = Buffer.from(chunk.data);
-  }
-  return metadata;
 }
 
 function* iteratePngChunks(buffer: Buffer): Generator<PngChunk> {
@@ -178,11 +146,9 @@ function parseIhdr(data: Buffer): PngMetadata {
   const compression = data[10]!;
   const filter = data[11]!;
   const interlace = data[12]!;
+  if (colorType === 3) throw new Error('Indexed/palette PNG not supported');
   if (!isPngColorType(colorType)) throw new Error(`Unsupported PNG color type ${colorType}`);
-  const validDepths = VALID_BIT_DEPTHS.get(colorType);
-  if (!validDepths?.has(bitDepth)) {
-    throw new Error(`Unsupported PNG color type ${colorType} with bit depth ${bitDepth}`);
-  }
+  if (bitDepth !== 8) throw new Error(`PNG bit depth ${bitDepth} not supported`);
   if (compression !== 0) throw new Error(`Unsupported PNG compression method ${compression}`);
   if (filter !== 0) throw new Error(`Unsupported PNG filter method ${filter}`);
   if (interlace !== 0 && interlace !== 1)
@@ -190,7 +156,6 @@ function parseIhdr(data: Buffer): PngMetadata {
   return {
     width: validateDimension(width, 'width'),
     height: validateDimension(height, 'height'),
-    bitDepth,
     colorType,
     interlace,
   };
@@ -275,62 +240,8 @@ function decodePixels(raw: Buffer, metadata: PngMetadata): Buffer {
   return output;
 }
 
-function decodeInterlacedPixels(inflated: Buffer, metadata: PngMetadata): Buffer {
-  const output = Buffer.alloc(metadata.width * metadata.height * 4);
-  let offset = 0;
-  for (const pass of ADAM7_PASSES) {
-    const width = interlacePassSize(metadata.width, pass.x, pass.dx);
-    const height = interlacePassSize(metadata.height, pass.y, pass.dy);
-    if (width === 0 || height === 0) continue;
-
-    const passMetadata = { ...metadata, width, height, interlace: 0 as const };
-    const result = unfilterScanlines({
-      inflated,
-      offset,
-      scanlineLength: scanlineByteLength(passMetadata),
-      height,
-      bytesPerPixel: filterBytesPerPixel(passMetadata),
-    });
-    offset = result.offset;
-
-    const scanlineLength = scanlineByteLength(passMetadata);
-    for (let y = 0; y < height; y += 1) {
-      const line = result.raw.subarray(y * scanlineLength, (y + 1) * scanlineLength);
-      for (let x = 0; x < width; x += 1) {
-        const targetX = pass.x + x * pass.dx;
-        const targetY = pass.y + y * pass.dy;
-        const target = (targetY * metadata.width + targetX) * 4;
-        const [red, green, blue, alpha] = readPixel(line, x, passMetadata);
-        output[target] = red;
-        output[target + 1] = green;
-        output[target + 2] = blue;
-        output[target + 3] = alpha;
-      }
-    }
-  }
-  return output;
-}
-
 function inflatedByteLength(metadata: PngMetadata): number {
-  if (metadata.interlace === 0) return filteredScanlineByteLength(metadata, metadata.height);
-
-  let byteLength = 0;
-  for (const pass of ADAM7_PASSES) {
-    const width = interlacePassSize(metadata.width, pass.x, pass.dx);
-    const height = interlacePassSize(metadata.height, pass.y, pass.dy);
-    if (width === 0 || height === 0) continue;
-    byteLength += filteredScanlineByteLength({ ...metadata, width, height }, height);
-  }
-  return byteLength;
-}
-
-function filteredScanlineByteLength(metadata: PngMetadata, height: number): number {
-  return (scanlineByteLength(metadata) + 1) * height;
-}
-
-function interlacePassSize(size: number, start: number, step: number): number {
-  if (size <= start) return 0;
-  return Math.floor((size - start + step - 1) / step);
+  return (scanlineByteLength(metadata) + 1) * metadata.height;
 }
 
 function readPixel(
@@ -338,28 +249,20 @@ function readPixel(
   x: number,
   metadata: PngMetadata,
 ): [number, number, number, number] {
-  if (metadata.colorType === 3) return readPalettePixel(line, x, metadata);
-  if (metadata.bitDepth < 8) return readPackedGrayscalePixel(line, x, metadata);
-
-  const bytesPerSample = metadata.bitDepth === 16 ? 2 : 1;
   const channels = COLOR_CHANNELS.get(metadata.colorType)!;
-  const offset = x * channels * bytesPerSample;
-  const rawSample = (channel: number): number =>
-    metadata.bitDepth === 16
-      ? line.readUInt16BE(offset + channel * 2)
-      : line[offset + channel * bytesPerSample]!;
-  const sample = (channel: number): number => scaleSample(rawSample(channel), metadata.bitDepth);
+  const offset = x * channels;
+  const sample = (channel: number): number => line[offset + channel]!;
 
   if (metadata.colorType === 0) {
     const gray = sample(0);
-    const transparent = matchesTransparentGray(rawSample(0), metadata);
+    const transparent = matchesTransparentGray(sample(0), metadata);
     return [gray, gray, gray, transparent ? 0 : 255];
   }
   if (metadata.colorType === 2) {
     const red = sample(0);
     const green = sample(1);
     const blue = sample(2);
-    const transparent = matchesTransparentRgb(rawSample(0), rawSample(1), rawSample(2), metadata);
+    const transparent = matchesTransparentRgb(sample(0), sample(1), sample(2), metadata);
     return [red, green, blue, transparent ? 0 : 255];
   }
   if (metadata.colorType === 4) {
@@ -369,59 +272,12 @@ function readPixel(
   return [sample(0), sample(1), sample(2), sample(3)];
 }
 
-function readPalettePixel(
-  line: Buffer,
-  x: number,
-  metadata: PngMetadata,
-): [number, number, number, number] {
-  if (!metadata.palette) throw new Error('Indexed PNG is missing PLTE');
-  const index = readPackedSample(line, x, metadata.bitDepth);
-  const paletteOffset = index * 3;
-  if (paletteOffset + 2 >= metadata.palette.length)
-    throw new Error('Indexed PNG palette is invalid');
-  return [
-    metadata.palette[paletteOffset]!,
-    metadata.palette[paletteOffset + 1]!,
-    metadata.palette[paletteOffset + 2]!,
-    metadata.transparency?.[index] ?? 255,
-  ];
-}
-
-function readPackedGrayscalePixel(
-  line: Buffer,
-  x: number,
-  metadata: PngMetadata,
-): [number, number, number, number] {
-  const sample = readPackedSample(line, x, metadata.bitDepth);
-  const max = (1 << metadata.bitDepth) - 1;
-  const gray = Math.round((sample / max) * 255);
-  const transparent =
-    metadata.transparency && metadata.transparency.length >= 2
-      ? sample === metadata.transparency.readUInt16BE(0)
-      : false;
-  return [gray, gray, gray, transparent ? 0 : 255];
-}
-
-function readPackedSample(line: Buffer, x: number, bitDepth: number): number {
-  const bitOffset = x * bitDepth;
-  const byte = line[Math.floor(bitOffset / 8)]!;
-  const shift = 8 - bitDepth - (bitOffset % 8);
-  return (byte >> shift) & ((1 << bitDepth) - 1);
-}
-
 function scanlineByteLength(metadata: PngMetadata): number {
-  const channels = COLOR_CHANNELS.get(metadata.colorType)!;
-  return Math.ceil((metadata.width * channels * metadata.bitDepth) / 8);
+  return metadata.width * COLOR_CHANNELS.get(metadata.colorType)!;
 }
 
 function filterBytesPerPixel(metadata: PngMetadata): number {
-  const channels = COLOR_CHANNELS.get(metadata.colorType)!;
-  return Math.max(1, Math.ceil((channels * metadata.bitDepth) / 8));
-}
-
-function scaleSample(sample: number, bitDepth: number): number {
-  if (bitDepth === 16) return Math.round((sample / 0xffff) * 0xff);
-  return sample;
+  return COLOR_CHANNELS.get(metadata.colorType)!;
 }
 
 function matchesTransparentGray(sample: number, metadata: PngMetadata): boolean {

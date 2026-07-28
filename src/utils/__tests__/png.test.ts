@@ -20,25 +20,6 @@ test('PNG sync reader decodes filtered RGB image data', () => {
   assert.deepEqual(readPngPixel(png, 1, 0), [50, 80, 130, 255]);
 });
 
-test('PNG sync reader decodes indexed color and transparency', () => {
-  const png = PNG.sync.read(
-    encodeTestPng({
-      width: 4,
-      height: 1,
-      bitDepth: 2,
-      colorType: 3,
-      palette: Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 20, 30, 40]),
-      transparency: Buffer.from([255, 200, 80, 255]),
-      rawScanlines: Buffer.from([0, 0b00011011]),
-    }),
-  );
-
-  assert.deepEqual(readPngPixel(png, 0, 0), [255, 0, 0, 255]);
-  assert.deepEqual(readPngPixel(png, 1, 0), [0, 255, 0, 200]);
-  assert.deepEqual(readPngPixel(png, 2, 0), [0, 0, 255, 80]);
-  assert.deepEqual(readPngPixel(png, 3, 0), [20, 30, 40, 255]);
-});
-
 test('PNG sync reader decodes RGBA alpha', () => {
   const png = PNG.sync.read(
     encodeTestPng({
@@ -53,75 +34,90 @@ test('PNG sync reader decodes RGBA alpha', () => {
   assert.deepEqual(readPngPixel(png, 0, 0), [10, 20, 30, 40]);
 });
 
-test('PNG sync reader scales 16-bit samples to 8-bit output', () => {
-  const rawScanlines = Buffer.alloc(7);
-  rawScanlines[0] = 0;
-  rawScanlines.writeUInt16BE(0x00ff, 1);
-  rawScanlines.writeUInt16BE(0x0100, 3);
-  rawScanlines.writeUInt16BE(0xffff, 5);
-
-  const png = PNG.sync.read(
-    encodeTestPng({
-      width: 1,
-      height: 1,
-      bitDepth: 16,
-      colorType: 2,
-      rawScanlines,
-    }),
-  );
-
-  assert.deepEqual(readPngPixel(png, 0, 0), [1, 1, 255, 255]);
-});
-
-test('PNG sync reader applies packed grayscale transparency', () => {
+test('PNG sync reader applies grayscale transparency', () => {
   const png = PNG.sync.read(
     encodeTestPng({
       width: 2,
       height: 1,
-      bitDepth: 4,
+      bitDepth: 8,
       colorType: 0,
-      transparency: Buffer.from([0, 2]),
-      rawScanlines: Buffer.from([0, 0x25]),
+      transparency: Buffer.from([0, 5]),
+      rawScanlines: Buffer.from([0, 5, 9]),
     }),
   );
 
-  assert.deepEqual(readPngPixel(png, 0, 0), [34, 34, 34, 0]);
-  assert.deepEqual(readPngPixel(png, 1, 0), [85, 85, 85, 255]);
+  assert.deepEqual(readPngPixel(png, 0, 0), [5, 5, 5, 0]);
+  assert.deepEqual(readPngPixel(png, 1, 0), [9, 9, 9, 255]);
 });
 
-test('PNG sync reader decodes Adam7 interlaced RGB image data', () => {
+test('PNG sync reader applies RGB transparency', () => {
   const png = PNG.sync.read(
     encodeTestPng({
-      width: 3,
-      height: 3,
+      width: 2,
+      height: 1,
       bitDepth: 8,
       colorType: 2,
-      interlace: 1,
-      rawScanlines: Buffer.from([
-        0,
-        ...rgb(0, 0),
-        0,
-        ...rgb(2, 0),
-        0,
-        ...rgb(0, 2),
-        ...rgb(2, 2),
-        0,
-        ...rgb(1, 0),
-        0,
-        ...rgb(1, 2),
-        0,
-        ...rgb(0, 1),
-        ...rgb(1, 1),
-        ...rgb(2, 1),
-      ]),
+      transparency: Buffer.from([0, 10, 0, 20, 0, 30]),
+      rawScanlines: Buffer.from([0, 10, 20, 30, 1, 2, 3]),
     }),
   );
 
-  for (let y = 0; y < 3; y += 1) {
-    for (let x = 0; x < 3; x += 1) {
-      assert.deepEqual(readPngPixel(png, x, y), [...rgb(x, y), 255]);
-    }
-  }
+  assert.deepEqual(readPngPixel(png, 0, 0), [10, 20, 30, 0]);
+  assert.deepEqual(readPngPixel(png, 1, 0), [1, 2, 3, 255]);
+});
+
+test('PNG sync reader rejects indexed/palette color', () => {
+  const bytes = encodeTestPng({
+    width: 4,
+    height: 1,
+    bitDepth: 2,
+    colorType: 3,
+    palette: Buffer.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 20, 30, 40]),
+    rawScanlines: Buffer.from([0, 0b00011011]),
+  });
+
+  assert.throws(() => PNG.sync.read(bytes), /Indexed\/palette PNG not supported/);
+});
+
+test('PNG sync reader rejects bit depths below 8', () => {
+  const bytes = encodeTestPng({
+    width: 2,
+    height: 1,
+    bitDepth: 4,
+    colorType: 0,
+    rawScanlines: Buffer.from([0, 0x25]),
+  });
+
+  assert.throws(() => PNG.sync.read(bytes), /PNG bit depth 4 not supported/);
+});
+
+test('PNG sync reader rejects interlaced images', () => {
+  const bytes = encodeTestPng({
+    width: 3,
+    height: 3,
+    bitDepth: 8,
+    colorType: 2,
+    interlace: 1,
+    rawScanlines: Buffer.from([
+      0,
+      ...rgb(0, 0),
+      0,
+      ...rgb(2, 0),
+      0,
+      ...rgb(0, 2),
+      ...rgb(2, 2),
+      0,
+      ...rgb(1, 0),
+      0,
+      ...rgb(1, 2),
+      0,
+      ...rgb(0, 1),
+      ...rgb(1, 1),
+      ...rgb(2, 1),
+    ]),
+  });
+
+  assert.throws(() => PNG.sync.read(bytes), /Interlaced PNG not supported/);
 });
 
 test('PNG sync reader rejects invalid chunk CRCs', () => {
