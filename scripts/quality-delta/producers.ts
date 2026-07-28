@@ -46,6 +46,32 @@ function newestRunFor(
   return matching[0] ?? null;
 }
 
+/** The fields this decision needs from GitHub's `commits/<sha>/pulls` payload. */
+export type PullRequestSummary = {
+  number: number;
+  state: string;
+  head: { sha: string };
+  base: { sha: string };
+};
+
+export type RenderTarget = { number: number; baseSha: string };
+
+/**
+ * The PR this render may post to: open, and whose CURRENT head is still the sha being rendered.
+ *
+ * A producer run for an older head can complete (or be cancelled and re-reported) after a newer head
+ * already rendered; concurrency keyed by head sha does not cancel across heads. Without this check
+ * such a late renderer would overwrite the sticky comment with obsolete metrics, so a superseded head
+ * renders nothing and the comment keeps describing the head it actually measured.
+ */
+export function selectRenderTarget(
+  pulls: readonly PullRequestSummary[],
+  headSha: string,
+): RenderTarget | null {
+  const current = pulls.find((pull) => pull.state === 'open' && pull.head.sha === headSha);
+  return current === undefined ? null : { number: current.number, baseSha: current.base.sha };
+}
+
 export function producerReadiness(
   runs: readonly WorkflowRunSummary[],
   headSha: string,

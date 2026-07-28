@@ -6,7 +6,13 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { parse } from 'yaml';
-import { producerReadiness, PRODUCER_WORKFLOWS, type WorkflowRunSummary } from './producers.ts';
+import {
+  producerReadiness,
+  PRODUCER_WORKFLOWS,
+  selectRenderTarget,
+  type PullRequestSummary,
+  type WorkflowRunSummary,
+} from './producers.ts';
 
 const HEAD = 'a'.repeat(40);
 
@@ -57,6 +63,24 @@ test('a re-run supersedes the earlier run of the same producer', () => {
   expect(readiness.runIds.Size).toBe(9);
 });
 
+test('a superseded head renders nothing, so a late run cannot overwrite newer metrics', () => {
+  const pull = (head: string, state = 'open'): PullRequestSummary => ({
+    number: 1477,
+    state,
+    head: { sha: head },
+    base: { sha: 'base'.repeat(10) },
+  });
+
+  expect(selectRenderTarget([pull(HEAD)], HEAD)).toEqual({
+    number: 1477,
+    baseSha: 'base'.repeat(10),
+  });
+  // The PR's head moved on while this run was finishing: its metrics describe an old tree.
+  expect(selectRenderTarget([pull('b'.repeat(40))], HEAD)).toBe(null);
+  expect(selectRenderTarget([pull(HEAD, 'closed')], HEAD)).toBe(null);
+  expect(selectRenderTarget([], HEAD)).toBe(null);
+});
+
 test('the rendering workflow triggers on both producers and gates every step on readiness', () => {
   const workflow = parse(readFileSync('.github/workflows/quality-delta.yml', 'utf8')) as {
     on: { workflow_run: { workflows: string[]; types: string[] } };
@@ -74,6 +98,11 @@ test('the rendering workflow triggers on both producers and gates every step on 
   );
   // Everything after the readiness check is gated on it; the checkout and the check itself are not.
   expect(gated).toHaveLength(job.steps.length - 2);
+
+  // Posting uses the PR the gate verified is still on this head, never a second, ungated lookup.
+  const post = job.steps.find((step) => step.name === 'Comment on the PR')!;
+  expect(post.if).toContain("steps.producers.outputs.ready == 'true'");
+  expect(JSON.stringify(post)).toContain('steps.producers.outputs.pr_number');
 });
 
 test('no other workflow posts a PR comment', () => {

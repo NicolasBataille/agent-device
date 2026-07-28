@@ -144,25 +144,57 @@ test('a missing head snapshot fails loudly, missing optional inputs do not', () 
   expect(degraded.stdout).toContain('no main baseline');
 });
 
-test('the producer gate reports readiness and run ids through $GITHUB_OUTPUT', () => {
+test('the render gate reports readiness, run ids and the PR through $GITHUB_OUTPUT', () => {
   const dir = workdir();
   const headSha = 'c'.repeat(40);
-  const runs = writeJson(dir, 'runs.json', {
-    workflow_runs: [
-      { id: 11, name: 'CI', head_sha: headSha, status: 'completed' },
-      { id: 22, name: 'Size', head_sha: headSha, status: 'in_progress' },
-    ],
-  });
-  const output = join(dir, 'github-output');
-  writeFileSync(output, '');
+  const baseSha = 'd'.repeat(40);
+  const openPr = [{ number: 7, state: 'open', head: { sha: headSha }, base: { sha: baseSha } }];
+  const pulls = writeJson(dir, 'pulls.json', openPr);
 
-  const waiting = runScript('producers-run.ts', ['--runs', runs, '--head-sha', headSha], {
-    GITHUB_OUTPUT: output,
-  });
-  // Not ready is a normal outcome: Size's completion fires the workflow again.
-  expect(waiting.status, waiting.stderr).toBe(0);
-  expect(readFileSync(output, 'utf8')).toContain('ready=false');
-  expect(readFileSync(output, 'utf8')).toContain('size_run_id=22');
+  function gate(name: string, runs: unknown, pullsPath: string): string {
+    const output = join(dir, `${name}-output`);
+    writeFileSync(output, '');
+    const result = runScript(
+      'producers-run.ts',
+      [
+        '--runs',
+        writeJson(dir, `${name}-runs.json`, runs),
+        '--pulls',
+        pullsPath,
+        '--head-sha',
+        headSha,
+      ],
+      { GITHUB_OUTPUT: output },
+    );
+    // Not rendering is a normal outcome, never a failure.
+    expect(result.status, result.stderr).toBe(0);
+    return readFileSync(output, 'utf8');
+  }
+
+  const completed = [
+    { id: 11, name: 'CI', head_sha: headSha, status: 'completed' },
+    { id: 22, name: 'Size', head_sha: headSha, status: 'completed' },
+  ];
+  const ready = gate('ready', { workflow_runs: completed }, pulls);
+  expect(ready).toContain('ready=true');
+  expect(ready).toContain('size_run_id=22');
+  expect(ready).toContain('pr_number=7');
+  expect(ready).toContain(`pr_base_sha=${baseSha}`);
+
+  // Size still running: its completion fires the workflow again.
+  const waiting = gate(
+    'waiting',
+    { workflow_runs: [completed[0], { ...completed[1], status: 'in_progress' }] },
+    pulls,
+  );
+  expect(waiting).toContain('ready=false');
+
+  // Superseded head: the PR moved on, so posting would replace newer metrics with older ones.
+  const moved = writeJson(dir, 'moved.json', [{ ...openPr[0], head: { sha: 'e'.repeat(40) } }]);
+  const superseded = gate('superseded', { workflow_runs: completed }, moved);
+  expect(superseded).toContain('ready=false');
+  expect(superseded).toContain('pr_number=');
+  expect(superseded).not.toContain('pr_number=7');
 });
 
 test('appending to the history is idempotent per commit', () => {

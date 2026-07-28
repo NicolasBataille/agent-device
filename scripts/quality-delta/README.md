@@ -114,8 +114,16 @@ either one is a race whose loser is permanent: the comment is written once, so a
 lands a minute later never reaches it. So the render runs on `workflow_run` for both producers and
 [`producers.ts`](./producers.ts) decides readiness — the **last** producer to complete renders, and
 earlier firings exit cleanly because the later completion fires the trigger again. A re-run of one
-producer supersedes its earlier run. `producers.test.ts` owns that policy, including the assertion
-that no other workflow contains `--post-comment`.
+producer supersedes its earlier run.
+
+The same gate answers the other half of "may this run post": the sha must still be the **current head
+of an open PR** (`selectRenderTarget`). Workflow concurrency is keyed by head sha and therefore cannot
+cancel across heads, so a producer run for an older head could otherwise complete late and replace the
+comment with obsolete metrics. A superseded head renders nothing, and the PR number the comment is
+posted to comes from that same verified lookup.
+
+`producers.test.ts` owns both policies, including the assertion that no other workflow contains
+`--post-comment`.
 
 Fork PRs are skipped there deliberately: `workflow_run` carries a **write token in the base repo**,
 so checking out and installing fork code in it would be a pwn-request. Fork PRs keep the producers'

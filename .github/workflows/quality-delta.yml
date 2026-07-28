@@ -23,8 +23,9 @@ permissions:
   actions: read
   pull-requests: write
 
-# One render per head sha, and never two comment writes at once. Superseding is safe and wanted: a
-# newer run describes a newer head.
+# One render per head sha at a time. This cannot serialize ACROSS heads (the PR number is not known
+# at trigger time), so the render gate below additionally refuses to post for a sha that is no longer
+# the PR's head — that, not this group, is what keeps a late run from overwriting newer metrics.
 concurrency:
   group: quality-delta-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
@@ -44,8 +45,10 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      # The race policy, as a decision the unit tests own: scripts/quality-delta/producers.ts.
-      - name: Check that every producer finished
+      # The race policy, as a decision the unit tests own: scripts/quality-delta/producers.ts. It
+      # answers both halves of "may this run post" — every producer finished, AND this sha is still
+      # the open PR's head, so a superseded head renders nothing instead of overwriting the comment.
+      - name: Check that every producer finished and this head is current
         id: producers
         env:
           GH_TOKEN: ${{ github.token }}
@@ -54,8 +57,9 @@ jobs:
           set -euo pipefail
           mkdir -p .tmp
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&per_page=100" > .tmp/runs.json
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" > .tmp/pulls.json
           node --experimental-strip-types scripts/quality-delta/producers-run.ts \
-            --runs .tmp/runs.json --head-sha "${HEAD_SHA}"
+            --runs .tmp/runs.json --pulls .tmp/pulls.json --head-sha "${HEAD_SHA}"
 
       - name: Setup toolchain
         if: steps.producers.outputs.ready == 'true'
@@ -102,29 +106,15 @@ jobs:
             echo "No metrics/repo-health ref yet; the comment will report no baseline."
           fi
 
-      - name: Resolve the pull request and its base
-        if: steps.producers.outputs.ready == 'true'
-        id: pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" > .tmp/pulls.json
-          number=$(jq -r '[.[] | select(.state == "open") | .number] | first // empty' .tmp/pulls.json)
-          base=$(jq -r '[.[] | select(.state == "open") | .base.sha] | first // empty' .tmp/pulls.json)
-          echo "number=${number}" >> "$GITHUB_OUTPUT"
-          echo "base_sha=${base}" >> "$GITHUB_OUTPUT"
-
       - name: Render quality delta
-        if: steps.producers.outputs.ready == 'true' && steps.pr.outputs.number != ''
+        if: steps.producers.outputs.ready == 'true'
         continue-on-error: true
         run: |
           pnpm repo-health --out .tmp/repo-health.json
           pnpm quality-delta \
             --head .tmp/repo-health.json \
             --history-dir .tmp/history-ref \
-            --base-sha "${{ steps.pr.outputs.base_sha }}" \
+            --base-sha "${{ steps.producers.outputs.pr_base_sha }}" \
             --changed-coverage .tmp/changed-coverage.json \
             --slow-test .tmp/slow-tests.json \
             --markdown .tmp/quality-delta.md
@@ -132,9 +122,9 @@ jobs:
       # ONE comment per PR: the marker machinery in scripts/size-report.mjs updates it in place, and
       # no other workflow posts a comment.
       - name: Comment on the PR
-        if: steps.producers.outputs.ready == 'true' && steps.pr.outputs.number != ''
+        if: steps.producers.outputs.ready == 'true'
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_PR_NUMBER: ${{ steps.pr.outputs.number }}
+          GITHUB_PR_NUMBER: ${{ steps.producers.outputs.pr_number }}
         run: node scripts/size-report.mjs --post-comment .tmp/quality-delta.md
