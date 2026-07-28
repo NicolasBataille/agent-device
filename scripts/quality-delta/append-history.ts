@@ -21,34 +21,38 @@ Options:
   --history-dir <path>  Working copy of the history ref; the shard lands in its ${HISTORY_DIR}/.
 `;
 
+/** The shard file this snapshot belongs in, created empty if the month has no entries yet. */
+function shardFor(historyDir: string, snapshot: RepoHealthSnapshot): string {
+  const shard = path.join(
+    path.resolve(historyDir),
+    HISTORY_DIR,
+    historyShardName(snapshot.provenance.generatedAt),
+  );
+  fs.mkdirSync(path.dirname(shard), { recursive: true });
+  return shard;
+}
+
+function appendSnapshot(historyDir: string, snapshot: RepoHealthSnapshot): string {
+  const shard = shardFor(historyDir, snapshot);
+  const outcome = appendEntry(fs.existsSync(shard) ? fs.readFileSync(shard, 'utf8') : '', snapshot);
+  const commit = snapshot.provenance.commit.slice(0, 12);
+  if (!outcome.appended) return `${commit} is already in ${path.basename(shard)}; nothing to do.`;
+  fs.writeFileSync(shard, outcome.text);
+  return `appended ${commit} to ${path.basename(shard)}.`;
+}
+
 function run(argv: readonly string[]): number {
   const values = parseScriptArgs(argv, USAGE, {
     snapshot: { type: 'string', default: '.tmp/repo-health.json' },
     'history-dir': { type: 'string' },
   });
-  if (typeof values['history-dir'] !== 'string') throw new Error('--history-dir is required');
+  const historyDir = values['history-dir'];
+  if (typeof historyDir !== 'string') throw new Error('--history-dir is required');
 
   const snapshot = JSON.parse(
     fs.readFileSync(path.resolve(values.snapshot ?? ''), 'utf8'),
   ) as RepoHealthSnapshot;
-  const shard = path.join(
-    path.resolve(values['history-dir']),
-    HISTORY_DIR,
-    historyShardName(snapshot.provenance.generatedAt),
-  );
-  fs.mkdirSync(path.dirname(shard), { recursive: true });
-  const existing = fs.existsSync(shard) ? fs.readFileSync(shard, 'utf8') : '';
-  const outcome = appendEntry(existing, snapshot);
-  if (!outcome.appended) {
-    process.stdout.write(
-      `repo-health:history: ${snapshot.provenance.commit.slice(0, 12)} is already in ${path.basename(shard)}; nothing to do.\n`,
-    );
-    return 0;
-  }
-  fs.writeFileSync(shard, outcome.text);
-  process.stdout.write(
-    `repo-health:history: appended ${snapshot.provenance.commit.slice(0, 12)} to ${path.basename(shard)}.\n`,
-  );
+  process.stdout.write(`repo-health:history: ${appendSnapshot(historyDir, snapshot)}\n`);
   return 0;
 }
 

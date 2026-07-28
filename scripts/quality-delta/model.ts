@@ -27,7 +27,7 @@ import {
   type MetricSpec,
 } from './thresholds.ts';
 
-export const COMMENT_HEADING = 'Quality delta';
+const COMMENT_HEADING = 'Quality delta';
 export const NO_DELTAS_LINE = 'No notable quality deltas.';
 
 export type QualityDeltaRow = {
