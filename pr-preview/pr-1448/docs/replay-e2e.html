@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1448/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1448/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1448/static/js/56.6e0af2a80d.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1448/static/js/index.0ab6b4a250.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1448/static/js/index.ca0ed4e2fa.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -65,6 +65,7 @@
 <li>Runtime: iOS and Android only; <code>launchApp.clearState</code> supports Android and iOS simulators, launch arguments are Apple-only, and standalone device utility/state commands are unsupported.</li>
 <li>Expressions: <code>when.true</code> supports boolean literals and <code>maestro.platform</code> comparisons; <code>repeat.while</code>, <code>evalScript</code>, and broader JavaScript expressions are unsupported.</li>
 <li>Environment: flow <code>env</code> is the default, <code>AD_VAR_*</code> overrides it, and CLI <code>-e KEY=VALUE</code> wins over both.</li>
+<li>Failure diagnostics: resolved targets and <code>runFlow</code> paths are rendered, while <code>inputText</code> payloads remain hidden; do not place secrets in diagnostic identifiers.</li>
 <li>Trust: <code>runScript</code> executes trusted scripts, may make <code>http.post</code> network requests, and is not a security sandbox; output keys cannot contain a dot.</li>
 <li>Errors and tracking: unsupported commands and fields fail with source context when available; open a focused issue only when implementation work is planned.</li>
 </ul>
