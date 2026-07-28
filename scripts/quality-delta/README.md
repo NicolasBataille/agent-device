@@ -83,8 +83,10 @@ git fetch --depth 1 origin +refs/heads/metrics/repo-health:refs/remotes/origin/m
 git show origin/metrics/repo-health:history/2026-07.jsonl | grep "$(git rev-parse HEAD)" | jq .metrics
 ```
 
-A PR whose exact base sha is not in the store yet falls back to the newest entry (a near baseline
-states a real delta; no baseline states nothing), and the job summary records which was used.
+A PR whose exact base sha is not in the store yet falls back to the newest entry — a near baseline
+states a real delta; no baseline states nothing — but it is **labelled**: the comment heading reads
+`vs nearest main@<sha> (PR base not in history yet)` and the job summary says deltas may include
+main-side changes the PR did not make. Only an exact base-sha hit renders as a plain `vs main@<sha>`.
 
 ### Serializing concurrent writes
 
@@ -101,12 +103,32 @@ Two merges landing seconds apart must not lose an entry, so the history job uses
 | Where | What it does |
 | --- | --- |
 | `.github/workflows/repo-health-history.yml` | push-to-main: build → `pnpm size:markdown` → snapshot → append to `metrics/repo-health`. Main only; not on the PR gate. |
-| `.github/workflows/ci.yml` (Coverage job) | PR: reuses the coverage run's lcov numbers and slow-test report, pulls the Size workflow's `size-report-json` artifact for the same head sha, snapshots, renders, and posts the sticky comment. |
-| `.github/workflows/size.yml` | still measures base vs head into the job summary, and now publishes `size-report-json` instead of posting its own comment. |
+| `.github/workflows/ci.yml` (Coverage job) | PR: writes the changed-line coverage JSON and slow-test report and uploads them as `quality-delta-inputs`. Does not render or comment. |
+| `.github/workflows/size.yml` | still measures base vs head into the job summary, and publishes `size-report-json` instead of posting its own comment. |
+| `.github/workflows/quality-delta.yml` | `workflow_run` on **CI and Size**: renders and posts the one sticky comment, after both producers finished. |
 
-The comment reuses `scripts/size-report.mjs --post-comment` and its `COMMENT_MARKER` verbatim, so a
-PR keeps exactly one marker-tracked comment that is updated in place. `run.test.ts` fails if the
-marker in `run.ts` and the one in `size-report.mjs` ever drift apart.
+### Why rendering is its own workflow
+
+The rows come from two workflows that run **concurrently** on the same head sha. Rendering inside
+either one is a race whose loser is permanent: the comment is written once, so a size report that
+lands a minute later never reaches it. So the render runs on `workflow_run` for both producers and
+[`producers.ts`](./producers.ts) decides readiness — the **last** producer to complete renders, and
+earlier firings exit cleanly because the later completion fires the trigger again. A re-run of one
+producer supersedes its earlier run. `producers.test.ts` owns that policy, including the assertion
+that no other workflow contains `--post-comment`.
+
+Fork PRs are skipped there deliberately: `workflow_run` carries a **write token in the base repo**,
+so checking out and installing fork code in it would be a pwn-request. Fork PRs keep the producers'
+job summaries, which is the documented degradation.
+
+### One comment, not one bot per metric
+
+The comment reuses `scripts/size-report.mjs --post-comment` and its marker machinery, so a PR keeps
+exactly one marker-tracked comment updated in place — size is now one row family inside it, which is
+why the marker is `<!-- agent-device-quality-delta -->` rather than the size-specific one it grew out
+of. The old marker stays in `LEGACY_COMMENT_MARKERS` so comments posted before the rename are updated
+instead of duplicated. `run.test.ts` fails if the marker in `run.ts` and the ones in
+`size-report.mjs` drift apart.
 
 ## Schema migrations
 

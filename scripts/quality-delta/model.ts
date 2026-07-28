@@ -15,6 +15,10 @@
 //     source file is newer than the artifact): the row is kept but marked, never silently paired
 //     with the head commit.
 //
+// And one label: a baseline that is NOT the PR's own base commit (the history has no entry for it
+// yet) renders as the nearest stored main snapshot, because such a delta can include main-side
+// movement the PR did not cause.
+//
 // All I/O — reading files, resolving links, posting the comment — belongs to run.ts.
 
 import type { RepoHealthSnapshot } from '../repo-health/model.ts';
@@ -50,7 +54,7 @@ export type QualityDeltaRow = {
 export type QualityDeltaReport = {
   rows: readonly QualityDeltaRow[];
   head: { commit: string; schemaVersion: number };
-  base: { commit: string; schemaVersion: number } | null;
+  base: { commit: string; schemaVersion: number; exact: boolean } | null;
   /** Baseline and head disagree on schemaVersion, so baseline-derived rows are refused. */
   schemaMismatch: { base: number; head: number } | null;
   /** Quiet degradations (missing inputs, absent baseline). Job summary only. */
@@ -131,6 +135,12 @@ function missingInputNotes(sources: DeltaSources): string[] {
       'No main-branch baseline for this PR yet — baseline-derived rows are omitted. ' +
         'The history job appends one snapshot per push to main (see scripts/quality-delta/README.md).',
     );
+  } else if (!sources.baseExact) {
+    notes.push(
+      "The history has no entry for this PR's base commit yet, so the baseline is the nearest " +
+        `stored main snapshot (\`${shortSha(sources.base.provenance.commit)}\`). Deltas may include ` +
+        'main-side changes this PR did not make.',
+    );
   }
   if (sources.head.metrics.size.available !== true) {
     notes.push(
@@ -167,7 +177,11 @@ export function computeQualityDelta(sources: DeltaSources): QualityDeltaReport {
     base:
       sources.base === null
         ? null
-        : { commit: sources.base.provenance.commit, schemaVersion: sources.base.schemaVersion },
+        : {
+            commit: sources.base.provenance.commit,
+            schemaVersion: sources.base.schemaVersion,
+            exact: sources.baseExact,
+          },
     schemaMismatch,
     notes: schemaMismatch === null ? missingInputNotes(sources) : missingInputNotes(comparable),
   };
@@ -201,9 +215,13 @@ function shortSha(commit: string): string {
 }
 
 function headingLine(report: QualityDeltaReport): string {
-  const against =
-    report.base === null ? 'no main baseline' : `main@\`${shortSha(report.base.commit)}\``;
-  return `### ${COMMENT_HEADING} vs ${against}`;
+  if (report.base === null) return `### ${COMMENT_HEADING} vs no main baseline`;
+  const sha = `main@\`${shortSha(report.base.commit)}\``;
+  // An inexact baseline is labelled in the heading, not buried in the job summary: the reader is
+  // about to attribute these numbers to the PR, and part of them may belong to main.
+  return report.base.exact
+    ? `### ${COMMENT_HEADING} vs ${sha}`
+    : `### ${COMMENT_HEADING} vs nearest ${sha} (PR base not in history yet)`;
 }
 
 function summaryLink(summaryUrl: string | null): string {

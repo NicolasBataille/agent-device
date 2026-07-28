@@ -62,6 +62,7 @@ export default defineConfig({
             'scripts/quality-delta/model.test.ts',
             'scripts/quality-delta/history.test.ts',
             'scripts/quality-delta/thresholds.test.ts',
+            'scripts/quality-delta/producers.test.ts',
             // Parses CI configuration only, so this action guard needs no device or subprocess lane.
             'test/ci/upload-agent-device-artifacts.test.ts',
             'test/skillgym/suites/local-cli-help-policy.test.ts',

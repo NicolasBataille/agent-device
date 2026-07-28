@@ -14,11 +14,12 @@ import { STICKY_COMMENT_MARKER } from './run.ts';
 function runScript(
   script: string,
   args: readonly string[],
+  env: Record<string, string> = {},
 ): { status: number | null; stdout: string; stderr: string } {
   const result = spawnSync(
     process.execPath,
     ['--experimental-strip-types', `scripts/quality-delta/${script}`, ...args],
-    { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: '' } },
+    { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: '', ...env } },
   );
   return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
@@ -38,6 +39,8 @@ test('the sticky-comment marker stays the one scripts/size-report.mjs posts', ()
   // second comment per PR instead of updating one in place.
   const sizeReport = readFileSync('scripts/size-report.mjs', 'utf8');
   expect(sizeReport).toContain(`const COMMENT_MARKER = '${STICKY_COMMENT_MARKER}'`);
+  // The pre-#1424 marker stays recognized, or PRs that already carry that comment get a second one.
+  expect(sizeReport).toContain("LEGACY_COMMENT_MARKERS = ['<!-- agent-device-size-report -->']");
 });
 
 test('the CLI writes a marker-prefixed comment and prints the full summary', () => {
@@ -113,6 +116,20 @@ test('the CLI resolves its baseline out of the JSONL history by base sha', () =>
   expect(status, stdout).toBe(0);
   expect(stdout).toContain(`baseline \`${baseSha.slice(0, 7)}\``);
   expect(stdout).toContain('R6 type inversions');
+
+  // A base sha the history has not stored yet falls back to the newest entry — allowed, but it must
+  // say so, or main-side movement since the base reads as this PR's doing.
+  const fallback = runScript('run.ts', [
+    '--head',
+    head,
+    '--history-dir',
+    historyDir,
+    '--base-sha',
+    'f'.repeat(40),
+  ]);
+  expect(fallback.status, fallback.stdout).toBe(0);
+  expect(fallback.stdout).toContain('nearest');
+  expect(fallback.stdout).toContain('main-side changes this PR did not make');
 });
 
 test('a missing head snapshot fails loudly, missing optional inputs do not', () => {
@@ -125,6 +142,27 @@ test('a missing head snapshot fails loudly, missing optional inputs do not', () 
   const degraded = runScript('run.ts', ['--head', head]);
   expect(degraded.status, degraded.stderr).toBe(0);
   expect(degraded.stdout).toContain('no main baseline');
+});
+
+test('the producer gate reports readiness and run ids through $GITHUB_OUTPUT', () => {
+  const dir = workdir();
+  const headSha = 'c'.repeat(40);
+  const runs = writeJson(dir, 'runs.json', {
+    workflow_runs: [
+      { id: 11, name: 'CI', head_sha: headSha, status: 'completed' },
+      { id: 22, name: 'Size', head_sha: headSha, status: 'in_progress' },
+    ],
+  });
+  const output = join(dir, 'github-output');
+  writeFileSync(output, '');
+
+  const waiting = runScript('producers-run.ts', ['--runs', runs, '--head-sha', headSha], {
+    GITHUB_OUTPUT: output,
+  });
+  // Not ready is a normal outcome: Size's completion fires the workflow again.
+  expect(waiting.status, waiting.stderr).toBe(0);
+  expect(readFileSync(output, 'utf8')).toContain('ready=false');
+  expect(readFileSync(output, 'utf8')).toContain('size_run_id=22');
 });
 
 test('appending to the history is idempotent per commit', () => {

@@ -9,6 +9,7 @@ function sources(overrides: Partial<DeltaSources> = {}): DeltaSources {
   return {
     head: snapshotFixture({ commit: 'b'.repeat(40) }),
     base: snapshotFixture(),
+    baseExact: true,
     changedCoverage: null,
     slowTest: null,
     ...overrides,
@@ -91,8 +92,24 @@ test('differing schemaVersions are refused instead of diffed, PR-local rows surv
   expect(comment).toContain('Changed-line coverage');
 });
 
+test('a baseline that is not the PR base is labelled as the nearest stored snapshot', () => {
+  const head = snapshotFixture({ commit: 'b'.repeat(40), typeInversionTotal: 20 });
+  const report = computeQualityDelta(sources({ head, baseExact: false }));
+  const comment = renderComment(report, CONTEXT);
+  // Otherwise main-side movement since the PR's base gets attributed to the PR.
+  expect(comment).toContain('vs nearest main@`aaaaaaa` (PR base not in history yet)');
+  expect(report.base?.exact).toBe(false);
+  expect(renderJobSummary(report, CONTEXT)).toContain(
+    'Deltas may include main-side changes this PR did not make.',
+  );
+
+  const exact = renderComment(computeQualityDelta(sources({ head })), CONTEXT);
+  expect(exact).toContain('vs main@`aaaaaaa`');
+  expect(exact).not.toContain('nearest');
+});
+
 test('without a baseline the comment says so in one line and notes it in the summary', () => {
-  const report = computeQualityDelta(sources({ base: null }));
+  const report = computeQualityDelta(sources({ base: null, baseExact: false }));
   const comment = renderComment(report, CONTEXT);
   expect(comment.trim().split('\n')).toHaveLength(1);
   expect(comment).toContain('no main baseline');

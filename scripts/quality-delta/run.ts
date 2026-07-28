@@ -19,7 +19,7 @@ import { runAsMain } from '../lib/run-as-main.ts';
 import type { ChangedCoverageResult } from '../coverage-changed/model.ts';
 import type { RepoHealthSnapshot } from '../repo-health/model.ts';
 import type { SlowTestReport } from '../vitest-slow-test-budgets.ts';
-import { findBaseline, HISTORY_DIR, parseHistory } from './history.ts';
+import { findBaseline, HISTORY_DIR, parseHistory, type BaselineLookup } from './history.ts';
 import { computeQualityDelta, renderComment, renderJobSummary } from './model.ts';
 
 const USAGE = `Usage: pnpm quality-delta [options]
@@ -35,11 +35,11 @@ Options:
 `;
 
 /**
- * The sticky-comment marker owned by scripts/size-report.mjs. The comment this command renders IS
- * that comment, evolved: same marker, same update-in-place machinery, so a PR keeps exactly one.
- * scripts/quality-delta/run.test.ts fails if the two ever drift apart.
+ * The sticky-comment marker owned by scripts/size-report.mjs, whose `--post-comment` machinery
+ * posts this body and updates it in place. One marker, one comment per PR, no second bot — size is
+ * now one row family inside it. scripts/quality-delta/run.test.ts fails if the two drift apart.
  */
-export const STICKY_COMMENT_MARKER = '<!-- agent-device-size-report -->';
+export const STICKY_COMMENT_MARKER = '<!-- agent-device-quality-delta -->';
 
 function readJsonIfExists<T>(filePath: string | undefined): T | null {
   if (filePath === undefined || !fs.existsSync(filePath)) return null;
@@ -57,17 +57,22 @@ function shardPaths(historyDir: string): string[] {
     .map((name) => path.join(dir, name));
 }
 
+/**
+ * The baseline and whether it is the PR's own base commit. An inexact hit is kept (a near baseline
+ * states a real delta) but reported as such, so the comment can say the numbers may include
+ * main-side movement instead of attributing all of it to the PR.
+ */
 function readBaselineFromHistory(
   historyDir: string,
   baseSha: string | null,
-): RepoHealthSnapshot | null {
-  let newest: RepoHealthSnapshot | null = null;
+): BaselineLookup | null {
+  let newest: BaselineLookup | null = null;
   for (const shard of shardPaths(historyDir)) {
     const { entries } = parseHistory(fs.readFileSync(shard, 'utf8'));
     const found = findBaseline(entries, baseSha);
     if (found === null) continue;
-    if (found.exact) return found.snapshot;
-    newest ??= found.snapshot;
+    if (found.exact) return found;
+    newest ??= found;
   }
   return newest;
 }
@@ -88,6 +93,26 @@ function writeFile(filePath: string, contents: string): void {
   fs.writeFileSync(resolved, contents);
 }
 
+/** The baseline to diff against: an explicitly passed snapshot, or the history's best hit. */
+function resolveBaseline(
+  baselinePath: string | undefined,
+  historyDir: string | undefined,
+  baseSha: string | null,
+): BaselineLookup | null {
+  // An explicitly passed baseline is the caller's assertion that it IS the base.
+  const explicit = readJsonIfExists<RepoHealthSnapshot>(baselinePath);
+  if (explicit !== null) return { snapshot: explicit, exact: true };
+  if (historyDir === undefined) return null;
+  return readBaselineFromHistory(historyDir, baseSha);
+}
+
+/** stdout always, the job summary when GitHub gave us one: it is the comment's overflow surface. */
+function emitSummary(summary: string): void {
+  process.stdout.write(summary);
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath) fs.appendFileSync(summaryPath, summary);
+}
+
 function run(argv: readonly string[]): number {
   const values = parseScriptArgs(argv, USAGE, {
     head: { type: 'string', default: '.tmp/repo-health.json' },
@@ -105,16 +130,16 @@ function run(argv: readonly string[]): number {
       `no repo-health snapshot at ${values.head}. Run \`pnpm repo-health --out\` first.`,
     );
   }
-  const baseSha = values['base-sha'] ?? process.env.GITHUB_BASE_SHA ?? null;
-  const base =
-    readJsonIfExists<RepoHealthSnapshot>(values.baseline) ??
-    (values['history-dir'] === undefined
-      ? null
-      : readBaselineFromHistory(values['history-dir'], baseSha));
+  const lookup = resolveBaseline(
+    values.baseline,
+    values['history-dir'],
+    values['base-sha'] ?? process.env.GITHUB_BASE_SHA ?? null,
+  );
 
   const report = computeQualityDelta({
     head,
-    base,
+    base: lookup?.snapshot ?? null,
+    baseExact: lookup?.exact ?? false,
     changedCoverage: readJsonIfExists<ChangedCoverageResult>(values['changed-coverage']),
     slowTest: readJsonIfExists<SlowTestReport>(values['slow-test']),
   });
@@ -123,10 +148,7 @@ function run(argv: readonly string[]): number {
   const comment = `${STICKY_COMMENT_MARKER}\n${renderComment(report, context)}`;
   if (typeof values.markdown === 'string') writeFile(values.markdown, comment);
 
-  const summary = renderJobSummary(report, context);
-  process.stdout.write(summary);
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryPath) fs.appendFileSync(summaryPath, summary);
+  emitSummary(renderJobSummary(report, context));
   return 0;
 }
 

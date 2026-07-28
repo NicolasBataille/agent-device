@@ -5,7 +5,12 @@ import { execFileSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { gzipSync } from 'node:zlib';
 
-const COMMENT_MARKER = '<!-- agent-device-size-report -->';
+// One sticky comment per PR for all repo-quality reporting (#1424): this started as the size
+// report, which is now one section of the quality-delta comment, so the marker is deliberately not
+// size-specific. The legacy marker stays recognized so comments posted before the rename are
+// updated in place instead of being duplicated by a second bot comment.
+const COMMENT_MARKER = '<!-- agent-device-quality-delta -->';
+const LEGACY_COMMENT_MARKERS = ['<!-- agent-device-size-report -->'];
 const VALUE_ARGS = new Map([
   ['--cwd', 'cwd'],
   ['--json', 'json'],
@@ -366,7 +371,10 @@ async function postGitHubComment(markdownPath, explicitPrNumber) {
   const body = fs.readFileSync(markdownPath, 'utf8');
   const commentsUrl = buildCommentsUrl(config.repository, config.prNumber);
   const comments = await listGitHubComments(commentsUrl, config.headers);
-  const existing = comments.find((comment) => comment.body?.includes(COMMENT_MARKER));
+  const markers = [COMMENT_MARKER, ...LEGACY_COMMENT_MARKERS];
+  const existing = comments.find((comment) =>
+    markers.some((marker) => comment.body?.includes(marker)),
+  );
   await writeGitHubComment(commentsUrl, config.headers, body, existing?.url);
 }
 

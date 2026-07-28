@@ -32,6 +32,12 @@ export type DeltaSources = {
   head: RepoHealthSnapshot;
   /** The main-branch baseline for `head`, read from the JSONL history. */
   base: RepoHealthSnapshot | null;
+  /**
+   * Whether `base` is the PR's own base commit. False means the history had no entry for it and
+   * this is the nearest stored main snapshot, so the delta may include main-side changes the PR
+   * did not cause — a difference the comment states rather than hides.
+   */
+  baseExact: boolean;
   /** This PR's changed-line coverage report (#1418), which has no main baseline by construction. */
   changedCoverage: ChangedCoverageResult | null;
   /** Slow-test offenders recorded by the vitest reporter during the coverage run. */

@@ -1,0 +1,140 @@
+name: Quality Delta
+
+# The single sticky PR comment (#1424). It renders from two workflows that run CONCURRENTLY on the
+# same head sha — CI (changed-line coverage, slow-test breaches) and Size (the size report) — so it
+# runs on their completion instead of inside either one: whichever finishes LAST triggers the render,
+# and earlier firings exit at the readiness gate below. Rendering inside CI would lose the race
+# whenever Size finished second, permanently omitting size rows from that head's comment.
+#
+# Fork PRs are skipped deliberately, twice over: `workflow_run` runs with a write token in the BASE
+# repo, so checking out and installing fork code here would be a pwn-request. Fork PRs therefore get
+# the producers' own job summaries, which is the documented degradation (never a failure).
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Size
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+# One render per head sha, and never two comment writes at once. Superseding is safe and wanted: a
+# newer run describes a newer head.
+concurrency:
+  group: quality-delta-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    name: Quality Delta
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # The base repo's tree at the producers' head sha. Safe because the fork guard above means this
+      # sha is always a branch in this repository.
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      # The race policy, as a decision the unit tests own: scripts/quality-delta/producers.ts.
+      - name: Check that every producer finished
+        id: producers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&per_page=100" > .tmp/runs.json
+          node --experimental-strip-types scripts/quality-delta/producers-run.ts \
+            --runs .tmp/runs.json --head-sha "${HEAD_SHA}"
+
+      - name: Setup toolchain
+        if: steps.producers.outputs.ready == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      # Both downloads are best effort: a producer that failed before uploading costs the rows it
+      # owned plus a job-summary note, never the comment.
+      - name: Download producer artifacts
+        if: steps.producers.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN_ID: ${{ steps.producers.outputs.ci_run_id }}
+          SIZE_RUN_ID: ${{ steps.producers.outputs.size_run_id }}
+        run: |
+          set -uo pipefail
+          download() {
+            local run_id="$1" name="$2"
+            local id
+            id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts" \
+              --jq "[.artifacts[] | select(.name == \"${name}\" and .expired == false) | .id] | first")
+            if [ -z "$id" ] || [ "$id" = "null" ]; then
+              echo "run ${run_id} published no ${name}; its rows will be omitted."
+              return 0
+            fi
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > ".tmp/${name}.zip"
+            unzip -o -q -d .tmp ".tmp/${name}.zip"
+          }
+          mkdir -p .tmp
+          download "${SIZE_RUN_ID}" size-report-json
+          download "${CI_RUN_ID}" quality-delta-inputs
+
+      # Read-only extraction of the history ref the Repo Health History workflow writes on main — no
+      # checkout, no write, absent until that workflow has run once.
+      - name: Fetch the main-branch metric history
+        if: steps.producers.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p .tmp/history-ref
+          if git fetch --quiet --depth 1 origin +refs/heads/metrics/repo-health:refs/remotes/origin/metrics/repo-health; then
+            git archive origin/metrics/repo-health | tar -x -C .tmp/history-ref
+          else
+            echo "No metrics/repo-health ref yet; the comment will report no baseline."
+          fi
+
+      - name: Resolve the pull request and its base
+        if: steps.producers.outputs.ready == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" > .tmp/pulls.json
+          number=$(jq -r '[.[] | select(.state == "open") | .number] | first // empty' .tmp/pulls.json)
+          base=$(jq -r '[.[] | select(.state == "open") | .base.sha] | first // empty' .tmp/pulls.json)
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Render quality delta
+        if: steps.producers.outputs.ready == 'true' && steps.pr.outputs.number != ''
+        continue-on-error: true
+        run: |
+          pnpm repo-health --out .tmp/repo-health.json
+          pnpm quality-delta \
+            --head .tmp/repo-health.json \
+            --history-dir .tmp/history-ref \
+            --base-sha "${{ steps.pr.outputs.base_sha }}" \
+            --changed-coverage .tmp/changed-coverage.json \
+            --slow-test .tmp/slow-tests.json \
+            --markdown .tmp/quality-delta.md
+
+      # ONE comment per PR: the marker machinery in scripts/size-report.mjs updates it in place, and
+      # no other workflow posts a comment.
+      - name: Comment on the PR
+        if: steps.producers.outputs.ready == 'true' && steps.pr.outputs.number != ''
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: node scripts/size-report.mjs --post-comment .tmp/quality-delta.md
