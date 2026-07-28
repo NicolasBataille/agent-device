@@ -38,11 +38,13 @@ export function snapshotFixture(overrides: SnapshotOverrides = {}): RepoHealthSn
         coverageSummary: {
           path: 'coverage/coverage-summary.json',
           sha256: 'cccccccccccc',
+          producerInputs: ['src', 'test', 'vitest.config.ts'],
           stale: false,
         },
         sizeReport: {
           path: '.tmp/size-report.json',
           sha256: 'ssssssssssss',
+          producerInputs: ['src', 'package.json'],
           stale: overrides.sizeStale ?? false,
         },
       },
