@@ -554,10 +554,12 @@ Public subpath API exposed for Node consumers:
   - `buildBundleUrl(baseUrl, platform)`
   - `normalizeBaseUrl(baseUrl)`
   - `resolveRuntimeTransport(runtime)`
+  - `prepareMetroRuntime(options?)`, `reloadMetro(options?)`, `stopMetroTunnel(options)`
   - types: `MetroBridgeDescriptor`, `MetroTunnelRequestMessage`, `MetroTunnelResponseMessage`
 - `agent-device/batch`
   - `runBatch(req, sessionName, invoke)`
 - `agent-device/remote-config`
+  - `resolveRemoteConfigProfile(options)`
   - types: `RemoteConfigProfile`
 - `agent-device/contracts`
   - `centerOfRect(rect)`
@@ -593,8 +595,11 @@ Public subpath API exposed for Node consumers:
   - `listAndroidAppsWithAdb(executor)`
   - `getAndroidAppStateWithAdb(executor)`
   - types: `AndroidAdbExecutor`, `AndroidAdbExecutorOptions`, `AndroidPortReverseEndpoint`
+- `agent-device/limrun`
+  - `new LimrunRuntime(options)`
+  - types: `LimrunRuntimeOptions`
 
-The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `artifacts`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/cloud-webdriver`, `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are not published.
+The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `limrun`, `artifacts`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/cloud-webdriver`, `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are not published.
 
 ## Basic usage
 
@@ -653,8 +658,10 @@ const result = await client.sessions.artifacts({
   providerSessionId: 'arn:aws:devicefarm:us-west-2:123:session/project/session/00000',
 });
 
-for (const artifact of result.cloudArtifacts) {
-  console.log(artifact.kind, artifact.name, artifact.url);
+if ('cloudArtifacts' in result) {
+  for (const artifact of result.cloudArtifacts) {
+    console.log(artifact.kind, artifact.name, artifact.url);
+  }
 }
 ```
 
@@ -667,13 +674,11 @@ import { createAgentDeviceClient } from 'agent-device';
 
 const client = createAgentDeviceClient({
   leaseProvider: 'browserstack',
-  platform: 'android',
-  device: 'Google Pixel 8',
   providerOsVersion: '14.0',
   providerApp: 'bs://app-id',
 });
 
-await client.apps.open({ app: 'com.example.app' });
+await client.apps.open({ app: 'com.example.app', platform: 'android', device: 'Google Pixel 8' });
 await client.capture.snapshot({ interactiveOnly: true });
 const closed = await client.sessions.close();
 ```
@@ -726,9 +731,11 @@ idempotent for the same owner and rejects conflicting owners for the same local 
 
 ```ts
 import { getAndroidAppStateWithAdb, listAndroidAppsWithAdb } from 'agent-device/android-adb';
+import type { AndroidAdbExecutorOptions } from 'agent-device/android-adb';
 
 const provider = {
-  exec: async (args, options) => await runAdbThroughRemoteTunnel(args, options),
+  exec: async (args: string[], options?: AndroidAdbExecutorOptions) =>
+    await runAdbThroughRemoteTunnel(args, options),
 };
 
 const apps = await listAndroidAppsWithAdb(provider.exec); // user-installed apps by default
@@ -872,6 +879,8 @@ async function handleBatch(req: BatchRequest): Promise<DaemonResponse> {
 ## Android `installFromSource()`
 
 ```ts
+import { createAgentDeviceClient } from 'agent-device';
+
 const androidClient = createAgentDeviceClient({ session: 'qa-android' });
 
 const installed = await androidClient.apps.installFromSource({
@@ -933,7 +942,7 @@ Direct Android `.apk` and `.aab` URL sources can still resolve package identity 
 ## Remote Metro helpers
 
 ```ts
-import { prepareRemoteMetro, reloadRemoteMetro, stopMetroTunnel } from 'agent-device/metro';
+import { prepareMetroRuntime, reloadMetro, stopMetroTunnel } from 'agent-device/metro';
 import { resolveRemoteConfigProfile } from 'agent-device/remote-config';
 
 const remoteConfig = resolveRemoteConfigProfile({
@@ -941,7 +950,7 @@ const remoteConfig = resolveRemoteConfigProfile({
   cwd: process.cwd(),
 });
 
-const prepared = await prepareRemoteMetro({
+const prepared = await prepareMetroRuntime({
   projectRoot: remoteConfig.profile.metroProjectRoot!,
   kind: remoteConfig.profile.metroKind ?? 'auto',
   proxyBaseUrl: remoteConfig.profile.metroProxyBaseUrl,
@@ -951,12 +960,12 @@ const prepared = await prepareRemoteMetro({
     runId: remoteConfig.profile.runId!,
     leaseId: remoteConfig.profile.leaseId!,
   },
-  profileKey: remoteConfig.resolvedPath,
+  companionProfileKey: remoteConfig.resolvedPath,
 });
 
 console.log(prepared.iosRuntime, prepared.androidRuntime);
 
-await reloadRemoteMetro({
+await reloadMetro({
   runtime: prepared.iosRuntime,
 });
 
@@ -966,7 +975,7 @@ await stopMetroTunnel({
 });
 ```
 
-Use `agent-device/remote-config` for profile loading and path resolution, `agent-device/metro` for Metro preparation, reload, and tunnel lifecycle, and `agent-device/contracts` when a server consumer needs daemon request or runtime contract types. For bridged remote Metro, `proxyBaseUrl` is the bridge origin and `publicBaseUrl` is optional; the bridge descriptor supplies cloud iOS wildcard HTTPS hints and Android runtime-route hints. `reloadRemoteMetro()` calls Metro's `/reload` endpoint, matching the terminal `r` reload path for connected React Native apps.
+Use `agent-device/remote-config` for profile loading and path resolution, `agent-device/metro` for Metro preparation, reload, and tunnel lifecycle, and `agent-device/contracts` when a server consumer needs daemon request or runtime contract types. For bridged remote Metro, `proxyBaseUrl` is the bridge origin and `publicBaseUrl` is optional; the bridge descriptor supplies cloud iOS wildcard HTTPS hints and Android runtime-route hints. `reloadMetro()` calls Metro's `/reload` endpoint, matching the terminal `r` reload path for connected React Native apps.
 
 ## Selector helpers
 
@@ -2655,7 +2664,24 @@ const client = createAgentDeviceClient({
 });
 ```
 
-The JavaScript client does not publish provider SDK subpaths. Use the normal typed client methods; provider implementation details stay internal. Limrun uses the same client shape with `leaseProvider: 'limrun'`, `platform: 'android'` or `platform: 'ios'`, and `LIMRUN_API_KEY` in the daemon environment.
+Use the normal typed client methods when agent-device owns the daemon. Limrun uses the same client
+shape with `leaseProvider: 'limrun'`, `platform: 'android'` or `platform: 'ios'`, and
+`LIMRUN_API_KEY` in the daemon environment.
+
+The first-party agent-device-cloud bridge hosts the provider runtime itself and can reuse
+agent-device's Limrun implementation:
+
+```ts
+import { LimrunRuntime } from 'agent-device/limrun';
+
+const apiKey = process.env.LIMRUN_API_KEY;
+if (!apiKey) throw new Error('LIMRUN_API_KEY is required');
+
+const runtime = new LimrunRuntime({
+  apiKey,
+  region: process.env.LIMRUN_REGION,
+});
+```
 
 ## MCP Experience
 
@@ -3452,6 +3478,7 @@ Boundaries:
 - Runtime: iOS and Android only; `launchApp.clearState` supports Android and iOS simulators, launch arguments are Apple-only, and standalone device utility/state commands are unsupported.
 - Expressions: `when.true` supports boolean literals and `maestro.platform` comparisons; `repeat.while`, `evalScript`, and broader JavaScript expressions are unsupported.
 - Environment: flow `env` is the default, `AD_VAR_*` overrides it, and CLI `-e KEY=VALUE` wins over both.
+- Failure diagnostics: resolved targets and `runFlow` paths are rendered, while `inputText` payloads remain hidden; do not place secrets in diagnostic identifiers.
 - Trust: `runScript` executes trusted scripts, may make `http.post` network requests, and is not a security sandbox; output keys cannot contain a dot.
 - Errors and tracking: unsupported commands and fields fail with source context when available; open a focused issue only when implementation work is planned.
 
