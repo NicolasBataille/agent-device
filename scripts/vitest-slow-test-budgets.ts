@@ -13,6 +13,23 @@ export const INTEGRATION_BUDGET_MS = 15_000;
 // budget and 2x budget the gate reports without failing.
 export const ENFORCE_FACTOR = 2;
 
+/** One test over its wall-clock budget, as the reporter classifies it. */
+export type SlowTestOffender = {
+  key: string;
+  durationMs: number;
+  budgetMs: number;
+  /** Past ENFORCE_FACTOR x budget, i.e. this one fails the run rather than only reporting. */
+  enforce: boolean;
+};
+
+/**
+ * The offenders of one run, persisted when SLOW_TEST_REPORT_ENV names a path, so the quality-delta
+ * comment (#1424) can show budget breaches without re-running or scraping the suite's stderr.
+ */
+export type SlowTestReport = { offenders: SlowTestOffender[] };
+
+export const SLOW_TEST_REPORT_ENV = 'AGENT_DEVICE_SLOW_TEST_REPORT';
+
 /** The ratchet as one record, for callers that report it rather than enforce it. */
 export const SLOW_TEST_RATCHET = {
   unitBudgetMs: UNIT_BUDGET_MS,

@@ -21,7 +21,7 @@ import {
   type ChangedCoverageResult,
 } from './model.ts';
 
-const USAGE = 'Usage: pnpm check:coverage-changed [--base <ref>]\n';
+const USAGE = 'Usage: pnpm check:coverage-changed [--base <ref>] [--json <path>]\n';
 const LCOV_PATH = 'coverage/lcov.info';
 
 function fmtPct(pct: number | null): string {
@@ -58,6 +58,8 @@ function render(result: ChangedCoverageResult): string {
 export function run(argv: readonly string[], cwd?: string): number {
   const values = parseScriptArgs(argv, USAGE, {
     base: { type: 'string', default: 'origin/main' },
+    // The quality-delta comment (#1424) reads these numbers rather than scraping the markdown.
+    json: { type: 'string' },
   });
   const base = values.base ?? 'origin/main';
   // The `coverage-waiver` PR label sets this env var in CI (and locally).
@@ -83,6 +85,12 @@ export function run(argv: readonly string[], cwd?: string): number {
       return fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8').split('\n') : null;
     },
   });
+
+  if (typeof values.json === 'string') {
+    const jsonPath = path.resolve(values.json);
+    fs.mkdirSync(path.dirname(jsonPath), { recursive: true });
+    fs.writeFileSync(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
+  }
 
   const report = render(result);
   process.stdout.write(report);

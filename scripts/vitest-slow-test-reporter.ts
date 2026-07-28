@@ -1,8 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Reporter, TestCase, TestModule } from 'vitest/node';
 import {
   ENFORCE_FACTOR,
   INTEGRATION_BUDGET_MS,
+  SLOW_TEST_REPORT_ENV,
   UNIT_BUDGET_MS,
+  type SlowTestOffender,
 } from './vitest-slow-test-budgets.ts';
 
 /**
@@ -14,7 +18,23 @@ import {
  * This reporter fails the run when a unit test exceeds the enforced budget.
  * The budgets themselves live in ./vitest-slow-test-budgets.ts.
  */
-type Offender = { key: string; durationMs: number; budgetMs: number; enforce: boolean };
+type Offender = SlowTestOffender;
+
+/**
+ * Persist the run's offenders when SLOW_TEST_REPORT_ENV names a path, so the quality-delta comment
+ * (#1424) reads budget breaches from data instead of scraping this reporter's stderr. Best-effort:
+ * a report nobody asked for must not fail an otherwise green run.
+ */
+function writeSlowTestReport(offenders: readonly Offender[]): void {
+  const target = process.env[SLOW_TEST_REPORT_ENV];
+  if (!target) return;
+  try {
+    fs.mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
+    fs.writeFileSync(path.resolve(target), `${JSON.stringify({ offenders }, null, 2)}\n`);
+  } catch {
+    // A missing directory or read-only path is not worth failing a green run over.
+  }
+}
 
 function budgetForPath(relativePath: string): number {
   return relativePath.startsWith('src/') ? UNIT_BUDGET_MS : INTEGRATION_BUDGET_MS;
@@ -91,6 +111,7 @@ export default function slowTestGateReporter(): Reporter {
       if (offender) offenders.push(offender);
     },
     onTestRunEnd(): void {
+      writeSlowTestReport(offenders);
       // eslint-disable-next-line no-console
       if (reportSlowTests(offenders, (message) => console.error(message))) {
         process.exitCode = 1;

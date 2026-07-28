@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: size-${{ github.workflow }}-${{ github.ref }}
@@ -80,8 +79,16 @@ jobs:
       - name: Add job summary
         run: cat .tmp/size-report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Comment on PR
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: pnpm size --post-comment .tmp/size-report.md
+      # The size table itself is job-summary output now: the sticky PR comment it used to post is
+      # the quality-delta comment (#1424), rendered from the repo-health snapshot in the CI
+      # workflow's Coverage job under the SAME marker, so a PR still carries exactly one comment.
+      # Size rows reach it through this artifact rather than a second base/head measurement.
+      - name: Upload size report JSON
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: size-report-json
+          path: .tmp/size-report.json
+          # .tmp is a dotted directory, which upload-artifact skips by default.
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error

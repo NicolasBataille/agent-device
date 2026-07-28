@@ -25,6 +25,9 @@ export const SUBPROCESS_STUB_TESTS = [
   // Spawns the `pnpm repo-health` CLI as a subprocess to exercise its arg handling and the JSON
   // it writes over the real tree (#1423).
   'scripts/repo-health/run.test.ts',
+  // Spawns the `pnpm quality-delta` / `pnpm repo-health:history` CLIs to exercise the comment they
+  // write and the JSONL they append (#1424).
+  'scripts/quality-delta/run.test.ts',
 ];
 
 export default defineConfig({
@@ -54,6 +57,11 @@ export default defineConfig({
             // subprocess or device work, so it runs in the fast lane. The CLI's subprocess test
             // lives in the subprocess-stub project.
             'scripts/repo-health/model.test.ts',
+            // Quality-delta comment model (#1424): pure threshold comparison and rendering over
+            // fixture snapshots. Its CLI's subprocess test lives in the subprocess-stub project.
+            'scripts/quality-delta/model.test.ts',
+            'scripts/quality-delta/history.test.ts',
+            'scripts/quality-delta/thresholds.test.ts',
             // Parses CI configuration only, so this action guard needs no device or subprocess lane.
             'test/ci/upload-agent-device-artifacts.test.ts',
             'test/skillgym/suites/local-cli-help-policy.test.ts',

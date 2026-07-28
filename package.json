@@ -133,6 +133,8 @@
     "depgraph": "node --experimental-strip-types scripts/depgraph/build.ts",
     "depgraph:test": "node --experimental-strip-types --test scripts/depgraph/model.test.ts scripts/depgraph/affected.test.ts",
     "repo-health": "node --experimental-strip-types scripts/repo-health/run.ts",
+    "repo-health:history": "node --experimental-strip-types scripts/quality-delta/append-history.ts",
+    "quality-delta": "node --experimental-strip-types scripts/quality-delta/run.ts",
     "check:production-exports": "fallow dead-code --config fallow-production-exports.json --production --unused-exports --fail-on-issues",
     "check:bundle-owner-files": "node --experimental-strip-types scripts/check-bundle-owner-files.ts",
     "check:command-docs": "vitest run --project unit-core src/__tests__/command-doc-coverage.test.ts",

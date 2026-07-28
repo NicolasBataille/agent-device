@@ -240,6 +240,13 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      # The quality-delta comment (#1424) is posted from this job, and reads the Size workflow's
+      # size-report artifact for the same head sha. Fork PRs get a read-only token, so the posting
+      # step is skipped there and the delta degrades to job-summary output.
+      pull-requests: write
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -255,6 +262,9 @@ jobs:
       - name: Run coverage
         env:
           OUTPUT_ECONOMY_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          # The slow-test reporter persists this run's over-budget tests, which become one
+          # quality-delta row instead of a line only visible in this job's stderr.
+          AGENT_DEVICE_SLOW_TEST_REPORT: .tmp/slow-tests.json
         run: pnpm test:coverage
 
       # Reuses the lcov the coverage step just wrote (never runs coverage twice)
@@ -265,7 +275,69 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         env:
           AGENT_DEVICE_COVERAGE_WAIVER: ${{ contains(github.event.pull_request.labels.*.name, 'coverage-waiver') }}
-        run: pnpm check:coverage-changed --base "${{ github.event.pull_request.base.sha }}"
+        run: pnpm check:coverage-changed --base "${{ github.event.pull_request.base.sha }}" --json .tmp/changed-coverage.json
+
+      # --- Quality-delta comment (#1424) ------------------------------------------------------
+      # Non-gating reporting, ~20s total on top of this job: it reuses the lcov-derived numbers
+      # above, the size artifact the Size workflow already produced, and one repo-health snapshot
+      # (~1s, no network). Nothing below can fail the job.
+
+      # Best effort by design: when the Size workflow has not published yet (or is skipped, e.g.
+      # a fork PR), the comment simply carries no size rows and says so in the job summary.
+      - name: Fetch the Size workflow's report for this head sha
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=size-report-json&per_page=100" \
+            --jq "[.artifacts[] | select(.workflow_run.head_sha == \"${HEAD_SHA}\") | .id] | first")
+          if [ -z "$id" ] || [ "$id" = "null" ]; then
+            echo "No size-report artifact for ${HEAD_SHA} yet; size rows will be omitted."
+            exit 0
+          fi
+          mkdir -p .tmp
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > .tmp/size-report.zip
+          unzip -o -q -d .tmp .tmp/size-report.zip
+
+      # Read-only extraction of the history ref written by the Repo Health History workflow — no
+      # checkout, no write, absent until that workflow has run once.
+      - name: Fetch the main-branch metric history
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p .tmp/history-ref
+          if git fetch --quiet --depth 1 origin +refs/heads/metrics/repo-health:refs/remotes/origin/metrics/repo-health; then
+            git archive origin/metrics/repo-health | tar -x -C .tmp/history-ref
+          else
+            echo "No metrics/repo-health ref yet; the comment will report no baseline."
+          fi
+
+      - name: Render quality delta
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          pnpm repo-health --out .tmp/repo-health.json
+          pnpm quality-delta \
+            --head .tmp/repo-health.json \
+            --history-dir .tmp/history-ref \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --changed-coverage .tmp/changed-coverage.json \
+            --slow-test .tmp/slow-tests.json \
+            --markdown .tmp/quality-delta.md
+
+      # One sticky comment per PR, updated in place by the size-report marker machinery. Fork PRs
+      # cannot write comments with their read-only token, so they stop at the job summary above.
+      - name: Comment the quality delta on the PR
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/size-report.mjs --post-comment .tmp/quality-delta.md
 
   typecheck:
     name: Typecheck

@@ -1,0 +1,79 @@
+name: Repo Health History
+
+# Appends one repo-health snapshot (#1423) per push to main to the JSONL metric history the
+# quality-delta PR comment (#1424) reads its baseline from. See scripts/quality-delta/README.md for
+# why the history lives on a dedicated orphan ref instead of an artifact chain or gh-pages.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  # Only to append to the history ref. Nothing here touches the source tree.
+  contents: write
+
+# First half of the serialization contract: two merges landing seconds apart queue instead of
+# racing, and cancel-in-progress is OFF because a cancelled run is a lost history entry. The second
+# half is the compare-and-swap push below, which covers anything that slips past this group.
+concurrency:
+  group: repo-health-history
+  cancel-in-progress: false
+
+jobs:
+  append-snapshot:
+    name: Append snapshot to metric history
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-node-pnpm
+
+      # The snapshot READS .tmp/size-report.json rather than measuring size itself, so main's
+      # entry needs a build first — this is the whole cost of the job (~5 min), and it runs only on
+      # main, never on the PR gate.
+      - name: Measure package size
+        run: |
+          pnpm build
+          pnpm size:markdown
+
+      - name: Collect snapshot
+        run: pnpm repo-health --out .tmp/repo-health.json
+
+      # Compare-and-swap with one retry: clone the history ref's tip, append, push. A push rejected
+      # because another run advanced the ref re-runs the whole function against the new tip.
+      # Appending is keyed by commit sha, so a retry can never double-write an entry.
+      - name: Append to the history ref
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HISTORY_REF: metrics/repo-health
+        run: |
+          set -uo pipefail
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          append_and_push() {
+            rm -rf .tmp/history-ref
+            if git ls-remote --exit-code --heads "$remote" "$HISTORY_REF" >/dev/null 2>&1; then
+              git clone --quiet --depth 1 --single-branch --branch "$HISTORY_REF" "$remote" .tmp/history-ref || return 1
+            else
+              mkdir -p .tmp/history-ref
+              git -C .tmp/history-ref init --quiet --initial-branch "$HISTORY_REF"
+            fi
+            pnpm repo-health:history --snapshot .tmp/repo-health.json --history-dir .tmp/history-ref || return 1
+            git -C .tmp/history-ref add history || return 1
+            if git -C .tmp/history-ref diff --cached --quiet; then
+              echo "History already contains ${GITHUB_SHA}; nothing to push."
+              return 0
+            fi
+            git -C .tmp/history-ref \
+              -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit --quiet -m "repo-health: ${GITHUB_SHA}" || return 1
+            git -C .tmp/history-ref push --quiet "$remote" "HEAD:refs/heads/$HISTORY_REF"
+          }
+          append_and_push || {
+            echo "History ref moved under us; retrying once against the new tip."
+            append_and_push
+          }
