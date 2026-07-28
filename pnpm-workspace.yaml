@@ -1,5 +1,6 @@
 packages:
   - 'website'
+nodeLinker: hoisted
 # Keep non-interactive checks from downloading tooling or reinstalling dependencies implicitly.
 pmOnFail: warn
 verifyDepsBeforeRun: warn
@@ -8,11 +9,13 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@chenglou/freerange@0.0.1'
 # @limrun/api pins undici to an exact vulnerable version (7.24.7) even in its
-# latest release, so a direct bump can't clear the Dependabot alerts. Override
-# the transitive resolution instead; scoped to major 7 so any future undici 8
-# elsewhere in the tree is untouched.
+# latest release. agent-device bundles the resolved Limrun tree so this override
+# reaches npm consumers; an override alone would apply only in this workspace.
+# Keep the override scoped to major 7 so future undici 8 users stay untouched.
 overrides:
   undici@7: '^7.28.0'
   postcss: 8.5.18
   react-router: 7.18.1
   react-router-dom: 7.18.1
+patchedDependencies:
+  '@limrun/api@0.24.5': patches/@limrun__api@0.24.5.patch

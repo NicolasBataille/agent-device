@@ -1,0 +1,53 @@
+diff --git a/instance-client.js b/instance-client.js
+index 9b5f73b1e60b72a95d562a17ec9d2165c01f923c..701dbb9c9450764df33b825aef4371609d440998 100644
+--- a/instance-client.js
++++ b/instance-client.js
+@@ -523,7 +523,7 @@ async function createInstanceClient(options) {
+             });
+             try {
+                 await new Promise((resolve, reject) => {
+-                    (0, node_child_process_1.exec)(`${options.adbPath ?? 'adb'} connect ${tunnel.address.address}:${tunnel.address.port}`, (err) => {
++                    (0, node_child_process_1.execFile)(options.adbPath ?? 'adb', ['connect', `${tunnel.address.address}:${tunnel.address.port}`], (err) => {
+                         if (err)
+                             return reject(err);
+                         resolve();
+diff --git a/instance-client.mjs b/instance-client.mjs
+index 14da077ecc1bb8232dfee06d1616962e5c225971..a73778d6193b34cb15319912675ad7a2a7b0fc29 100644
+--- a/instance-client.mjs
++++ b/instance-client.mjs
+@@ -1,5 +1,5 @@
+ import { WebSocket } from 'ws';
+-import { exec } from 'node:child_process';
++import { execFile } from 'node:child_process';
+ import { downloadFileToLocalPath } from "./internal/download-file.mjs";
+ import { nodeProxyTransport } from "./internal/proxy-transport.mjs";
+ import { startTcpTunnel, isNonRetryableError } from "./tunnel.mjs";
+@@ -519,7 +519,7 @@ export async function createInstanceClient(options) {
+             });
+             try {
+                 await new Promise((resolve, reject) => {
+-                    exec(`${options.adbPath ?? 'adb'} connect ${tunnel.address.address}:${tunnel.address.port}`, (err) => {
++                    execFile(options.adbPath ?? 'adb', ['connect', `${tunnel.address.address}:${tunnel.address.port}`], (err) => {
+                         if (err)
+                             return reject(err);
+                         resolve();
+diff --git a/src/instance-client.ts b/src/instance-client.ts
+index 666f631530b18267f1eda032e206cca4901fd2b8..e40d8b641416bec96c22a183a93c84c98b434d11 100644
+--- a/src/instance-client.ts
++++ b/src/instance-client.ts
+@@ -1,2 +1,2 @@
+ import { WebSocket, Data } from 'ws';
+-import { exec } from 'node:child_process';
++import { execFile } from 'node:child_process';
+@@ -994,8 +994,9 @@ export async function createInstanceClient(options: InstanceClientOptions): Prom
+       });
+       try {
+         await new Promise<void>((resolve, reject) => {
+-          exec(
+-            `${options.adbPath ?? 'adb'} connect ${tunnel.address.address}:${tunnel.address.port}`,
++          execFile(
++            options.adbPath ?? 'adb',
++            ['connect', `${tunnel.address.address}:${tunnel.address.port}`],
+             (err) => {
+               if (err) return reject(err);
+               resolve();

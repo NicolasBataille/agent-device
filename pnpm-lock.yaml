@@ -10,13 +10,16 @@ overrides:
   react-router: 7.18.1
   react-router-dom: 7.18.1
 
+patchedDependencies:
+  '@limrun/api@0.24.5': e79aa299f9e7bfd51c93d462a4f5be21b042ad1968bceec9e6360dffbb9547b7
+
 importers:
 
   .:
     dependencies:
       '@limrun/api':
-        specifier: ^0.24.5
-        version: 0.24.5
+        specifier: 0.24.5
+        version: 0.24.5(patch_hash=e79aa299f9e7bfd51c93d462a4f5be21b042ad1968bceec9e6360dffbb9547b7)
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -3587,7 +3590,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@limrun/api@0.24.5':
+  '@limrun/api@0.24.5(patch_hash=e79aa299f9e7bfd51c93d462a4f5be21b042ad1968bceec9e6360dffbb9547b7)':
     dependencies:
       eventsource-client: 1.2.0
       https-proxy-agent: 7.0.6

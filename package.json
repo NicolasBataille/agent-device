@@ -125,6 +125,8 @@
     "check:affected:test": "node --experimental-strip-types --test scripts/check-affected/model.test.ts scripts/check-affected/run.test.ts",
     "check:coverage-changed": "node --experimental-strip-types scripts/coverage-changed/run.ts",
     "check:coverage-changed:test": "node --experimental-strip-types --test scripts/coverage-changed/model.test.ts scripts/coverage-changed/run.test.ts",
+    "check:dependency-security": "node --experimental-strip-types scripts/security/check-production-dependencies.ts",
+    "check:dependency-security:test": "node --experimental-strip-types --test scripts/security/production-dependency-policy.test.ts",
     "check:layering": "node --experimental-strip-types --test scripts/layering/model.test.ts && node --experimental-strip-types scripts/layering/check.ts",
     "depgraph": "node --experimental-strip-types scripts/depgraph/build.ts",
     "depgraph:test": "node --experimental-strip-types --test scripts/depgraph/model.test.ts",
@@ -137,10 +139,10 @@
     "sync:mcp-metadata": "node scripts/sync-mcp-metadata.mjs",
     "check:mcp-metadata": "node scripts/sync-mcp-metadata.mjs --check",
     "version": "node scripts/sync-mcp-metadata.mjs && git add server.json",
-    "check:tooling": "pnpm lint && pnpm typecheck && pnpm check:layering && pnpm depgraph:test && pnpm check:production-exports && pnpm check:mcp-metadata && pnpm build && pnpm check:bundle-owner-files",
+    "check:tooling": "pnpm lint && pnpm typecheck && pnpm check:dependency-security:test && pnpm check:dependency-security && pnpm check:layering && pnpm depgraph:test && pnpm check:production-exports && pnpm check:mcp-metadata && pnpm build && pnpm check:bundle-owner-files",
     "check:unit": "pnpm test:unit && pnpm test:smoke",
     "check": "pnpm check:tooling && pnpm check:fallow && pnpm check:unit",
-    "prepack": "pnpm check:mcp-metadata && pnpm build:all && pnpm package:apple-runner:npm && pnpm package:android-snapshot-helper:npm && pnpm package:android-ime-helper:npm",
+    "prepack": "pnpm check:dependency-security && pnpm check:mcp-metadata && pnpm build:all && pnpm package:apple-runner:npm && pnpm package:android-snapshot-helper:npm && pnpm package:android-ime-helper:npm",
     "typecheck": "tsc -p tsconfig.json",
     "test-app:install": "pnpm install --dir examples/test-app",
     "test-app:start": "pnpm --dir examples/test-app start",
@@ -234,9 +236,12 @@
     "detox"
   ],
   "dependencies": {
-    "@limrun/api": "^0.24.5",
+    "@limrun/api": "0.24.5",
     "yaml": "^2.9.0"
   },
+  "bundleDependencies": [
+    "@limrun/api"
+  ],
   "devDependencies": {
     "@chenglou/freerange": "^0.0.1",
     "@stryker-mutator/core": "9.6.1",

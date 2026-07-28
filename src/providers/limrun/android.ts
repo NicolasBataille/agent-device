@@ -4,6 +4,7 @@ import {
   createInstanceClient as createAndroidInstanceClient,
   type InstanceClient as LimrunAndroidClient,
 } from '@limrun/api/instance-client';
+import { startTcpTunnel, type Tunnel as LimrunAdbTunnel } from '@limrun/api/tunnel';
 import { createAndroidInteractor } from '../../core/interactors/android.ts';
 import type { Interactor } from '../../contracts/interactor-types.ts';
 import type { DeviceLease } from '../../contracts/device-provider.ts';
@@ -23,14 +24,14 @@ import type {
 import { runCmd } from '../../utils/exec.ts';
 import { normalizeOptionalString } from './strings.ts';
 
-type LimrunAdbTunnel = Awaited<ReturnType<LimrunAndroidClient['startAdbTunnel']>>;
-
 type LimrunAndroidAdbSession = {
   platform: 'android';
   lease: DeviceLease;
   instanceId: string;
   device: DeviceInfo;
   client: LimrunAndroidClient;
+  adbUrl: string;
+  token: string;
   adbTunnel?: LimrunAdbTunnel;
   adbSerial?: string;
   adbTunnelPromise?: Promise<string>;
@@ -60,6 +61,8 @@ export async function createLimrunAndroidSession(options: {
     instanceId: options.instanceId,
     device: options.device,
     client,
+    adbUrl: options.adbUrl,
+    token: options.token,
   };
   const adbProvider: AndroidAdbProvider = {
     exec: async (args, execOptions) => await runLimrunAndroidAdb(session, args, execOptions),
@@ -199,8 +202,16 @@ async function ensurePersistentAndroidAdbSerial(session: LimrunAndroidAdbSession
 }
 
 async function startAndroidAdbTunnel(session: LimrunAndroidAdbSession): Promise<string> {
-  const tunnel = await session.client.startAdbTunnel();
+  const tunnel = await startTcpTunnel(session.adbUrl, session.token, '127.0.0.1', 0, {
+    logLevel: 'warn',
+  });
   const serial = `${tunnel.address.address}:${tunnel.address.port}`;
+  try {
+    await runCmd('adb', ['connect', serial], { timeoutMs: 30_000 });
+  } catch (error) {
+    tunnel.close();
+    throw error;
+  }
   session.adbTunnel = tunnel;
   session.adbSerial = serial;
   return serial;

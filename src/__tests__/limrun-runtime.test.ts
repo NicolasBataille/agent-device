@@ -32,7 +32,7 @@ const limrunMockState = vi.hoisted(() => {
     androidDisconnect: vi.fn(),
     androidSendAsset: vi.fn(async () => undefined),
     androidTunnelClose,
-    androidStartAdbTunnel: vi.fn(async () => ({
+    androidStartTcpTunnel: vi.fn(async () => ({
       address: { address: '127.0.0.1', port: 62_001 },
       close: androidTunnelClose,
     })),
@@ -98,8 +98,11 @@ vi.mock('@limrun/api/instance-client', () => ({
     disconnect: limrunMockState.androidDisconnect,
     openUrl: limrunMockState.androidOpenUrl,
     sendAsset: limrunMockState.androidSendAsset,
-    startAdbTunnel: limrunMockState.androidStartAdbTunnel,
   })),
+}));
+
+vi.mock('@limrun/api/tunnel', () => ({
+  startTcpTunnel: limrunMockState.androidStartTcpTunnel,
 }));
 
 vi.mock('../utils/exec.ts', async (importOriginal) => {
@@ -317,16 +320,19 @@ async function allocateLimrunDevice(
 }
 
 function assertAndroidTunnelLifecycle(openUrl: string): void {
-  assert.equal(limrunMockState.androidStartAdbTunnel.mock.calls.length, 1);
+  assert.deepEqual(limrunMockState.androidStartTcpTunnel.mock.calls, [
+    ['wss://adb.example', 'instance-token', '127.0.0.1', 0, { logLevel: 'warn' }],
+  ]);
   assert.equal(limrunMockState.androidOpenUrl.mock.calls.length, 0);
-  assert.deepEqual(vi.mocked(runCmd).mock.calls[0]?.[1], [
+  assert.deepEqual(vi.mocked(runCmd).mock.calls[0]?.[1], ['connect', '127.0.0.1:62001']);
+  assert.deepEqual(vi.mocked(runCmd).mock.calls[1]?.[1], [
     '-s',
     '127.0.0.1:62001',
     'reverse',
     'tcp:8081',
     'tcp:8081',
   ]);
-  assert.deepEqual(vi.mocked(runCmd).mock.calls[1]?.[1], [
+  assert.deepEqual(vi.mocked(runCmd).mock.calls[2]?.[1], [
     '-s',
     '127.0.0.1:62001',
     'shell',
@@ -338,20 +344,20 @@ function assertAndroidTunnelLifecycle(openUrl: string): void {
     '-d',
     openUrl,
   ]);
-  assert.deepEqual(vi.mocked(runCmd).mock.calls[2]?.[1], [
+  assert.deepEqual(vi.mocked(runCmd).mock.calls[3]?.[1], [
     '-s',
     '127.0.0.1:62001',
     'reverse',
     '--list',
   ]);
-  assert.deepEqual(vi.mocked(runCmd).mock.calls[3]?.[1], [
+  assert.deepEqual(vi.mocked(runCmd).mock.calls[4]?.[1], [
     '-s',
     '127.0.0.1:62001',
     'reverse',
     '--remove',
     'tcp:8081',
   ]);
-  assert.deepEqual(vi.mocked(runCmd).mock.calls[4]?.[1], ['disconnect', '127.0.0.1:62001']);
+  assert.deepEqual(vi.mocked(runCmd).mock.calls[5]?.[1], ['disconnect', '127.0.0.1:62001']);
   assert.equal(limrunMockState.androidTunnelClose.mock.calls.length, 1);
 }
 
@@ -429,7 +435,7 @@ test('Limrun Android shares an in-flight ADB tunnel across concurrent port rever
       }),
     ]);
 
-    assert.equal(limrunMockState.androidStartAdbTunnel.mock.calls.length, 1);
+    assert.equal(limrunMockState.androidStartTcpTunnel.mock.calls.length, 1);
   } finally {
     await runtime.shutdown();
   }
@@ -588,7 +594,8 @@ test('Limrun Android configures an explicit port reverse', async () => {
         name: 'react-devtools',
       },
     );
-    assert.deepEqual(vi.mocked(runCmd).mock.calls[0]?.[1], [
+    assert.deepEqual(vi.mocked(runCmd).mock.calls[0]?.[1], ['connect', '127.0.0.1:62001']);
+    assert.deepEqual(vi.mocked(runCmd).mock.calls[1]?.[1], [
       '-s',
       '127.0.0.1:62001',
       'reverse',
@@ -605,6 +612,12 @@ test('Limrun Android preserves canonical ADB failure classification', async () =
 
   try {
     await allocateLimrunDevice(runtime, androidLease());
+    await runtime.configurePortReverse({
+      leaseId: 'lease-android',
+      devicePort: 8081,
+      hostPort: 8081,
+      name: 'metro',
+    });
     vi.mocked(runCmd).mockResolvedValueOnce({
       stdout: '',
       stderr: 'error: device offline',
