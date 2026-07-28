@@ -20,6 +20,10 @@ function commentOf(overrides: Partial<DeltaSources> = {}): string {
   return renderComment(computeQualityDelta(sources(overrides)), CONTEXT);
 }
 
+function summaryOf(overrides: Partial<DeltaSources> = {}): string {
+  return renderJobSummary(computeQualityDelta(sources(overrides)), CONTEXT);
+}
+
 test('an unchanged tree collapses the whole comment to one line', () => {
   expect(commentOf()).toBe(`${NO_DELTAS_LINE}\n`);
 });
@@ -55,6 +59,27 @@ test('a ratchet improvement is shown, but a removed suppression is not', () => {
 test('a metric read from a stale artifact is marked rather than silently attributed to head', () => {
   const head = snapshotFixture({ jsGzipBytes: 900_000, sizeStale: true });
   expect(commentOf({ head })).toContain('| JS gzip (stale artifact) |');
+});
+
+test('an unproven (`unknown`) artifact caveats the job summary, not every row', () => {
+  // #1423 reports `unknown` for every artifact whose producer stamps no commit, i.e. all of them
+  // today; marking each row would caveat size and coverage forever.
+  const head = snapshotFixture({ jsGzipBytes: 900_000 });
+  const sizeReport = head.provenance.inputs.sizeReport!;
+  const unknown = {
+    ...head,
+    provenance: {
+      ...head.provenance,
+      inputs: {
+        ...head.provenance.inputs,
+        sizeReport: { ...sizeReport, producerCommit: null, status: 'unknown' as const },
+      },
+    },
+  };
+  const comment = commentOf({ head: unknown });
+  expect(comment).toContain('| JS gzip |');
+  expect(comment).not.toContain('stale artifact');
+  expect(summaryOf({ head: unknown })).toContain('freshness as `unknown`');
 });
 
 test('PR-local coverage rows are scored against a bound, not a baseline', () => {

@@ -21,7 +21,7 @@
 //
 // All I/O — reading files, resolving links, posting the comment — belongs to run.ts.
 
-import type { RepoHealthSnapshot } from '../repo-health/model.ts';
+import type { ArtifactStatus, RepoHealthSnapshot } from '../repo-health/model.ts';
 import {
   MAX_COMMENT_LINES,
   QUALITY_DELTA_METRICS,
@@ -75,11 +75,21 @@ function formatSigned(value: number, format: MetricFormat): string {
   return `${sign}${formatValue(Math.abs(value), format)}`;
 }
 
-function staleInputFlag(snapshot: RepoHealthSnapshot, spec: MetricSpec): boolean {
+function artifactStatus(snapshot: RepoHealthSnapshot, spec: MetricSpec): ArtifactStatus | null {
   const inputs = snapshot.provenance.inputs;
-  if (spec.staleInput === 'sizeReport') return inputs.sizeReport?.stale === true;
-  if (spec.staleInput === 'coverageSummary') return inputs.coverageSummary?.stale === true;
-  return false;
+  if (spec.staleInput === 'sizeReport') return inputs.sizeReport?.status ?? null;
+  if (spec.staleInput === 'coverageSummary') return inputs.coverageSummary?.status ?? null;
+  return null;
+}
+
+/**
+ * Only a PROVEN stale artifact marks its row. #1423 reports `unknown` whenever the producer stamps
+ * no commit, which is every artifact today, so marking that too would put a caveat on every size and
+ * coverage row forever — the comment fatigue this issue exists to remove. `unknown` gets one job
+ * summary note instead.
+ */
+function staleInputFlag(snapshot: RepoHealthSnapshot, spec: MetricSpec): boolean {
+  return artifactStatus(snapshot, spec) === 'stale';
 }
 
 function deltaRow(spec: MetricSpec, sources: DeltaSources): QualityDeltaRow | null {
@@ -153,6 +163,15 @@ function missingInputNotes(sources: DeltaSources): string[] {
   if (sources.slowTest === null) {
     notes.push(
       'Slow-test report unavailable (the vitest reporter writes it during the coverage run).',
+    );
+  }
+  const unverified = QUALITY_DELTA_METRICS.filter(
+    (spec) => artifactStatus(sources.head, spec) === 'unknown',
+  );
+  if (unverified.length > 0) {
+    notes.push(
+      'Size and coverage are read artifacts whose producers stamp no commit, so repo-health reports ' +
+        'their freshness as `unknown` (#1423): treat those rows as not provably current with the head tree.',
     );
   }
   return notes;

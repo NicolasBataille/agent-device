@@ -54,9 +54,12 @@ every row plus the notes for inputs that were unavailable.
   amendment). If the baseline's `schemaVersion` differs from head's, every baseline-derived row is
   dropped and the comment says so; PR-local rows still show. To resume diffing, add a migration note
   under "Schema migrations" below and bump the reader accordingly.
-- **Stale inputs are labelled, not laundered.** repo-health flags a read artifact (coverage, size)
-  as `stale` when a source file is newer than it. Rows derived from a stale artifact render as
-  `JS gzip (stale artifact)` rather than silently claiming to describe the head commit.
+- **Stale inputs are labelled, not laundered.** repo-health proves a read artifact's freshness
+  (`provenance.inputs.*.status`) only from a producing commit the artifact stamps in its own bytes.
+  A row whose artifact is `stale` renders as `JS gzip (stale artifact)` rather than silently claiming
+  to describe the head commit. `unknown` — today's honest answer for every artifact, since no
+  producer stamps a commit — gets one job-summary note instead of a caveat on every size and coverage
+  row, which is the comment fatigue this comment exists to remove.
 - **Missing inputs cost rows, not runs.** No baseline, no size artifact, no coverage JSON — each
   costs the rows it would have produced plus a job-summary note. Fork PRs (read-only token, no
   secrets) therefore degrade to job-summary output: the comment step is skipped, never failed.
