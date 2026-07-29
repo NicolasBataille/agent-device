@@ -594,10 +594,14 @@ Public subpath API exposed for Node consumers:
   - `forceStopAndroidAppWithAdb(executor, packageName)`
   - `listAndroidAppsWithAdb(executor)`
   - `getAndroidAppStateWithAdb(executor)`
-  - types: `AndroidAdbExecutor`, `AndroidAdbExecutorOptions`, `AndroidPortReverseEndpoint`
+  - types: `AndroidAdbExecutor`, `AndroidAdbExecutorOptions`, `AndroidAdbProvider`,
+    `AndroidKeyboardState`, `AndroidKeyboardDismissResult`, `AndroidPortReverseEndpoint`
 - `agent-device/limrun`
   - `new LimrunRuntime(options)`
-  - types: `LimrunRuntimeOptions`
+  - `runtime.getDeviceSession(device)`
+  - types: `LimrunRuntimeOptions`, `LimrunDeviceSession`, `LimrunAndroidDeviceSession`,
+    `LimrunIosDeviceSession`, `AndroidAdbProvider`, `AndroidKeyboardState`,
+    `AndroidKeyboardDismissResult`
 
 The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `limrun`, `artifacts`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/cloud-webdriver`, `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are not published.
 
@@ -2682,6 +2686,14 @@ const runtime = new LimrunRuntime({
   region: process.env.LIMRUN_REGION,
 });
 ```
+
+After allocating a lease, embedding bridges can call `runtime.getDeviceSession(device)` to access
+the allocated device's reusable semantic capabilities. The facade includes app inventory,
+foreground state where the provider exposes it, key input, bounded log reads, recording, remote
+asset installation, and the existing interactor. Android additionally exposes agent-device's
+`AndroidAdbProvider` abstraction for helpers and reversible port forwarding. iOS exposes a typed
+`simctl` execution handle for bridge-owned runner lifecycle and launch policy. Raw Limrun clients
+remain private to the provider runtime.
 
 ## MCP Experience
 
