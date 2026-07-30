@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1503/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1503/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1503/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1503/static/js/index.2197cc1635.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1503/static/js/index.1304276799.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -62,12 +62,14 @@
 <li><code>createLocalArtifactAdapter(options?)</code></li>
 <li><code>AppError</code>, <code>isAgentDeviceError(error)</code>, <code>normalizeAgentDeviceError(error)</code></li>
 <li><code>centerOfRect(rect)</code></li>
-<li>root types are limited to the typed client contracts used by hosted adapters, such as <code>AppListOptions</code>, <code>BackCommandOptions</code>, <code>ScrollOptions</code>, and command result types.</li>
 </ul>
 </li>
 <li><code>agent-device/io</code>
 <ul>
-<li>artifact adapter types, file input refs, and file output refs</li>
+<li><code>createLocalArtifactAdapter(options?)</code></li>
+<li>types: <code>ArtifactAdapter</code>, <code>ArtifactDescriptor</code>, <code>CreateTempFileOptions</code>, <code>FileInputRef</code>,
+<code>FileOutputRef</code>, <code>LocalArtifactAdapterOptions</code>, <code>OutputVisibility</code>, <code>ReserveOutputOptions</code>,
+<code>ReservedOutputFile</code>, <code>ResolveInputOptions</code>, <code>ResolvedInputFile</code>, <code>TemporaryFile</code></li>
 </ul>
 </li>
 <li><code>agent-device/metro</code>
@@ -119,6 +121,7 @@
 </li>
 <li><code>agent-device/install-source</code>
 <ul>
+<li><code>ARCHIVE_EXTENSIONS</code></li>
 <li><code>isTrustedInstallSourceUrl(sourceUrl)</code></li>
 <li><code>validateDownloadSourceUrl(url)</code></li>
 <li>types: <code>MaterializeInstallSource</code></li>
@@ -148,8 +151,10 @@
 <li><code>new LimrunRuntime(options)</code></li>
 <li><code>runtime.getDeviceSession(device)</code></li>
 <li>types: <code>LimrunRuntimeOptions</code>, <code>LimrunDeviceSession</code>, <code>LimrunAndroidDeviceSession</code>,
-<code>LimrunIosDeviceSession</code>, <code>AndroidAdbProvider</code>, <code>AndroidKeyboardState</code>,
-<code>AndroidKeyboardDismissResult</code></li>
+<code>LimrunIosDeviceSession</code>, <code>LimrunForegroundApp</code>, <code>LimrunInstalledApp</code>,
+<code>LimrunIosCommandExecution</code>, <code>LimrunIosCommandResult</code>, <code>LimrunRecordingQuality</code>,
+<code>LimrunIosRemoteInstallOptions</code>, <code>LimrunIosRemoteInstallResult</code>, <code>AndroidAdbProvider</code>,
+<code>AndroidKeyboardState</code>, <code>AndroidKeyboardDismissResult</code></li>
 </ul>
 </li>
 </ul>
@@ -355,6 +360,7 @@ idempotent for the same owner and rejects conflicting owners for the same local 
 <p>Supported command methods:</p>
 <ul>
 <li><code>wait</code></li>
+<li><code>alert</code></li>
 <li><code>appState</code></li>
 <li><code>back</code></li>
 <li><code>home</code></li>
@@ -363,20 +369,26 @@ idempotent for the same owner and rejects conflicting owners for the same local 
 <li><code>keyboard</code></li>
 <li><code>clipboard</code></li>
 <li><code>tvRemote</code></li>
-<li><code>alert</code></li>
+<li><code>reactNative</code></li>
+<li><code>doctor</code></li>
+<li><code>prepare</code></li>
+<li><code>viewport</code></li>
 </ul>
-<p>Additional CLI-backed methods are exposed on their domain groups with typed option objects so Node consumers do not need to build raw daemon requests:</p>
+<p>The deprecated <code>rotate()</code> alias remains available for compatibility; use <code>orientation()</code> in new integrations.</p>
+<p>The complete domain-client method map is:</p>
 <ul>
-<li><code>client.devices.boot()</code></li>
-<li><code>client.devices.capabilities()</code></li>
-<li><code>client.devices.shutdown()</code></li>
-<li><code>client.apps.push()</code></li>
-<li><code>client.apps.triggerEvent()</code></li>
-<li><code>client.capture.diff()</code></li>
-<li><code>client.interactions.click()</code>, <code>press()</code>, <code>longPress()</code>, <code>swipe()</code>, <code>pan()</code>, <code>fling()</code>, <code>focus()</code>, <code>type()</code>, <code>fill()</code>, <code>scroll()</code>, <code>pinch()</code>, <code>rotateGesture()</code>, <code>transformGesture()</code>, <code>get()</code>, <code>is()</code>, <code>find()</code></li>
+<li><code>client.devices.list()</code>, <code>capabilities()</code>, <code>boot()</code>, <code>shutdown()</code></li>
+<li><code>client.sessions.list()</code>, <code>stateDir()</code>, <code>close()</code>, <code>saveScript()</code>, <code>artifacts()</code></li>
+<li><code>client.apps.install()</code>, <code>reinstall()</code>, <code>installFromSource()</code>, <code>list()</code>, <code>open()</code>, <code>close()</code>, <code>push()</code>, <code>triggerEvent()</code></li>
+<li><code>client.materializations.release()</code></li>
+<li><code>client.leases.allocate()</code>, <code>heartbeat()</code>, <code>release()</code></li>
+<li><code>client.metro.prepare()</code>, <code>reload()</code></li>
+<li><code>client.capture.snapshot()</code>, <code>screenshot()</code>, <code>diff()</code></li>
+<li><code>client.interactions.click()</code>, <code>press()</code>, <code>longPress()</code>, <code>swipe()</code>, <code>pan()</code>, <code>fling()</code>, <code>swipeGesture()</code>, <code>focus()</code>, <code>type()</code>, <code>fill()</code>, <code>scroll()</code>, <code>pinch()</code>, <code>rotateGesture()</code>, <code>transformGesture()</code>, <code>get()</code>, <code>is()</code>, <code>find()</code></li>
 <li><code>client.replay.run()</code> and <code>client.replay.test()</code></li>
 <li><code>client.batch.run()</code></li>
 <li><code>client.observability.perf()</code>, <code>logs()</code>, <code>events()</code>, <code>network()</code>, and <code>audio()</code></li>
+<li><code>client.debug.symbols()</code></li>
 <li><code>client.recording.record()</code> and <code>client.recording.trace()</code></li>
 <li><code>client.settings.update()</code></li>
 </ul>
