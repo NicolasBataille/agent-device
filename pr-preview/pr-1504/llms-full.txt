@@ -369,6 +369,87 @@ agent-device help dogfood
 
 
 ---
+url: /agent-device/pr-preview/pr-1504/docs/ai-sdk.md
+---
+
+# AI SDK
+
+[Vercel's AI SDK](https://ai-sdk.dev/) can expose `agent-device` client methods as typed tools in a Node.js agent. `ToolLoopAgent` owns the model loop, while `createAgentDeviceClient()` owns the device session and keeps tool implementations aligned with the CLI command contracts.
+
+Install the integration dependencies:
+
+```bash
+pnpm add agent-device ai zod
+```
+
+The example below gives the model two deliberately small tools: one for observing the current UI and one for pressing an element returned by that observation.
+
+```ts
+import { ToolLoopAgent, tool } from 'ai';
+import { createAgentDeviceClient } from 'agent-device';
+import { z } from 'zod';
+
+const client = createAgentDeviceClient({
+  session: 'ai-sdk-agent',
+  lockPolicy: 'reject',
+});
+
+const agent = new ToolLoopAgent({
+  model: process.env.AI_MODEL!,
+  instructions: [
+    'Inspect the current UI before acting.',
+    'Only press an element ref returned by the latest snapshot.',
+    'Stop and explain when the requested state cannot be verified.',
+  ].join('\n'),
+  tools: {
+    snapshot: tool({
+      description: 'Return the interactive elements in the current device UI.',
+      inputSchema: z.object({}),
+      execute: async () => await client.capture.snapshot({ interactiveOnly: true }),
+    }),
+    press: tool({
+      description: 'Press an element from the latest snapshot by its @e ref.',
+      inputSchema: z.object({
+        ref: z.string().regex(/^@e\d+$/),
+      }),
+      execute: async ({ ref }) => await client.interactions.press({ ref }),
+    }),
+  },
+});
+
+try {
+  await client.apps.open({
+    app: 'com.example.app',
+    platform: 'ios',
+  });
+
+  const result = await agent.generate({
+    prompt: 'Navigate to Notifications and verify that notifications are enabled.',
+  });
+
+  console.log(result.text);
+} finally {
+  await client.sessions.close();
+}
+```
+
+Set `AI_MODEL` to a model available through your configured AI SDK provider. See the AI SDK references for [`ToolLoopAgent`](https://ai-sdk.dev/docs/reference/ai-sdk-core/tool-loop-agent) and [`tool()`](https://ai-sdk.dev/docs/reference/ai-sdk-core/tool).
+
+## Designing device tools
+
+Prefer focused tools over a single tool that accepts an arbitrary command name and arguments:
+
+- Validate tool input with a schema. In particular, constrain element refs to values such as `@e12` and make the model observe before acting.
+- Keep the `agent-device` client outside tool execution so calls share one named session.
+- Return typed client results directly unless the result needs an application-specific projection.
+- Let the host application own session cleanup with `try`/`finally`; do not rely on the model to close the session.
+- Use AI SDK's `needsApproval` option for actions that require human confirmation in your product.
+
+See [Node.js API](/agent-device/pr-preview/pr-1504/docs/client-api.md) for the complete client surface and runnable, typechecked `agent-device` examples.
+
+
+
+---
 url: /agent-device/pr-preview/pr-1504/docs/batching.md
 ---
 
@@ -534,22 +615,43 @@ Rapid UI changes can outpace accessibility tree updates. Mitigate by inserting e
 url: /agent-device/pr-preview/pr-1504/docs/client-api.md
 ---
 
-# Typed Client
+# Node.js API
 
-Use `createAgentDeviceClient()` when you want to drive the daemon from application code instead of shelling out to the CLI.
+Use `createAgentDeviceClient()` to give a Node.js agent typed access to device automation instead of shelling out to the CLI. Its methods can be exposed as model tools, called from deterministic orchestration code, or combined with another Node.js agent framework.
 
-For remote Metro-backed flows, import the reusable Node APIs instead of spawning the `agent-device` binary. The CLI uses the same helpers internally.
+Start with the [AI SDK](/agent-device/pr-preview/pr-1504/docs/ai-sdk.md) or [Eve](/agent-device/pr-preview/pr-1504/docs/eve.md) integration guide for complete tool-calling examples. The client is framework-neutral, so the same pattern works with other solutions that accept JavaScript or TypeScript functions as tools.
 
-Public subpath API exposed for Node consumers:
+## Runnable examples
+
+The repository includes [runnable, typechecked Node.js examples](https://github.com/callstack/agent-device/tree/main/examples/sdk) that import the same published `agent-device/*` entry points used by consumers:
+
+| Example                                                                                                             | Demonstrates                                                                |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [`client-session.ts`](https://github.com/callstack/agent-device/blob/main/examples/sdk/client-session.ts)           | Open, snapshot, interact, handle typed errors, and always close the session |
+| [`contracts-result.ts`](https://github.com/callstack/agent-device/blob/main/examples/sdk/contracts-result.ts)       | Consume snapshot results with helpers from `agent-device/contracts`         |
+| [`batch-orchestration.ts`](https://github.com/callstack/agent-device/blob/main/examples/sdk/batch-orchestration.ts) | Run a batch through a custom transport                                      |
+| [`metro-runtime.ts`](https://github.com/callstack/agent-device/blob/main/examples/sdk/metro-runtime.ts)             | Normalize a Metro URL and resolve runtime transport hints                   |
+
+The examples are checked against the source SDK using their dedicated [`tsconfig.json`](https://github.com/callstack/agent-device/blob/main/examples/sdk/tsconfig.json). After building the package with `pnpm build`, run an example directly with Node:
+
+```bash
+node --experimental-strip-types examples/sdk/client-session.ts
+```
+
+## API reference
+
+Supported public entry points for Node consumers:
 
 - `agent-device`
   - `createAgentDeviceClient(options?)`
   - `createLocalArtifactAdapter(options?)`
   - `AppError`, `isAgentDeviceError(error)`, `normalizeAgentDeviceError(error)`
   - `centerOfRect(rect)`
-  - root types are limited to the typed client contracts used by hosted adapters, such as `AppListOptions`, `BackCommandOptions`, `ScrollOptions`, and command result types.
 - `agent-device/io`
-  - artifact adapter types, file input refs, and file output refs
+  - `createLocalArtifactAdapter(options?)`
+  - types: `ArtifactAdapter`, `ArtifactDescriptor`, `CreateTempFileOptions`, `FileInputRef`,
+    `FileOutputRef`, `LocalArtifactAdapterOptions`, `OutputVisibility`, `ReserveOutputOptions`,
+    `ReservedOutputFile`, `ResolveInputOptions`, `ResolvedInputFile`, `TemporaryFile`
 - `agent-device/metro`
   - `buildBundleUrl(baseUrl, platform)`
   - `normalizeBaseUrl(baseUrl)`
@@ -580,6 +682,7 @@ Public subpath API exposed for Node consumers:
   - `parseFindArgs(args)`
   - types: `FindMatchOptions`
 - `agent-device/install-source`
+  - `ARCHIVE_EXTENSIONS`
   - `isTrustedInstallSourceUrl(sourceUrl)`
   - `validateDownloadSourceUrl(url)`
   - types: `MaterializeInstallSource`
@@ -600,46 +703,92 @@ Public subpath API exposed for Node consumers:
   - `new LimrunRuntime(options)`
   - `runtime.getDeviceSession(device)`
   - types: `LimrunRuntimeOptions`, `LimrunDeviceSession`, `LimrunAndroidDeviceSession`,
-    `LimrunIosDeviceSession`, `AndroidAdbProvider`, `AndroidKeyboardState`,
-    `AndroidKeyboardDismissResult`
-
-The `contracts`, `selectors`, `finders`, `install-source`, `android-adb`, `limrun`, `artifacts`, `batch`, `metro`, `remote-config`, and `io` subpaths are the supported Node entry points. The former compatibility subpaths `agent-device/android-apps` and `agent-device/daemon`, plus hosted-runtime subpaths `agent-device/cloud-webdriver`, `agent-device/commands`, `agent-device/backend`, `agent-device/testing/conformance`, and `agent-device/observability`, are not published.
+    `LimrunIosDeviceSession`, `LimrunForegroundApp`, `LimrunInstalledApp`,
+    `LimrunIosCommandExecution`, `LimrunIosCommandResult`, `LimrunRecordingQuality`,
+    `LimrunIosRemoteInstallOptions`, `LimrunIosRemoteInstallResult`, `AndroidAdbProvider`,
+    `AndroidKeyboardState`, `AndroidKeyboardDismissResult`
 
 ## Basic usage
 
-```ts
-import { createAgentDeviceClient } from 'agent-device';
+The canonical client example is embedded below. It is also runnable from [`examples/sdk/client-session.ts`](https://github.com/callstack/agent-device/blob/main/examples/sdk/client-session.ts).
 
-const client = createAgentDeviceClient({
-  session: 'qa-ios',
-  lockPolicy: 'reject',
-  lockPlatform: 'ios',
-});
+```ts file="<root>/../examples/sdk/client-session.ts"
+/**
+ * Root client session: create a client, open an app, capture a snapshot, tap
+ * a node, then close the session — with typed error handling via the
+ * exported error helpers.
+ *
+ * Demonstrates: `createAgentDeviceClient`, `AppError`, `isAgentDeviceError`,
+ * and `normalizeAgentDeviceError` from the `agent-device` root export.
+ *
+ * Prerequisites: an `agent-device` daemon target (a booted iOS simulator).
+ * This file typechecks without one; running it for real also requires
+ * `pnpm build` first, so the package resolves at runtime.
+ *
+ * Run: node --experimental-strip-types examples/sdk/client-session.ts
+ */
+import {
+  AppError,
+  createAgentDeviceClient,
+  isAgentDeviceError,
+  normalizeAgentDeviceError,
+} from 'agent-device';
 
-const devices = await client.devices.list({ platform: 'ios' });
-const capabilities = await client.devices.capabilities({ platform: 'ios' });
-const apps = await client.apps.list({ platform: 'ios' });
-const device = devices.find((candidate) => candidate.name === 'iPhone 16') ?? devices[0];
-if (!device) {
-  throw new Error('No iOS device available');
+async function resolveSnapshotCapableIosDevice(client: ReturnType<typeof createAgentDeviceClient>) {
+  const devices = await client.devices.list({ platform: 'ios' });
+  const device = devices[0];
+  if (!device) {
+    throw new AppError('DEVICE_NOT_FOUND', 'No iOS device available');
+  }
+
+  const capabilities = await client.devices.capabilities({ platform: 'ios' });
+  if (!capabilities.availableCommands.includes('snapshot')) {
+    throw new AppError('UNSUPPORTED_OPERATION', 'Selected target does not support snapshots');
+  }
+
+  return device;
 }
-if (!capabilities.availableCommands.includes('snapshot')) {
-  throw new Error('Selected target does not support snapshots');
+
+function reportAgentDeviceError(error: unknown): void {
+  const normalized = normalizeAgentDeviceError(error);
+  console.error(`agent-device error [${normalized.code}]: ${normalized.message}`);
+  if (normalized.hint) {
+    console.error(`hint: ${normalized.hint}`);
+  }
+  process.exitCode = 1;
 }
 
-await client.apps.open({
-  app: 'com.apple.Preferences',
-  platform: 'ios',
-  udid: device.id,
-  runtime: {
-    metroHost: '127.0.0.1',
-    metroPort: 8081,
-  },
-});
+async function main(): Promise<void> {
+  const client = createAgentDeviceClient({
+    session: 'sdk-example',
+    lockPolicy: 'reject',
+    lockPlatform: 'ios',
+  });
 
-const snapshot = await client.capture.snapshot({ interactiveOnly: true });
+  try {
+    const device = await resolveSnapshotCapableIosDevice(client);
 
-await client.sessions.close();
+    await client.apps.open({
+      app: 'com.apple.Preferences',
+      platform: 'ios',
+      udid: device.id,
+    });
+
+    const snapshot = await client.capture.snapshot({ interactiveOnly: true });
+    const target = snapshot.nodes.find((node) => node.role === 'button');
+    if (target) {
+      await client.interactions.press({ ref: target.ref });
+    }
+  } catch (error) {
+    if (!isAgentDeviceError(error)) throw error;
+    reportAgentDeviceError(error);
+  } finally {
+    await client.sessions.close();
+  }
+}
+
+await main();
+
 ```
 
 `client.devices.capabilities()` returns `{ device, availableCommands }`, using the same capability matrix as the CLI. Use it when a dynamic integration needs to decide which command names are valid for the selected target.
@@ -799,6 +948,7 @@ Vega OS client support is currently VVD-only and covers device discovery, app op
 Supported command methods:
 
 - `wait`
+- `alert`
 - `appState`
 - `back`
 - `home`
@@ -807,20 +957,27 @@ Supported command methods:
 - `keyboard`
 - `clipboard`
 - `tvRemote`
-- `alert`
+- `reactNative`
+- `doctor`
+- `prepare`
+- `viewport`
 
-Additional CLI-backed methods are exposed on their domain groups with typed option objects so Node consumers do not need to build raw daemon requests:
+The deprecated `rotate()` alias remains available for compatibility; use `orientation()` in new integrations.
 
-- `client.devices.boot()`
-- `client.devices.capabilities()`
-- `client.devices.shutdown()`
-- `client.apps.push()`
-- `client.apps.triggerEvent()`
-- `client.capture.diff()`
-- `client.interactions.click()`, `press()`, `longPress()`, `swipe()`, `pan()`, `fling()`, `focus()`, `type()`, `fill()`, `scroll()`, `pinch()`, `rotateGesture()`, `transformGesture()`, `get()`, `is()`, `find()`
+The complete domain-client method map is:
+
+- `client.devices.list()`, `capabilities()`, `boot()`, `shutdown()`
+- `client.sessions.list()`, `stateDir()`, `close()`, `saveScript()`, `artifacts()`
+- `client.apps.install()`, `reinstall()`, `installFromSource()`, `list()`, `open()`, `close()`, `push()`, `triggerEvent()`
+- `client.materializations.release()`
+- `client.leases.allocate()`, `heartbeat()`, `release()`
+- `client.metro.prepare()`, `reload()`
+- `client.capture.snapshot()`, `screenshot()`, `diff()`
+- `client.interactions.click()`, `press()`, `longPress()`, `swipe()`, `pan()`, `fling()`, `swipeGesture()`, `focus()`, `type()`, `fill()`, `scroll()`, `pinch()`, `rotateGesture()`, `transformGesture()`, `get()`, `is()`, `find()`
 - `client.replay.run()` and `client.replay.test()`
 - `client.batch.run()`
 - `client.observability.perf()`, `logs()`, `events()`, `network()`, and `audio()`
+- `client.debug.symbols()`
 - `client.recording.record()` and `client.recording.trace()`
 - `client.settings.update()`
 
@@ -863,11 +1020,42 @@ executor.
 
 Use `agent-device/batch` when a bridge or in-process runner receives daemon-shaped requests but owns command dispatch itself. The helper keeps validation, inherited flags, serial execution, partial results, and error envelopes aligned with the daemon batch command.
 
-```ts
+The standalone custom-transport example is embedded below from [`examples/sdk/batch-orchestration.ts`](https://github.com/callstack/agent-device/blob/main/examples/sdk/batch-orchestration.ts).
+
+```ts file="<root>/../examples/sdk/batch-orchestration.ts"
+/**
+ * Batch orchestration for a custom transport: `runBatch` keeps step
+ * validation, inherited flags, serial execution, partial results, and
+ * daemon-shaped error envelopes aligned with the CLI's `batch` command, so a
+ * bridge that owns command dispatch itself does not have to reimplement them.
+ *
+ * Demonstrates: `runBatch` from `agent-device/batch`, consumed against the
+ * `DaemonResponse` result type from `agent-device/contracts`.
+ *
+ * Prerequisites: none — `dispatch` below is a stub; a real integration would
+ * replace it with a call into the bridge's own command dispatcher.
+ *
+ * Run: node --experimental-strip-types examples/sdk/batch-orchestration.ts
+ */
 import { runBatch } from 'agent-device/batch';
 import type { DaemonResponse } from 'agent-device/contracts';
 
 type BatchRequest = Parameters<typeof runBatch>[0];
+
+async function dispatch(stepReq: unknown): Promise<Record<string, unknown>> {
+  console.log('dispatching step', stepReq);
+  return { handled: true };
+}
+
+function bridgeErrorToDaemonResponse(error: unknown): Extract<DaemonResponse, { ok: false }> {
+  return {
+    ok: false,
+    error: {
+      code: 'COMMAND_FAILED',
+      message: error instanceof Error ? error.message : 'Unknown bridge error',
+    },
+  };
+}
 
 async function handleBatch(req: BatchRequest): Promise<DaemonResponse> {
   return await runBatch(req, req.session ?? 'default', async (stepReq) => {
@@ -878,6 +1066,25 @@ async function handleBatch(req: BatchRequest): Promise<DaemonResponse> {
     }
   });
 }
+
+const result = await handleBatch({
+  command: 'batch',
+  positionals: [],
+  flags: {
+    batchSteps: [
+      { command: 'wait', input: { text: 'Welcome' } },
+      { command: 'back', input: {} },
+    ],
+  },
+});
+
+if (result.ok) {
+  console.log(`batch completed: ${JSON.stringify(result.data)}`);
+} else {
+  console.error(`batch failed [${result.error.code}]: ${result.error.message}`);
+  process.exitCode = 1;
+}
+
 ```
 
 ## Android `installFromSource()`
@@ -2409,7 +2616,7 @@ agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 ## Where to go deeper
 
 - Full command reference: [Commands](/agent-device/pr-preview/pr-1504/docs/commands.md)
-- Typed client observability APIs: [Typed Client](/agent-device/pr-preview/pr-1504/docs/client-api.md)
+- Node.js observability APIs: [Node.js API](/agent-device/pr-preview/pr-1504/docs/client-api.md)
 - Session behavior and lifecycle: [Sessions](/agent-device/pr-preview/pr-1504/docs/sessions.md)
 
 
@@ -2740,6 +2947,92 @@ BrowserStack can return session video, Appium logs, device logs, dashboard URL, 
 
 
 ---
+url: /agent-device/pr-preview/pr-1504/docs/eve.md
+---
+
+# Eve
+
+[Eve](https://eve.dev/) is Vercel's filesystem-first framework for durable agents. Files under `agent/tools/` become typed model tools, which makes them a natural place to adapt the `agent-device` Node.js client.
+
+Create an Eve project, then add `agent-device`:
+
+```bash
+npx eve@latest init mobile-agent
+cd mobile-agent
+pnpm add agent-device
+```
+
+Add `agent/tools/agent_device.ts`:
+
+```ts
+import { createAgentDeviceClient } from 'agent-device';
+import { defineTool } from 'eve/tools';
+import { z } from 'zod';
+
+const client = createAgentDeviceClient({
+  session: 'eve-agent',
+  lockPolicy: 'reject',
+});
+
+export default defineTool({
+  description: 'Inspect or interact with the current device UI.',
+  inputSchema: z.discriminatedUnion('action', [
+    z.object({
+      action: z.literal('open'),
+      app: z.string().min(1),
+      platform: z.enum(['ios', 'android']),
+    }),
+    z.object({
+      action: z.literal('snapshot'),
+    }),
+    z.object({
+      action: z.literal('press'),
+      ref: z.string().regex(/^@e\d+$/),
+    }),
+    z.object({
+      action: z.literal('close'),
+    }),
+  ]),
+  async execute(input) {
+    switch (input.action) {
+      case 'open':
+        return await client.apps.open({ app: input.app, platform: input.platform });
+      case 'snapshot':
+        return await client.capture.snapshot({ interactiveOnly: true });
+      case 'press':
+        return await client.interactions.press({ ref: input.ref });
+      case 'close':
+        return await client.sessions.close();
+    }
+  },
+});
+```
+
+Eve discovers the file automatically; no tool registry is required. Tell the agent how to use it in `agent/instructions.md`:
+
+```md
+Use the agent_device tool to inspect and operate the app.
+
+- Open the requested app before inspecting it.
+- Call snapshot before every interaction.
+- Only press an @e ref from the latest snapshot.
+- Verify the requested outcome with another snapshot.
+- Call close when the device task is complete.
+```
+
+For CI or another short-lived host, the outer runner should still close the named `agent-device` session in its own cleanup path. Model-directed `close` is useful during the normal tool loop, but it is not a replacement for deterministic cleanup after errors or cancellation.
+
+## Runtime placement
+
+Run the tool in Eve's app runtime when it needs local access to simulators, emulators, platform tooling, and daemon state. If Eve is hosted separately from the devices, connect through an [agent-device remote proxy](/agent-device/pr-preview/pr-1504/docs/remote-proxy.md) instead.
+
+Eve is currently beta, so check its [current documentation](https://eve.dev/) when upgrading. For a production example, read [Building Mobile QA Agents With Vercel Eve](https://www.callstack.com/blog/building-reviewable-mobile-qa-agents-with-vercel-eve), which covers a PR QA agent using an `agent_device` tool and a deterministic CI runner.
+
+See [Node.js API](/agent-device/pr-preview/pr-1504/docs/client-api.md) for the complete client surface.
+
+
+
+---
 url: /agent-device/pr-preview/pr-1504/docs/installation.md
 ---
 
@@ -2852,95 +3145,6 @@ vega device list
   - `agent-device session state-dir` prints the resolved state dir without starting the daemon
   - after pulling the worktree-scoped daemon change in a source checkout, stop any legacy default daemon once with `AGENT_DEVICE_STATE_DIR=~/.agent-device pnpm clean:daemon`
   - worktree-scoped state dirs outlive deleted worktrees; `pnpm clean:daemon --prune-dev` removes dirs under `~/.agent-device/dev/` with no live daemon and no activity for 14 days (one line printed per removed dir)
-
-
-
----
-url: /agent-device/pr-preview/pr-1504/docs/ios-snapshot-elements.md
----
-
-# iOS Snapshot Element Support
-
-This page tracks how `snapshot -i` presents common iOS interaction surfaces. It
-is scoped to the XCTest-backed iOS snapshot path and the default non-raw
-presentation. Use `snapshot --raw` or `snapshot --json` when investigating the
-provider tree itself.
-
-Sources used for this checklist:
-
-- Apple Human Interface Guidelines: [Components](https://developer.apple.com/design/human-interface-guidelines/components/)
-- Apple Human Interface Guidelines: [Selection and input](https://developer.apple.com/design/human-interface-guidelines/selection-and-input)
-- Apple Human Interface Guidelines: [Navigation and search](https://developer.apple.com/design/human-interface-guidelines/navigation-and-search)
-- Apple Human Interface Guidelines: [Menus and actions](https://developer.apple.com/design/human-interface-guidelines/menus-and-actions)
-- UIKit accessibility behavior: [UIAccessibility](https://developer.apple.com/documentation/UIKit/uiaccessibility-protocol) and [UIAccessibilityTraits](https://developer.apple.com/documentation/uikit/uiaccessibilitytraits)
-
-## Status Key
-
-| Status            | Meaning                                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| Supported         | Expected to produce one actionable, unambiguous node in `snapshot -i`.                                   |
-| Pass-through      | Preserved when XCTest exposes it, but no custom iOS presentation shaping yet.                            |
-| Command-supported | Handled by a dedicated command rather than snapshot presentation.                                        |
-| Needs fixture     | Known common element, but we still need raw tree and screenshot-overlay samples before claiming support. |
-| Out of scope      | Useful UI information, but not an interaction target for `snapshot -i`.                                  |
-
-## Matrix
-
-| Apple/HIG area          | Common iOS surface                               | Expected XCTest/accessibility shape                                           | Current support                | Tested with                                          | Notes                                                                                                                                                                                            |
-| ----------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Menus and actions       | Button, toolbar button, pull-down or menu button | `Button`, sometimes wrapped in `Other` with the same label/rect               | Supported                      | Settings rows, Expensify Home, Expensify action menu | Same-rect `Other -> Button` wrappers collapse to the button. Descendant duplicate text/image decoration is suppressed.                                                                           |
-| Menus and actions       | Link                                             | `Link`, sometimes wrapped in repeated static/link nodes                       | Supported                      | Unit fixture from Settings privacy link shape        | Repeated link/static descendants collapse to one link. Needs more live Safari/Mail coverage.                                                                                                     |
-| Selection and input     | Switch toggle                                    | `Cell -> Button -> Switch`, or a standalone `Switch`                          | Supported                      | Settings Camera live screen, unit fixture            | Row-backed switch collapses to the switch control, not the row/button wrapper.                                                                                                                   |
-| Selection and input     | Toggle button                                    | Usually `Button` with selected/value/trait semantics                          | Pass-through                   | None yet                                             | We keep the button. Need real samples to decide whether selected/value should be surfaced more explicitly.                                                                                       |
-| Selection and input     | Checkbox                                         | `CheckBox`/`Checkbox` or button-like custom node                              | Pass-through                   | None yet                                             | Common on macOS and web-like/custom iOS apps. Interactive filtering keeps role strings containing checkbox, but iOS shaping has no special checkbox rules.                                       |
-| Selection and input     | Radio button/group                               | `RadioButton`, `RadioGroup`, or button-like custom nodes                      | Pass-through                   | None yet                                             | Interactive filtering keeps role strings containing radio. Need grouped native/custom samples.                                                                                                   |
-| Selection and input     | Text field                                       | `TextField`, `SecureTextField`, or wrapper `Other -> TextField`               | Supported                      | Expensify Search, unit fixture                       | Fillability already recognizes text/search/secure/text-view types. Wrapper collapses to the editable node.                                                                                       |
-| Selection and input     | Search field                                     | `SearchField`, often inside toolbar/search wrappers                           | Supported                      | Settings search field, Expensify search field        | Settings toolbar duplicates collapse to one search field plus Dictate button.                                                                                                                    |
-| Selection and input     | Text view / multiline editor                     | `TextView`/`TextArea`                                                         | Pass-through                   | Unit coverage for read/fill helpers                  | Fillability recognizes text views, but iOS presentation has no live complex editor sample yet.                                                                                                   |
-| Selection and input     | Token field                                      | `TextField`, token cells/buttons, or custom wrappers                          | Needs fixture                  | None yet                                             | Need Mail/Calendar recipient-field samples. Likely mixed editable field plus token buttons.                                                                                                      |
-| Selection and input     | Digit entry / OTP                                | Multiple `TextField`s, one hidden text field, or custom key grid              | Needs fixture                  | None yet                                             | We should avoid collapsing distinct digit boxes until tested.                                                                                                                                    |
-| Selection and input     | Slider                                           | `Slider`, usually adjustable and rect-backed                                  | Pass-through                   | None yet                                             | `snapshot -i` keeps rect-backed controls. Need Settings volume/brightness samples to verify value formatting and adjustability.                                                                  |
-| Selection and input     | Stepper                                          | `Stepper` or increment/decrement buttons                                      | Needs fixture                  | None yet                                             | Need native examples to decide whether to expose one adjustable control or separate buttons.                                                                                                     |
-| Selection and input     | Segmented control                                | `SegmentedControl` with segment buttons, or collapsed adjustable-like control | Needs fixture                  | None yet                                             | Current workflow docs still call out horizontal tab/filter bars that may collapse into one composite. Needs real-app coverage.                                                                   |
-| Selection and input     | Picker / picker wheel                            | `Picker`, `PickerWheel`, option cells, or modal sheet                         | Needs fixture                  | None yet                                             | Need Clock/Calendar/Settings samples. We should not over-collapse value wheels before testing.                                                                                                   |
-| Selection and input     | Date picker                                      | `DatePicker`, calendar buttons, picker wheels, compact button + popover       | Needs fixture                  | None yet                                             | Test compact, inline, and wheels styles separately.                                                                                                                                              |
-| Selection and input     | Virtual keyboard and keys                        | `Keyboard`, `Key`                                                             | Command-supported              | Expensify Search                                     | Offscreen keyboard subtrees are suppressed when they are below the app viewport. Keyboard interaction belongs to `keyboard`/`fill`/`type`; visible app-owned Done buttons remain normal buttons. |
-| Navigation and search   | Navigation bar / toolbar                         | `NavigationBar`, `Toolbar`, title text, bar buttons                           | Supported                      | Settings, Expensify Search                           | Navigation/action buttons remain; duplicated title/search wrapper nodes are suppressed when they duplicate semantic children.                                                                    |
-| Navigation and search   | Tab bar                                          | `TabBar`, tab buttons, or custom `Other` nodes                                | Pass-through                   | Expensify Home                                       | Expensify tabs are exposed as distinct `Other` items. Need native UITabBar samples to decide if `TabBar` container should stay visible or collapse.                                              |
-| Navigation and search   | Sidebar/list navigation                          | `Table`, `CollectionView`, `Cell`, row button wrappers                        | Supported                      | Settings top/bottom, Expensify lists                 | Row-backed Settings cells collapse to a single `Cell`. Scroll-hidden above/below hints stay on the scroll container.                                                                             |
-| Navigation and search   | Search results list                              | `ScrollView`/`Table`/`CollectionView` plus rows                               | Supported                      | Expensify Search                                     | Repeated legitimate list rows do not trigger the duplicate-nav warning when they are stacked instead of overlapping.                                                                             |
-| Menus and actions       | Context menu / edit menu                         | `Menu`, `MenuItem`, sheet/popover, or transient system surface                | Needs fixture                  | None yet                                             | Need long-press samples from Photos/Files/Text selection.                                                                                                                                        |
-| Menus and actions       | Activity/share view                              | Sheet with buttons, collections, extension cells                              | Needs fixture                  | None yet                                             | Treat as normal app/system UI until samples show duplication patterns.                                                                                                                           |
-| Presentation            | Alert                                            | `Alert` plus buttons, or native alert command result                          | Command-supported              | Provider tests                                       | Use `alert wait/get/accept/dismiss` for native alerts. Snapshot should still be inspected when an app-owned sheet looks like an alert.                                                           |
-| Presentation            | Sheet, bottom sheet, popover                     | `Sheet`/`Popover`/`Other` wrappers plus buttons/fields                        | Supported for common wrappers  | Expensify action menu                                | Backdrop dismiss and action-row wrappers collapse when semantic children are present. Need native sheet/popover examples.                                                                        |
-| Status                  | Activity indicator, progress indicator, gauge    | `ActivityIndicator`, `ProgressIndicator`, `Other` with value                  | Out of scope                   | None yet                                             | These are important state, but not primary interaction targets. They should stay in full snapshots; `snapshot -i` may omit them unless rect-backed.                                              |
-| Status                  | Page control / page indicator                    | `PageIndicator`, adjustable trait, dots/buttons                               | Needs fixture                  | None yet                                             | Often interactive via swipe or adjustable actions. Need samples before deciding presentation.                                                                                                    |
-| Layout and organization | Static text, headers, images, decoration         | `StaticText`, `Image`, `Other`                                                | Supported as descendants/noise | Settings, Expensify                                  | Repeated static/link/image descendants under an actionable parent are suppressed. Standalone useful text remains visible when retained by the interactive tree.                                  |
-| Layout and organization | Scroll bars / scroll indicators                  | `Other` with labels like vertical scroll bar                                  | Supported                      | Settings top/bottom, Expensify lists                 | Scroll indicator nodes are removed from the interactive tree and converted into `[content above/below ... hidden]` hints on the nearest scroll container.                                        |
-| Layout and organization | Collection/table/scroll containers               | `CollectionView`, `Table`, `ScrollView`                                       | Supported                      | Settings, Expensify                                  | Containers remain when they communicate scrollability or hidden content.                                                                                                                         |
-
-## Next Apps To Sample
-
-Use `snapshot -i`, `snapshot -i --raw --json`, and `screenshot --overlay-refs` for each sample before updating this page.
-
-| Element family          | Suggested apps/screens                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------- |
-| Slider / page indicator | Settings > Sounds & Haptics, Photos onboarding/carousel, Control Center if accessible       |
-| Segmented controls      | Photos library filters, Calendar view switcher, App Store tabs/filters                      |
-| Picker/date picker      | Clock alarm editor, Calendar event editor, Reminders date picker                            |
-| Stepper                 | Calendar/Reminders repeat or count fields, any system form that exposes increment/decrement |
-| Token field             | Mail compose recipients, Calendar invitees                                                  |
-| Context/edit menu       | Files long-press, Photos long-press, text selection in Notes                                |
-| Native tab bar          | App Store, Phone, Photos                                                                    |
-| Share/activity sheet    | Photos share, Safari share                                                                  |
-
-When adding coverage, record:
-
-- app and screen;
-- shaped `snapshot -i` output;
-- raw `snapshot -i --raw --json` node shape for the relevant subtree;
-- overlay screenshot path;
-- whether the result is supported, pass-through, or needs implementation work.
 
 
 
@@ -3994,7 +4198,6 @@ It does not automatically switch to AX.
 - Use `diff snapshot` between mutations to validate structural changes with lower output volume.
 - Use `snapshot --diff` when you discover the feature from snapshot help, but keep `diff snapshot` as the default exploration command.
 - Keep `--raw` for troubleshooting only when you need the full tree instead of visible-first output.
-- For the current iOS interaction-element support matrix, see [iOS Snapshot Element Support](/agent-device/pr-preview/pr-1504/docs/ios-snapshot-elements.md).
 
 `diff snapshot` and `snapshot --diff` behavior:
 

@@ -188,5 +188,5 @@ agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 ## Where to go deeper
 
 - Full command reference: [Commands](/agent-device/pr-preview/pr-1504/docs/commands.md)
-- Typed client observability APIs: [Typed Client](/agent-device/pr-preview/pr-1504/docs/client-api.md)
+- Node.js observability APIs: [Node.js API](/agent-device/pr-preview/pr-1504/docs/client-api.md)
 - Session behavior and lifecycle: [Sessions](/agent-device/pr-preview/pr-1504/docs/sessions.md)
