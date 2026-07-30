@@ -369,6 +369,87 @@ agent-device help dogfood
 
 
 ---
+url: /agent-device/pr-preview/pr-1503/docs/ai-sdk.md
+---
+
+# AI SDK
+
+[Vercel's AI SDK](https://ai-sdk.dev/) can expose `agent-device` client methods as typed tools in a Node.js agent. `ToolLoopAgent` owns the model loop, while `createAgentDeviceClient()` owns the device session and keeps tool implementations aligned with the CLI command contracts.
+
+Install the integration dependencies:
+
+```bash
+pnpm add agent-device ai zod
+```
+
+The example below gives the model two deliberately small tools: one for observing the current UI and one for pressing an element returned by that observation.
+
+```ts
+import { ToolLoopAgent, tool } from 'ai';
+import { createAgentDeviceClient } from 'agent-device';
+import { z } from 'zod';
+
+const client = createAgentDeviceClient({
+  session: 'ai-sdk-agent',
+  lockPolicy: 'reject',
+});
+
+const agent = new ToolLoopAgent({
+  model: process.env.AI_MODEL!,
+  instructions: [
+    'Inspect the current UI before acting.',
+    'Only press an element ref returned by the latest snapshot.',
+    'Stop and explain when the requested state cannot be verified.',
+  ].join('\n'),
+  tools: {
+    snapshot: tool({
+      description: 'Return the interactive elements in the current device UI.',
+      inputSchema: z.object({}),
+      execute: async () => await client.capture.snapshot({ interactiveOnly: true }),
+    }),
+    press: tool({
+      description: 'Press an element from the latest snapshot by its @e ref.',
+      inputSchema: z.object({
+        ref: z.string().regex(/^@e\d+$/),
+      }),
+      execute: async ({ ref }) => await client.interactions.press({ ref }),
+    }),
+  },
+});
+
+try {
+  await client.apps.open({
+    app: 'com.example.app',
+    platform: 'ios',
+  });
+
+  const result = await agent.generate({
+    prompt: 'Navigate to Notifications and verify that notifications are enabled.',
+  });
+
+  console.log(result.text);
+} finally {
+  await client.sessions.close();
+}
+```
+
+Set `AI_MODEL` to a model available through your configured AI SDK provider. See the AI SDK references for [`ToolLoopAgent`](https://ai-sdk.dev/docs/reference/ai-sdk-core/tool-loop-agent) and [`tool()`](https://ai-sdk.dev/docs/reference/ai-sdk-core/tool).
+
+## Designing device tools
+
+Prefer focused tools over a single tool that accepts an arbitrary command name and arguments:
+
+- Validate tool input with a schema. In particular, constrain element refs to values such as `@e12` and make the model observe before acting.
+- Keep the `agent-device` client outside tool execution so calls share one named session.
+- Return typed client results directly unless the result needs an application-specific projection.
+- Let the host application own session cleanup with `try`/`finally`; do not rely on the model to close the session.
+- Use AI SDK's `needsApproval` option for actions that require human confirmation in your product.
+
+See [Node.js API](/agent-device/pr-preview/pr-1503/docs/client-api.md) for the complete client surface and runnable, typechecked `agent-device` examples.
+
+
+
+---
 url: /agent-device/pr-preview/pr-1503/docs/batching.md
 ---
 
@@ -536,9 +617,9 @@ url: /agent-device/pr-preview/pr-1503/docs/client-api.md
 
 # Node.js API
 
-Use `createAgentDeviceClient()` when you want to drive the daemon from application code instead of shelling out to the CLI.
+Use `createAgentDeviceClient()` to give a Node.js agent typed access to device automation instead of shelling out to the CLI. Its methods can be exposed as model tools, called from deterministic orchestration code, or combined with another Node.js agent framework.
 
-For remote Metro-backed flows, import the reusable Node APIs instead of spawning the `agent-device` binary. The CLI uses the same helpers internally.
+Start with the [AI SDK](/agent-device/pr-preview/pr-1503/docs/ai-sdk.md) or [Eve](/agent-device/pr-preview/pr-1503/docs/eve.md) integration guide for complete tool-calling examples. The client is framework-neutral, so the same pattern works with other solutions that accept JavaScript or TypeScript functions as tools.
 
 ## Runnable examples
 
@@ -2862,6 +2943,92 @@ BrowserStack can return session video, Appium logs, device logs, dashboard URL, 
 - If AWS allocation fails, first run `aws sts get-caller-identity` in the same CI step to confirm the AWS CLI credential chain is active, then verify the Device Farm ARNs and region.
 - If Limrun allocation fails, check `LIMRUN_API_KEY`, `--platform ios|android`, and the optional `LIMRUN_REGION`. Keep the key available in the environment used to start the local daemon.
 - If artifact lookup is pending immediately after `close`, retry `agent-device artifacts --json`. Some providers finalize video/log URLs asynchronously after the hosted session stops.
+
+
+
+---
+url: /agent-device/pr-preview/pr-1503/docs/eve.md
+---
+
+# Eve
+
+[Eve](https://eve.dev/) is Vercel's filesystem-first framework for durable agents. Files under `agent/tools/` become typed model tools, which makes them a natural place to adapt the `agent-device` Node.js client.
+
+Create an Eve project, then add `agent-device`:
+
+```bash
+npx eve@latest init mobile-agent
+cd mobile-agent
+pnpm add agent-device
+```
+
+Add `agent/tools/agent_device.ts`:
+
+```ts
+import { createAgentDeviceClient } from 'agent-device';
+import { defineTool } from 'eve/tools';
+import { z } from 'zod';
+
+const client = createAgentDeviceClient({
+  session: 'eve-agent',
+  lockPolicy: 'reject',
+});
+
+export default defineTool({
+  description: 'Inspect or interact with the current device UI.',
+  inputSchema: z.discriminatedUnion('action', [
+    z.object({
+      action: z.literal('open'),
+      app: z.string().min(1),
+      platform: z.enum(['ios', 'android']),
+    }),
+    z.object({
+      action: z.literal('snapshot'),
+    }),
+    z.object({
+      action: z.literal('press'),
+      ref: z.string().regex(/^@e\d+$/),
+    }),
+    z.object({
+      action: z.literal('close'),
+    }),
+  ]),
+  async execute(input) {
+    switch (input.action) {
+      case 'open':
+        return await client.apps.open({ app: input.app, platform: input.platform });
+      case 'snapshot':
+        return await client.capture.snapshot({ interactiveOnly: true });
+      case 'press':
+        return await client.interactions.press({ ref: input.ref });
+      case 'close':
+        return await client.sessions.close();
+    }
+  },
+});
+```
+
+Eve discovers the file automatically; no tool registry is required. Tell the agent how to use it in `agent/instructions.md`:
+
+```md
+Use the agent_device tool to inspect and operate the app.
+
+- Open the requested app before inspecting it.
+- Call snapshot before every interaction.
+- Only press an @e ref from the latest snapshot.
+- Verify the requested outcome with another snapshot.
+- Call close when the device task is complete.
+```
+
+For CI or another short-lived host, the outer runner should still close the named `agent-device` session in its own cleanup path. Model-directed `close` is useful during the normal tool loop, but it is not a replacement for deterministic cleanup after errors or cancellation.
+
+## Runtime placement
+
+Run the tool in Eve's app runtime when it needs local access to simulators, emulators, platform tooling, and daemon state. If Eve is hosted separately from the devices, connect through an [agent-device remote proxy](/agent-device/pr-preview/pr-1503/docs/remote-proxy.md) instead.
+
+Eve is currently beta, so check its [current documentation](https://eve.dev/) when upgrading. For a production example, read [Building Mobile QA Agents With Vercel Eve](https://www.callstack.com/blog/building-reviewable-mobile-qa-agents-with-vercel-eve), which covers a PR QA agent using an `agent_device` tool and a deterministic CI runner.
+
+See [Node.js API](/agent-device/pr-preview/pr-1503/docs/client-api.md) for the complete client surface.
 
 
 
