@@ -7,20 +7,25 @@ import {
   type FlagDefinition,
   type FlagKey,
 } from './command-schema.ts';
-import { configTrustForFlag, type ConfigTrust } from './config-trust.ts';
 
 export type OptionSpec = {
   key: FlagKey;
   flagDefinitions: readonly FlagDefinition[];
-  config: {
-    trust: ConfigTrust;
-    key: string;
-  };
+  configurable: boolean;
   env: {
     names: readonly string[];
   };
   supportsCommand(command: string | null): boolean;
 };
+
+const CONFIG_EXCLUDED_FLAG_KEYS = new Set<FlagKey>([
+  'config',
+  'remoteConfig',
+  'help',
+  'version',
+  'batchSteps',
+  'githubActionsArtifact',
+]);
 
 const ENV_EXCLUDED_FLAG_KEYS = new Set<FlagKey>(['appsFilter', 'iosSimulatorDeviceSet']);
 
@@ -32,9 +37,7 @@ export function getOptionSpec(key: FlagKey): OptionSpec | undefined {
 }
 
 export function getConfigurableOptionSpecs(command: string | null): OptionSpec[] {
-  return optionSpecs.filter(
-    (spec) => spec.config.trust !== 'disabled' && spec.supportsCommand(command),
-  );
+  return optionSpecs.filter((spec) => spec.configurable && spec.supportsCommand(command));
 }
 
 export function isFlagSupportedForCommand(key: FlagKey, command: string | null): boolean {
@@ -76,10 +79,7 @@ function buildOptionSpecs(): OptionSpec[] {
     .map(([key, flagDefinitions]) => ({
       key,
       flagDefinitions,
-      config: {
-        trust: configTrustForFlag(key),
-        key,
-      },
+      configurable: !CONFIG_EXCLUDED_FLAG_KEYS.has(key),
       env: {
         names: ENV_EXCLUDED_FLAG_KEYS.has(key) ? [] : [buildPrimaryEnvVarName(key)],
       },

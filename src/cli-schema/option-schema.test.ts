@@ -16,8 +16,7 @@ import {
 test('option schema exposes config/env metadata for global options', () => {
   const spec = getOptionSpec('platform');
   assert.ok(spec);
-  assert.equal(spec.config.trust, 'project-safe');
-  assert.equal(spec.config.key, 'platform');
+  assert.equal(spec.configurable, true);
   assert.deepEqual(spec.env.names, ['AGENT_DEVICE_PLATFORM']);
   assert.equal(spec.supportsCommand('open'), true);
   assert.equal(spec.supportsCommand('snapshot'), true);

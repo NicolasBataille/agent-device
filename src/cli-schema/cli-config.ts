@@ -9,7 +9,6 @@ import {
   getOptionSpec,
   parseOptionValueFromSource,
 } from './option-schema.ts';
-import type { ConfigTrust } from './config-trust.ts';
 import { parseInstallSourceConfig } from '../utils/install-source-config.ts';
 import type { EnvMap } from '../utils/env-map.ts';
 
@@ -30,6 +29,99 @@ export function resolveConfigBackedFlagDefaults(options: {
 type ConfigFileSource = 'user' | 'project' | 'explicit';
 
 type ConfigPath = { path: string; required: boolean; source: ConfigFileSource };
+
+// Project config is repository-controlled, so new flags are operator-only by default.
+// Adding a key here is the only way to make it available to ./agent-device.json.
+const PROJECT_CONFIG_FLAG_KEYS = new Set<FlagKey>([
+  'json',
+  'platform',
+  'target',
+  'device',
+  'udid',
+  'serial',
+  'session',
+  'sessionLock',
+  'activity',
+  'launchConsole',
+  'launchArgs',
+  'launchUrl',
+  'remote',
+  'deviceHub',
+  'testIme',
+  'appsFilter',
+  'clean',
+  'force',
+  'stale',
+  'relaunch',
+  'shutdown',
+  'surface',
+  'headless',
+  'restart',
+  'noRecord',
+  'record',
+  'recordAs',
+  'saveScript',
+  'snapshotInteractiveOnly',
+  'snapshotDiff',
+  'snapshotDepth',
+  'snapshotScope',
+  'snapshotRaw',
+  'snapshotForceFull',
+  'screenshotPixelDensity',
+  'screenshotFullscreen',
+  'screenshotMaxSize',
+  'screenshotNoStabilize',
+  'screenshotNormalizeStatusBar',
+  'overlayRefs',
+  'networkInclude',
+  'baseline',
+  'threshold',
+  'count',
+  'pointerCount',
+  'fps',
+  'quality',
+  'hideTouches',
+  'recordingScope',
+  'intervalMs',
+  'delayMs',
+  'durationMs',
+  'holdMs',
+  'jitterPx',
+  'pixels',
+  'doubleTap',
+  'verify',
+  'settle',
+  'settleQuietMs',
+  'clickButton',
+  'backMode',
+  'pauseMs',
+  'pattern',
+  'kind',
+  'perfTemplate',
+  'responseLevel',
+  'verbose',
+  'cost',
+  'timeoutMs',
+  'retries',
+  'failFast',
+  'recordVideo',
+  'replayUpdate',
+  'replayMaestro',
+  'replayFrom',
+  'replayPlanDigest',
+  'replayKeepSession',
+  'findFirst',
+  'findLast',
+  'batchOnError',
+  'batchMaxSteps',
+  'retainPaths',
+  'retentionMs',
+  'reporter',
+  'reportJunit',
+  'shardAll',
+  'shardSplit',
+  'noLogin',
+]);
 
 function resolveConfigPaths(
   cwd: string,
@@ -113,7 +205,18 @@ function parseConfigObject(
     if (!spec) {
       throw new AppError('INVALID_ARGS', `Unknown config key "${rawKey}" in ${origin.label}.`);
     }
-    assertConfigTrust(rawKey, spec.config.trust, origin);
+    if (!spec.configurable) {
+      throw new AppError(
+        'INVALID_ARGS',
+        `Config key "${rawKey}" is not allowed in ${origin.label}. This key is not supported in config files.`,
+      );
+    }
+    if (origin.source === 'project' && !PROJECT_CONFIG_FLAG_KEYS.has(key)) {
+      throw new AppError(
+        'INVALID_ARGS',
+        `Config key "${rawKey}" is not allowed in ${origin.label}. Move it to ~/.agent-device/config.json, pass it with --config or AGENT_DEVICE_CONFIG, or provide it through CLI flags/environment variables.`,
+      );
+    }
     if (key === 'installSource') {
       flags.installSource = parseInstallSourceConfig(rawValue, origin.label);
       continue;
@@ -126,23 +229,6 @@ function parseConfigObject(
     );
   }
   return flags;
-}
-
-function assertConfigTrust(
-  rawKey: string,
-  trust: ConfigTrust,
-  origin: { source: ConfigFileSource; label: string },
-): void {
-  if (trust === 'project-safe') return;
-  if (trust === 'user-or-explicit-only' && origin.source !== 'project') return;
-  const guidance =
-    trust === 'disabled'
-      ? 'This key is not supported in config files.'
-      : 'Move it to ~/.agent-device/config.json, pass it with --config or AGENT_DEVICE_CONFIG, or provide it through CLI flags/environment variables.';
-  throw new AppError(
-    'INVALID_ARGS',
-    `Config key "${rawKey}" is not allowed in ${origin.label}. ${guidance}`,
-  );
 }
 
 function readEnvFlagDefaults(env: EnvMap, command: string | null): Partial<CliFlags> {
