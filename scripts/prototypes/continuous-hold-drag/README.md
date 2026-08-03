@@ -60,6 +60,26 @@ The active-drag frames in
 displaced and the outlined Blue row held at the pending insertion point before
 release. The primary recording is [fallback-ios.mp4](fallback-ios.mp4).
 
+### Reanimated + Gesture Handler fallback on Android 17
+
+The same selector-authored gesture ran on the Pixel 10 Pro emulator against
+the fallback probe's 220 ms long-press activation threshold. Blue moved below
+Yellow, and the Android accessibility tree exposed the complete lifecycle and
+resulting order:
+
+```text
+fallback began blue
+fallback center 88pt crossed into index 1
+fallback center 159pt crossed into index 2
+fallback dropped blue → G · Y · B · O · P
+```
+
+The active-drag frames in
+[android-fallback-contact-sheet.png](android-fallback-contact-sheet.png) show
+the Blue row moving continuously while Green and Yellow occupy their pending
+positions. The primary recording is
+[android-fallback.mp4](android-fallback.mp4).
+
 ### Deterministic recording and replay
 
 [native-ios.ad](native-ios.ad) retains both accessibility selectors and all
@@ -67,6 +87,10 @@ three timing phases. From a clean source daemon, public replay completed its
 three steps in 9.8 seconds and the destination guard verified
 `Blue card, position 3`. A post-replay snapshot independently confirmed the
 five-row order above.
+
+[android-fallback.ad](android-fallback.ad) records the Android device context,
+source readiness guard, selectors, timings, and destination-order guard. Its
+four steps replayed headlessly in 6.9 seconds from a clean daemon.
 
 The first replay attempt failed before gesture dispatch because the authoring
 daemon retained the XCTest runner lease. Stopping that daemon, as required by
@@ -79,14 +103,16 @@ that prepare/authoring-daemon handoff rule.
 - PASS: element-to-element targeting through accessibility labels, without
   test-only IDs.
 - PASS: native SwiftUI reorder and fallback reorder on iOS 27.
+- PASS: fallback long-press activation, continuous drag, boundary crossings,
+  drop callback, and final order on an Android 17 Pixel 10 Pro emulator.
 - PASS: selector-preserving `.ad` publication and clean-daemon headless replay.
 - PASS: observable active destination feedback, callback trace, and resulting
   order on both iOS engines.
-- BLOCKED: Android device proof. The current host has Android Studio but no
-  Android SDK, `adb`, emulator, APK, or authenticated remote-device provider.
-  Installing a multi-gigabyte Android toolchain was deliberately not folded
-  into this throwaway branch.
+- PASS: the same timestamped pointer plan dispatches through the Android
+  MotionEvent backend without releasing contact before the final sample.
 
-The iOS results establish that the architecture is viable. They do not settle
-the issue's cross-platform harness decision until the same public command is
-run against an Android fallback build.
+The iOS and Android results establish that the architecture is viable for the
+issue's required native and fallback harness lanes. This Android probe is
+deliberately smaller than the planned production fallback engine; it proves
+gesture synthesis and observable reorder behavior, not the full portable
+contract.

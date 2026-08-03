@@ -1,0 +1,6 @@
+context platform=android device="Pixel 10 Pro" kind=emulator theme=unknown
+open "reorderable.example" --relaunch --platform android --metro-host 127.0.0.1 --metro-port 8082
+wait "label=\"Fallback Blue card\""
+gesture "drag" "id=\"fallback-blue\"" "id=\"fallback-yellow\"" 800 900 1500
+# agent-device:target-v1 {"id":"fallback-order","role":"textview","label":"G · Y · B · O · P","ancestry":[{"role":"viewgroup"},{"role":"framelayout"},{"role":"framelayout"},{"role":"linearlayout"},{"role":"framelayout"},{"role":"linearlayout"},{"role":"framelayout"}],"sibling":7,"viewportOrder":0,"rect":{"x":652,"y":554,"width":592,"height":37},"verification":"verified"}
+wait "label=\"G · Y · B · O · P\""
