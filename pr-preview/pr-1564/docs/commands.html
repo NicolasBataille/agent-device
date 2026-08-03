@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1564/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1564/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1564/static/js/56.6e0af2a80d.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1564/static/js/index.65e013a629.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1564/static/js/index.fa867b8f14.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -900,7 +900,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <li><code>connect</code> without <code>--remote-config</code> authenticates to cloud when needed, fetches the connection profile, writes a generated local profile, stores the remote scope locally, and defers tenant lease allocation plus Metro preparation until a later command needs them.</li>
 <li>Cloud connection profile responses must return a JSON object at <code>connection.remoteConfigProfile</code>. The older <code>connection.remoteConfig</code> JSON string shape is no longer accepted.</li>
 <li><code>--remote-config &lt;path&gt;</code> points to a local remote workflow profile that captures stable host, tenant/run, and any optional session, platform, lease backend, or Metro overrides for <code>connect</code>.</li>
-<li><code>connect --remote-config ...</code> follows the same state and deferred-preparation flow using the local profile instead of cloud discovery.</li>
+<li><code>connect --remote-config ...</code> follows the same verification, state, and deferred-preparation flow using the local profile instead of cloud discovery. Direct-provider profiles therefore require their provider credentials when <code>connect</code> runs; no device lease is created until a later device command.</li>
 <li>Auth management commands are available for inspection and recovery: <code>agent-device auth status</code>, <code>agent-device auth login</code>, and <code>agent-device auth logout</code>. Human login stores a revocable CLI session locally; it does not create or persist an <code>adc_live_...</code> service token.</li>
 <li>Cloud auth uses three credential classes: <code>adc_agent_...</code> short-lived command tokens, revocable CLI session refresh credentials, and explicit <code>adc_live_...</code> service/API tokens for CI. The CLI implements credential selection, CI refusal, local storage permissions, logout, and output redaction; the cloud API must enforce token expiry, tenant/run scope, revocation, one-time device approval, polling rate limits, and dashboard/API separation.</li>
 <li><code>AGENT_DEVICE_CLOUD_BASE_URL</code> should point at the bridge/control-plane API origin, not necessarily the dashboard origin. API-token setup links use <code>/api-keys</code> on that origin so the bridge can redirect users to the right dashboard page.</li>
