@@ -62,10 +62,11 @@ release. The primary recording is [fallback-ios.mp4](fallback-ios.mp4).
 
 ### Reanimated + Gesture Handler fallback on Android 17
 
-The same selector-authored gesture ran on the Pixel 10 Pro emulator against
-the fallback probe's 220 ms long-press activation threshold. Blue moved below
-Yellow, and the Android accessibility tree exposed the complete lifecycle and
-resulting order:
+The same accessibility-label-authored gesture (`Fallback Blue card` to
+`Fallback Yellow card`) ran on the Pixel 10 Pro emulator against the fallback
+probe's 220 ms long-press activation threshold. Blue moved below Yellow, and
+the Android accessibility tree exposed the complete lifecycle and resulting
+order:
 
 ```text
 fallback began blue
@@ -90,7 +91,7 @@ five-row order above.
 
 [android-fallback.ad](android-fallback.ad) records the Android device context,
 source readiness guard, selectors, timings, and destination-order guard. Its
-four steps replayed headlessly in 6.9 seconds from a clean daemon.
+four steps replayed headlessly in 11.2 seconds from a clean daemon.
 
 The first replay attempt failed before gesture dispatch because the authoring
 daemon retained the XCTest runner lease. Stopping that daemon, as required by
