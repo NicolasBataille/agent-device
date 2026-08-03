@@ -26,6 +26,7 @@ export type CapturedCliRun = {
   stdout: string;
   stderr: string;
   calls: CapturedDaemonRequest[];
+  transportOptions: DaemonTransportOptions[];
 };
 
 export type CliCaptureOptions = {
@@ -59,6 +60,7 @@ export async function runCliCapture(
   let stderr = '';
   let code: number | null = null;
   const calls: CapturedDaemonRequest[] = [];
+  const transportOptions: DaemonTransportOptions[] = [];
   const stateDir = options.stateDirPrefix
     ? fs.mkdtempSync(path.join(os.tmpdir(), options.stateDirPrefix))
     : undefined;
@@ -99,6 +101,7 @@ export async function runCliCapture(
     daemonOptions?: DaemonTransportOptions,
   ): Promise<DaemonResponse> => {
     calls.push(req);
+    transportOptions.push(daemonOptions);
     if (options.sendToDaemon) {
       return await options.sendToDaemon(req, daemonOptions);
     }
@@ -119,5 +122,5 @@ export async function runCliCapture(
     process.chdir(originalCwd);
   }
 
-  return { code, stdout, stderr, calls };
+  return { code, stdout, stderr, calls, transportOptions };
 }

@@ -29,6 +29,7 @@ import {
   emitDiagnostic,
   flushDiagnosticsToSessionFile,
   getDiagnosticsMeta,
+  registerDiagnosticSensitiveValue,
   withDiagnosticsScope,
 } from './utils/diagnostics.ts';
 import { resolveDaemonPaths } from './daemon/config.ts';
@@ -117,6 +118,7 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
         requestId,
         debugOutputEnabled,
       });
+      registerDaemonAuthDiagnosticValue(ctx.effectiveFlags);
       let logTailStopper: (() => void) | null = null;
       try {
         if (command === 'react-devtools') {
@@ -139,6 +141,7 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
           flags: ctx.effectiveFlags,
         });
         await resolveRemoteContext(ctx, deps);
+        registerDaemonAuthDiagnosticValue(ctx.effectiveFlags);
         if (command === 'cdp') {
           process.exit(
             await runAgentCdpCommand(positionals, {
@@ -168,6 +171,10 @@ export async function runCli(argv: string[], deps: CliDeps = DEFAULT_CLI_DEPS): 
       }
     },
   );
+}
+
+function registerDaemonAuthDiagnosticValue(flags: CliFlags): void {
+  if (flags.daemonAuthToken) registerDiagnosticSensitiveValue(flags.daemonAuthToken);
 }
 
 type ParsedCliInput = {
@@ -323,9 +330,10 @@ function resolveRunContextOrExit(
 }
 
 async function runReactDevtoolsCli(ctx: CliRunContext, deps: CliDeps): Promise<number> {
+  const { daemonAuthToken, ...directRequestFlags } = ctx.effectiveFlags;
   return await runReactDevtoolsCommand(ctx.positionals, {
     flags: {
-      ...ctx.effectiveFlags,
+      ...directRequestFlags,
       leaseProvider: ctx.connectionDefaults?.connection?.leaseProvider,
     },
     stateDir: ctx.daemonPaths.baseDir,
@@ -333,18 +341,21 @@ async function runReactDevtoolsCli(ctx: CliRunContext, deps: CliDeps): Promise<n
     cwd: process.cwd(),
     env: process.env,
     configureDirectPortReverse: async () => {
-      const response = await deps.sendToDaemon({
-        command: INTERNAL_COMMANDS.runtime,
-        positionals: ['port-reverse'],
-        flags: {
-          ...ctx.effectiveFlags,
-          leaseProvider: ctx.connectionDefaults?.connection?.leaseProvider,
-          devicePort: 8097,
-          hostPort: 8097,
-          portReverseName: 'react-devtools',
+      const response = await deps.sendToDaemon(
+        {
+          command: INTERNAL_COMMANDS.runtime,
+          positionals: ['port-reverse'],
+          flags: {
+            ...directRequestFlags,
+            leaseProvider: ctx.connectionDefaults?.connection?.leaseProvider,
+            devicePort: 8097,
+            hostPort: 8097,
+            portReverseName: 'react-devtools',
+          },
+          session: ctx.effectiveFlags.session ?? ctx.sessionName,
         },
-        session: ctx.effectiveFlags.session ?? ctx.sessionName,
-      });
+        { authToken: daemonAuthToken },
+      );
       if (!response.ok) throwDaemonError(response.error);
     },
   });
@@ -741,8 +752,12 @@ function createCliDaemonTransport(options: {
 }): AgentDeviceDaemonTransport {
   const { command, flags, replayTestReporterRuntime, transport } = options;
   if (flags.json) return createClientDaemonTransport(transport);
-  return async (req) =>
-    await sendClientRequestToCliTransport(
+  return async (req, context) => {
+    const transportOptions =
+      command === 'test' && replayTestReporterRuntime
+        ? { ...context, onProgress: replayTestReporterRuntime.onProgress }
+        : context;
+    return await sendClientRequestToCliTransport(
       transport,
       {
         ...req,
@@ -751,14 +766,13 @@ function createCliDaemonTransport(options: {
           requestProgress: command === 'test' ? 'replay-test' : 'command',
         },
       },
-      command === 'test' && replayTestReporterRuntime
-        ? { onProgress: replayTestReporterRuntime.onProgress }
-        : undefined,
+      transportOptions,
     );
+  };
 }
 
 function createClientDaemonTransport(transport: CliDaemonTransport): AgentDeviceDaemonTransport {
-  return async (req) => await sendClientRequestToCliTransport(transport, req);
+  return async (req, context) => await sendClientRequestToCliTransport(transport, req, context);
 }
 
 async function sendClientRequestToCliTransport(

@@ -9,7 +9,10 @@ mattering — threading it further is the common failure, not stopping too early
    flag; find the owner with
    `rg -n "<command>|supportedFlags|allowedFlags" src/commands src/cli-schema src/cli/parser`. For
    schema-only CLI commands (`cdp`, `auth`, `connect`, `proxy`, `react-devtools`, `web`) the owner is
-   `SCHEMA_ONLY_CLI_COMMAND_SCHEMAS` in `src/cli-schema/command-overrides.ts`.
+   `SCHEMA_ONLY_CLI_COMMAND_SCHEMAS` in `src/cli-schema/command-overrides.ts`. Classify every new
+   flag in `src/cli-schema/config-trust.ts`: repository config gets only project-safe automation
+   defaults, while connection, credential, provider, cloud, and operator-controlled path/source
+   fields are user-or-explicit-only. The exhaustive `FlagKey` record is the completeness gate.
 2. `src/commands/cli-grammar/*`: read the CLI flag into command input.
 3. `src/commands/command-projection.ts` and command-family projection helpers: write the input into
    the daemon request only if the flag affects daemon execution.

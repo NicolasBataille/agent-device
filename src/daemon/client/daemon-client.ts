@@ -2,6 +2,7 @@ import type {
   DaemonRequest as SharedDaemonRequest,
   DaemonResponse as SharedDaemonResponse,
 } from '../types.ts';
+import type { AgentDeviceDaemonTransportContext } from '@agent-device/contracts/client';
 import type { RequestProgressSink } from '../../request/progress.ts';
 import { AppError } from '@agent-device/kernel/errors';
 import { createRequestId, emitDiagnostic, withDiagnosticTimer } from '../../utils/diagnostics.ts';
@@ -20,11 +21,10 @@ import {
 } from './daemon-client-lifecycle.ts';
 import { sendRequest } from './daemon-client-transport.ts';
 import { resolveDaemonRequestTimeoutMs } from './daemon-client-timeout.ts';
-import { readDaemonRequestAuthToken } from './daemon-client-auth.ts';
 
 export type DaemonRequest = SharedDaemonRequest;
 export type DaemonResponse = SharedDaemonResponse;
-type DaemonTransportOptions = {
+type DaemonTransportOptions = AgentDeviceDaemonTransportContext & {
   onProgress?: RequestProgressSink;
 };
 
@@ -37,13 +37,14 @@ export async function sendToDaemon(
   // A few internal callers build DaemonRequest directly instead of using the
   // public client flag builder. Defend this transport boundary too: credentials
   // belong in the auth channel, never in serializable request flags.
-  const { daemonAuthToken: flagAuthToken, ...flags } = req.flags as typeof req.flags & {
-    daemonAuthToken?: string;
-  };
-  const requestWithoutAuthFlag = { ...req, flags };
+  const rawFlags = req.flags as
+    | (NonNullable<typeof req.flags> & { daemonAuthToken?: string })
+    | undefined;
+  const { daemonAuthToken: flagAuthToken, ...flags } = rawFlags ?? {};
+  const requestWithoutAuthFlag = rawFlags ? { ...req, flags } : req;
   const settings = resolveClientSettings(
     requestWithoutAuthFlag,
-    readDaemonRequestAuthToken(req) ?? flagAuthToken,
+    options.authToken ?? flagAuthToken,
   );
   const requestTimeoutMs = resolveDaemonRequestTimeoutMs(requestWithoutAuthFlag);
   const daemon = await withDiagnosticTimer(
@@ -85,7 +86,7 @@ export async function sendToDaemon(
             settings.transportPreference,
             settings.paths,
             requestTimeoutMs,
-            options,
+            options.onProgress ? { onProgress: options.onProgress } : undefined,
           ),
         { requestId, command: req.command },
       );

@@ -69,7 +69,6 @@ import type { ProjectedNavigationCommandClient } from './commands/system/navigat
 import type { CommandResult } from './core/command-descriptor/command-result.ts';
 import type { CommandFlags } from './core/dispatch-context.ts';
 import { sendToDaemon } from './daemon/client/daemon-client.ts';
-import { attachDaemonRequestAuthToken } from './daemon/client/daemon-client-auth.ts';
 import { resolveDaemonPaths } from './daemon/config.ts';
 import { prepareMetroRuntime, reloadMetro } from './metro/client-metro.ts';
 import {
@@ -113,7 +112,7 @@ export function createAgentDeviceClient(
       runtime: merged.runtime,
       meta: buildMeta(merged),
     };
-    const response = await transport(attachDaemonRequestAuthToken(request, merged.daemonAuthToken));
+    const response = await transport(request, { authToken: merged.daemonAuthToken });
     if (!response.ok) {
       throwDaemonError(response.error);
     }

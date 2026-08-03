@@ -15,8 +15,13 @@ import type {
   RemoteConnectionProfileFields,
 } from './remote-config-fields.ts';
 
+export type AgentDeviceDaemonTransportContext = {
+  authToken?: string;
+};
+
 export type AgentDeviceDaemonTransport = (
   req: Omit<DaemonRequest, 'token'>,
+  context?: AgentDeviceDaemonTransportContext,
 ) => Promise<DaemonResponse>;
 
 export type AgentDeviceClientConfig = RemoteConnectionProfileFields &

@@ -7,6 +7,7 @@ import {
   type FlagDefinition,
   type FlagKey,
 } from './command-schema.ts';
+import { configTrustForFlag, type ConfigTrust } from './config-trust.ts';
 
 export type OptionSpec = {
   key: FlagKey;
@@ -21,34 +22,19 @@ export type OptionSpec = {
   supportsCommand(command: string | null): boolean;
 };
 
-export type ConfigTrust = 'project-safe' | 'user-or-explicit-only' | 'disabled';
-
 const ENV_EXCLUDED_FLAG_KEYS = new Set<FlagKey>(['appsFilter', 'iosSimulatorDeviceSet']);
 
-let optionSpecs: OptionSpec[] | undefined;
-let optionSpecByKey: Map<FlagKey, OptionSpec> | undefined;
+const optionSpecs = buildOptionSpecs();
+const optionSpecByKey = new Map(optionSpecs.map((spec) => [spec.key, spec]));
 
 export function getOptionSpec(key: FlagKey): OptionSpec | undefined {
-  return getOptionSpecsByKey().get(key);
+  return optionSpecByKey.get(key);
 }
 
 export function getConfigurableOptionSpecs(command: string | null): OptionSpec[] {
-  return getOptionSpecs().filter(
+  return optionSpecs.filter(
     (spec) => spec.config.trust !== 'disabled' && spec.supportsCommand(command),
   );
-}
-
-function getOptionSpecs(): OptionSpec[] {
-  if (optionSpecs) return optionSpecs;
-  optionSpecs = buildOptionSpecs();
-  optionSpecByKey = new Map(optionSpecs.map((spec) => [spec.key, spec]));
-  return optionSpecs;
-}
-
-function getOptionSpecsByKey(): Map<FlagKey, OptionSpec> {
-  getOptionSpecs();
-  if (!optionSpecByKey) throw new Error('Option specs were not initialized.');
-  return optionSpecByKey;
 }
 
 export function isFlagSupportedForCommand(key: FlagKey, command: string | null): boolean {
@@ -106,174 +92,6 @@ function buildOptionSpecs(): OptionSpec[] {
       },
     }))
     .sort((left, right) => left.key.localeCompare(right.key));
-}
-
-// This record is deliberately exhaustive over FlagKey. A new CLI flag must be
-// classified before it can silently become valid in repository config.
-const CONFIG_TRUST_BY_FLAG = {
-  config: 'disabled',
-  remoteConfig: 'disabled',
-  help: 'disabled',
-  version: 'disabled',
-  batchSteps: 'disabled',
-  githubActionsArtifact: 'disabled',
-  stateDir: 'user-or-explicit-only',
-  daemonBaseUrl: 'user-or-explicit-only',
-  daemonAuthToken: 'user-or-explicit-only',
-  daemonTransport: 'user-or-explicit-only',
-  daemonServerMode: 'user-or-explicit-only',
-  proxyHost: 'user-or-explicit-only',
-  proxyPort: 'user-or-explicit-only',
-  tenant: 'user-or-explicit-only',
-  sessionIsolation: 'user-or-explicit-only',
-  runId: 'user-or-explicit-only',
-  leaseId: 'user-or-explicit-only',
-  leaseBackend: 'user-or-explicit-only',
-  provider: 'user-or-explicit-only',
-  providerSessionId: 'user-or-explicit-only',
-  providerApp: 'user-or-explicit-only',
-  providerOsVersion: 'user-or-explicit-only',
-  providerProject: 'user-or-explicit-only',
-  providerBuild: 'user-or-explicit-only',
-  providerSessionName: 'user-or-explicit-only',
-  providerDeviceOrientation: 'user-or-explicit-only',
-  providerGeoLocation: 'user-or-explicit-only',
-  providerTimezone: 'user-or-explicit-only',
-  providerLanguage: 'user-or-explicit-only',
-  providerLocale: 'user-or-explicit-only',
-  providerNetworkProfile: 'user-or-explicit-only',
-  providerCustomNetwork: 'user-or-explicit-only',
-  providerNoResignApp: 'user-or-explicit-only',
-  awsProjectArn: 'user-or-explicit-only',
-  awsDeviceArn: 'user-or-explicit-only',
-  awsAppArn: 'user-or-explicit-only',
-  awsRegion: 'user-or-explicit-only',
-  awsInteractionMode: 'user-or-explicit-only',
-  header: 'user-or-explicit-only',
-  installSource: 'user-or-explicit-only',
-  metroProjectRoot: 'user-or-explicit-only',
-  metroKind: 'user-or-explicit-only',
-  metroPublicBaseUrl: 'user-or-explicit-only',
-  metroProxyBaseUrl: 'user-or-explicit-only',
-  metroBearerToken: 'user-or-explicit-only',
-  metroPreparePort: 'user-or-explicit-only',
-  metroListenHost: 'user-or-explicit-only',
-  metroStatusHost: 'user-or-explicit-only',
-  metroStartupTimeoutMs: 'user-or-explicit-only',
-  metroProbeTimeoutMs: 'user-or-explicit-only',
-  metroRuntimeFile: 'user-or-explicit-only',
-  metroNoReuseExisting: 'user-or-explicit-only',
-  metroNoInstallDeps: 'user-or-explicit-only',
-  metroHost: 'user-or-explicit-only',
-  metroPort: 'user-or-explicit-only',
-  bundleUrl: 'user-or-explicit-only',
-  iosSimulatorDeviceSet: 'user-or-explicit-only',
-  iosXctestrunFile: 'user-or-explicit-only',
-  iosXctestDerivedDataPath: 'user-or-explicit-only',
-  iosXctestEnvDir: 'user-or-explicit-only',
-  androidDeviceAllowlist: 'user-or-explicit-only',
-  targetApp: 'user-or-explicit-only',
-  artifactsDir: 'user-or-explicit-only',
-  artifact: 'user-or-explicit-only',
-  dsym: 'user-or-explicit-only',
-  searchPath: 'user-or-explicit-only',
-  out: 'user-or-explicit-only',
-  steps: 'user-or-explicit-only',
-  stepsFile: 'user-or-explicit-only',
-  replayEnv: 'user-or-explicit-only',
-  replayShellEnv: 'user-or-explicit-only',
-  json: 'project-safe',
-  platform: 'project-safe',
-  target: 'project-safe',
-  device: 'project-safe',
-  udid: 'project-safe',
-  serial: 'project-safe',
-  session: 'project-safe',
-  sessionLock: 'project-safe',
-  activity: 'project-safe',
-  launchConsole: 'project-safe',
-  launchArgs: 'project-safe',
-  launchUrl: 'project-safe',
-  remote: 'project-safe',
-  deviceHub: 'project-safe',
-  testIme: 'project-safe',
-  appsFilter: 'project-safe',
-  clean: 'project-safe',
-  force: 'project-safe',
-  stale: 'project-safe',
-  relaunch: 'project-safe',
-  shutdown: 'project-safe',
-  surface: 'project-safe',
-  headless: 'project-safe',
-  restart: 'project-safe',
-  noRecord: 'project-safe',
-  record: 'project-safe',
-  recordAs: 'project-safe',
-  saveScript: 'project-safe',
-  snapshotInteractiveOnly: 'project-safe',
-  snapshotDiff: 'project-safe',
-  snapshotDepth: 'project-safe',
-  snapshotScope: 'project-safe',
-  snapshotRaw: 'project-safe',
-  snapshotForceFull: 'project-safe',
-  screenshotPixelDensity: 'project-safe',
-  screenshotFullscreen: 'project-safe',
-  screenshotMaxSize: 'project-safe',
-  screenshotNoStabilize: 'project-safe',
-  screenshotNormalizeStatusBar: 'project-safe',
-  overlayRefs: 'project-safe',
-  networkInclude: 'project-safe',
-  baseline: 'project-safe',
-  threshold: 'project-safe',
-  count: 'project-safe',
-  pointerCount: 'project-safe',
-  fps: 'project-safe',
-  quality: 'project-safe',
-  hideTouches: 'project-safe',
-  recordingScope: 'project-safe',
-  intervalMs: 'project-safe',
-  delayMs: 'project-safe',
-  durationMs: 'project-safe',
-  holdMs: 'project-safe',
-  jitterPx: 'project-safe',
-  pixels: 'project-safe',
-  doubleTap: 'project-safe',
-  verify: 'project-safe',
-  settle: 'project-safe',
-  settleQuietMs: 'project-safe',
-  clickButton: 'project-safe',
-  backMode: 'project-safe',
-  pauseMs: 'project-safe',
-  pattern: 'project-safe',
-  kind: 'project-safe',
-  perfTemplate: 'project-safe',
-  responseLevel: 'project-safe',
-  verbose: 'project-safe',
-  cost: 'project-safe',
-  timeoutMs: 'project-safe',
-  retries: 'project-safe',
-  failFast: 'project-safe',
-  recordVideo: 'project-safe',
-  replayUpdate: 'project-safe',
-  replayMaestro: 'project-safe',
-  replayFrom: 'project-safe',
-  replayPlanDigest: 'project-safe',
-  replayKeepSession: 'project-safe',
-  findFirst: 'project-safe',
-  findLast: 'project-safe',
-  batchOnError: 'project-safe',
-  batchMaxSteps: 'project-safe',
-  retainPaths: 'project-safe',
-  retentionMs: 'project-safe',
-  reporter: 'project-safe',
-  reportJunit: 'project-safe',
-  shardAll: 'project-safe',
-  shardSplit: 'project-safe',
-  noLogin: 'project-safe',
-} satisfies Record<FlagKey, ConfigTrust>;
-
-function configTrustForFlag(key: FlagKey): ConfigTrust {
-  return CONFIG_TRUST_BY_FLAG[key];
 }
 
 function primaryFlagDefinition(spec: OptionSpec): FlagDefinition {

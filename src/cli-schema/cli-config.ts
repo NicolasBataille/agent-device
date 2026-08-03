@@ -8,8 +8,8 @@ import {
   getConfigurableOptionSpecs,
   getOptionSpec,
   parseOptionValueFromSource,
-  type ConfigTrust,
 } from './option-schema.ts';
+import type { ConfigTrust } from './config-trust.ts';
 import { parseInstallSourceConfig } from '../utils/install-source-config.ts';
 import type { EnvMap } from '../utils/env-map.ts';
 
@@ -108,17 +108,16 @@ function parseConfigObject(
 ): Partial<CliFlags> {
   const flags: Partial<CliFlags> = {};
   for (const [rawKey, rawValue] of Object.entries(source)) {
-    if (rawKey === 'installSource') {
-      assertConfigTrust('installSource', 'user-or-explicit-only', origin);
-      flags.installSource = parseInstallSourceConfig(rawValue, origin.label);
-      continue;
-    }
     const key = rawKey as FlagKey;
     const spec = getOptionSpec(key);
     if (!spec) {
       throw new AppError('INVALID_ARGS', `Unknown config key "${rawKey}" in ${origin.label}.`);
     }
     assertConfigTrust(rawKey, spec.config.trust, origin);
+    if (key === 'installSource') {
+      flags.installSource = parseInstallSourceConfig(rawValue, origin.label);
+      continue;
+    }
     (flags as Record<string, unknown>)[key] = parseOptionValueFromSource(
       spec,
       rawValue,

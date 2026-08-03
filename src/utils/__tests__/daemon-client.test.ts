@@ -1002,16 +1002,18 @@ test('sendToDaemon uses explicit remote daemon base URL and auth token', async (
   const previousBaseUrl = process.env.AGENT_DEVICE_DAEMON_BASE_URL;
   const previousAuthToken = process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN;
   process.env.AGENT_DEVICE_DAEMON_BASE_URL = 'http://remote-mac.example.test:7777/agent-device';
-  process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN = 'remote-secret';
+  process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN = 'ambient-token';
 
   try {
-    const response = await sendToDaemon({
-      session: 'default',
-      command: 'remote-smoke',
-      positionals: ['ping'],
-      flags: {},
-      meta: { requestId: 'req-remote' },
-    });
+    const response = await sendToDaemon(
+      {
+        session: 'default',
+        command: 'remote-smoke',
+        positionals: ['ping'],
+        meta: { requestId: 'req-remote' },
+      },
+      { authToken: 'remote-secret' },
+    );
 
     assert.equal(response.ok, true);
     assert.deepEqual(response.data, { source: 'remote-daemon' });
@@ -1033,14 +1035,11 @@ test('sendToDaemon uses explicit remote daemon base URL and auth token', async (
   }
 });
 
-test('sendToDaemon moves a direct-dispatch auth token out of serialized flags', async () => {
+test('sendToDaemon moves a raw direct-dispatch token into auth instead of RPC flags', async () => {
   let rpcRequest: Record<string, unknown> | undefined;
   let authHeader = '';
   const restoreHttpRequest = mockEventHttpRequest(({ options, body, res }) => {
-    if (options.method === 'GET') {
-      res.emit('end');
-      return;
-    }
+    if (respondToHealthcheck(options, res)) return;
     authHeader = String(options.headers.authorization ?? '');
     rpcRequest = JSON.parse(body) as Record<string, unknown>;
     emitJsonRpcResult(res, 'req-direct-dispatch', { ok: true, data: {} });
@@ -1052,12 +1051,9 @@ test('sendToDaemon moves a direct-dispatch auth token out of serialized flags', 
         session: 'default',
         command: 'remote-smoke',
         positionals: ['ping'],
-        // React DevTools uses this direct transport path instead of the public
-        // client flag builder, so retain a counterfactual guard here.
         flags: { daemonAuthToken: 'direct-dispatch-token' } as never,
         meta: { requestId: 'req-direct-dispatch' },
       });
-
       assert.equal(response.ok, true);
     });
 
