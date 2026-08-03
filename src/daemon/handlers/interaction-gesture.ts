@@ -10,7 +10,7 @@ import {
   SWIPE_REPETITION_MAX,
   SWIPE_SERIES_MAX_SCHEDULED_DURATION_MS,
   type GesturePayload,
-  type GestureSemanticInput,
+  type PublicGestureSemanticInput,
   type SwipePayload,
 } from '@agent-device/contracts/interaction';
 import { AppError, normalizeError } from '@agent-device/kernel/errors';
@@ -45,21 +45,36 @@ export async function dispatchGestureViaRuntime(
 ): Promise<DaemonResponse> {
   return await dispatchGestureInteraction(params, 'gesture', async (session) => {
     const input = readGesturePayload(params.req.input);
-    const normalized = normalizePublicGesture(input);
-    if (normalized.gesture.intent === 'pan' && params.req.internal?.gestureExecutionProfile) {
-      normalized.gesture.executionProfile = params.req.internal.gestureExecutionProfile;
+    const gesture: PublicGestureSemanticInput =
+      input.kind === 'drag'
+        ? {
+            intent: 'drag',
+            source: input.source,
+            destination: input.destination,
+            sourceHoldMs: input.sourceHoldMs,
+            moveMs: input.moveMs,
+            destinationHoldMs: input.destinationHoldMs,
+          }
+        : normalizePublicGesture(input).gesture;
+    if (gesture.intent === 'pan' && params.req.internal?.gestureExecutionProfile) {
+      gesture.executionProfile = params.req.internal.gestureExecutionProfile;
     }
-    requireGestureSupported(normalized.gesture, session.device);
+    requireGestureSupported(
+      gesture.intent === 'drag'
+        ? { intent: 'pan', origin: { x: 0, y: 0 }, delta: { x: 0, y: 0 } }
+        : gesture,
+      session.device,
+    );
     const result = await createGestureRuntime(params).interactions.gesture({
       session: params.sessionName,
       requestId: params.req.meta?.requestId,
-      gesture: normalized.gesture,
+      gesture,
     });
     return {
       positionals: gesturePayloadToPositionals(input),
       flags: gestureReplayFlags(input, params.req.flags),
       responseData: gestureResponseData(result, {
-        executionProfile: resolveExecutionProfile(normalized.gesture),
+        executionProfile: resolveExecutionProfile(gesture),
       }),
       ...(input.kind === 'pinch' ? { recordingResultExtra: { scale: input.scale } } : {}),
     };
@@ -153,9 +168,10 @@ async function dispatchGestureInteraction(
   }
 }
 
-function resolveExecutionProfile(gesture: GestureSemanticInput): string | undefined {
+function resolveExecutionProfile(gesture: PublicGestureSemanticInput): string | undefined {
   if (gesture.intent === 'fling') return 'endpoint-hold';
   if (gesture.intent === 'pan') return gesture.executionProfile ?? 'timed-pan';
+  if (gesture.intent === 'drag') return 'hold-drag';
   return undefined;
 }
 

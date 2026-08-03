@@ -1,6 +1,11 @@
 import type { AgentDeviceRuntime, CommandContext } from '../../../runtime-contract.ts';
-import type { GestureIntent, GestureSemanticInput } from '@agent-device/contracts/interaction';
-import { buildGesturePlan } from '@agent-device/contracts/interaction';
+import type {
+  DragGestureTargetInput,
+  GestureIntent,
+  GestureSemanticInput,
+  PublicGestureSemanticInput,
+} from '@agent-device/contracts/interaction';
+import { buildGesturePlan, buildHoldDragGesturePlan } from '@agent-device/contracts/interaction';
 import type { Point, Rect } from '@agent-device/kernel/snapshot';
 import { AppError } from '@agent-device/kernel/errors';
 import { successText } from '../../../utils/success-text.ts';
@@ -10,15 +15,19 @@ import {
   type BackendResultEnvelope,
   type RuntimeCommand,
 } from '../../runtime-types.ts';
-import { assertSupportedInteractionSurface, captureInteractionSnapshot } from './resolution.ts';
+import {
+  assertSupportedInteractionSurface,
+  captureInteractionSnapshot,
+  resolveInteractionTarget,
+} from './resolution.ts';
 import { resolveVisibleSnapshotViewport } from './viewport.ts';
 
 export type GestureCommandOptions = CommandContext & {
-  gesture: GestureSemanticInput;
+  gesture: PublicGestureSemanticInput;
 };
 
 export type GestureCommandResult = {
-  kind: GestureIntent;
+  kind: GestureIntent | 'drag';
   durationMs: number;
   pointerCount: 1 | 2;
   from: Point;
@@ -32,9 +41,13 @@ export const gestureCommand: RuntimeCommand<GestureCommandOptions, GestureComman
   if (!runtime.backend.performGesture) {
     throw new AppError('UNSUPPORTED_OPERATION', 'gesture is not supported by this backend');
   }
-  await assertSupportedInteractionSurface(runtime, options, options.gesture.intent);
+  const supportedIntent = options.gesture.intent === 'drag' ? 'pan' : options.gesture.intent;
+  await assertSupportedInteractionSurface(runtime, options, supportedIntent);
   const viewport = await captureGestureViewport(runtime, options);
-  const plan = buildGesturePlan(options.gesture, viewport, runtime.backend.platform);
+  const plan =
+    options.gesture.intent === 'drag'
+      ? await buildResolvedHoldDragPlan(runtime, options, options.gesture, viewport)
+      : buildGesturePlan(options.gesture, viewport, runtime.backend.platform);
   const backendResult = await runtime.backend.performGesture(
     toBackendContext(runtime, options),
     plan,
@@ -43,15 +56,66 @@ export const gestureCommand: RuntimeCommand<GestureCommandOptions, GestureComman
   const from = centroidAt(plan.pointers, 0);
   const to = centroidAt(plan.pointers, -1);
   return {
-    kind: plan.intent,
+    kind: options.gesture.intent,
     durationMs: plan.durationMs,
     pointerCount: plan.topology === 'single' ? 1 : 2,
     from,
     to,
     ...(formattedBackendResult ? { backendResult: formattedBackendResult } : {}),
-    ...successText(gestureMessage(options.gesture, from, to)),
+    ...successText(
+      options.gesture.intent === 'drag'
+        ? dragGestureMessage(options.gesture)
+        : gestureMessage(options.gesture, from, to),
+    ),
   };
 };
+
+async function buildResolvedHoldDragPlan(
+  runtime: AgentDeviceRuntime,
+  options: GestureCommandOptions,
+  gesture: DragGestureTargetInput,
+  viewport: Rect,
+) {
+  const source = await resolveDragTarget(runtime, options, gesture.source, 'source');
+  const destination = await resolveDragTarget(runtime, options, gesture.destination, 'destination');
+  return buildHoldDragGesturePlan(
+    {
+      from: source,
+      to: destination,
+      sourceHoldMs: gesture.sourceHoldMs,
+      moveMs: gesture.moveMs,
+      destinationHoldMs: gesture.destinationHoldMs,
+    },
+    viewport,
+    runtime.backend.platform,
+  );
+}
+
+async function resolveDragTarget(
+  runtime: AgentDeviceRuntime,
+  options: GestureCommandOptions,
+  target: string,
+  role: 'source' | 'destination',
+): Promise<Point> {
+  const resolved = await resolveInteractionTarget(
+    runtime,
+    {
+      ...options,
+      target: target.startsWith('@')
+        ? { kind: 'ref', ref: target }
+        : { kind: 'selector', selector: target },
+    },
+    {
+      action: 'pan',
+      requireInteractive: false,
+      promoteToHittableAncestor: false,
+    },
+  );
+  if (!resolved.point) {
+    throw new AppError('COMMAND_FAILED', `gesture drag ${role} resolved without coordinates`);
+  }
+  return resolved.point;
+}
 
 async function captureGestureViewport(
   runtime: AgentDeviceRuntime,
@@ -80,6 +144,10 @@ function centroidAt(
     x: defined.reduce((sum, point) => sum + point.x, 0) / defined.length,
     y: defined.reduce((sum, point) => sum + point.y, 0) / defined.length,
   };
+}
+
+function dragGestureMessage(input: DragGestureTargetInput): string {
+  return `Dragged ${input.source} to ${input.destination}`;
 }
 
 function gestureMessage(input: GestureSemanticInput, from: Point, to: Point): string {

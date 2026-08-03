@@ -58,6 +58,18 @@ test('gesture recording codec round-trips fling with distance', () => {
   assert.deepEqual(gesturePayloadFromPositionals(gesturePayloadToPositionals(payload)), payload);
 });
 
+test('gesture recording codec round-trips selector-authored hold drag timings', () => {
+  const payload = {
+    kind: 'drag' as const,
+    source: 'label="Blue card"',
+    destination: '@destination',
+    sourceHoldMs: 800,
+    moveMs: 700,
+    destinationHoldMs: 250,
+  };
+  assert.deepEqual(gesturePayloadFromPositionals(gesturePayloadToPositionals(payload)), payload);
+});
+
 test('a retired trailing positional reports its migration, not a bare usage line', () => {
   assert.throws(() => swipePayloadFromPositionals(['197', '650', '197', '300', '300']), {
     code: 'INVALID_ARGS',

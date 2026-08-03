@@ -1,0 +1,5 @@
+context platform=ios device="iPhone 17 Pro" kind=simulator theme=unknown
+open "reorderable.example" --relaunch
+gesture "drag" "label=\"Blue card, position 1\"" "label=\"Yellow card, position 3\"" 800 700 250
+# agent-device:target-v1 {"role":"other","label":"Blue card, position 3","ancestry":[{"role":"other","label":"Green card, position 1"},{"role":"other","label":"Single collection cards"},{"role":"other","label":"Cards"},{"role":"application","label":"ReorderableExample"}],"sibling":2,"viewportOrder":0,"rect":{"x":16,"y":297.6666717529297,"width":370,"height":54},"verification":"verified"}
+wait "label=\"Blue card, position 3\"" 10000
