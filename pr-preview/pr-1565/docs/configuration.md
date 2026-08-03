@@ -80,7 +80,6 @@ user- or explicit-config only:
 - `runId`
 - `leaseId`
 - `leaseBackend`
-- `sessionLock` when paired with an explicitly named session
 - provider/cloud fields (`provider*`, `aws*`)
 - Metro endpoint/token fields (`metro*`, `bundleUrl`)
 - request headers and structured install sources
