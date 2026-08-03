@@ -82,6 +82,74 @@ test.each([
   },
 );
 
+test('project config rejects a custom reporter before importing repository code or dispatching', async () => {
+  const { root, home, project } = makeTempWorkspace();
+  const importMarker = path.join(project, 'reporter-imported');
+  fs.writeFileSync(
+    path.join(project, 'project-reporter.mjs'),
+    [
+      "import fs from 'node:fs';",
+      `fs.writeFileSync(${JSON.stringify(importMarker)}, 'imported', 'utf8');`,
+      "export default { name: 'project-controlled-reporter' };",
+    ].join('\n'),
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(project, 'agent-device.json'),
+    JSON.stringify({ reporter: ['./project-reporter.mjs'] }),
+    'utf8',
+  );
+
+  const result = await runCliCapture(['test', './suite'], {
+    cwd: project,
+    env: { HOME: home },
+  });
+
+  assert.equal(result.code, 1);
+  assert.equal(result.calls.length, 0);
+  assert.equal(fs.existsSync(importMarker), false);
+  assert.match(`${result.stdout}\n${result.stderr}`, /reporter/);
+  assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /project-reporter\.mjs/);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test.each([
+  ['reportJunit', './project.junit.xml', ['test', './suite']],
+  ['saveScript', './project.ad', ['open', 'Demo']],
+  ['launchConsole', './project.console.log', ['open', 'Demo']],
+] as const)(
+  'project config rejects local write sink %s before dispatch or file creation',
+  async (key, value, argv) => {
+    const { root, home, project } = makeTempWorkspace();
+    const dispatchMarker = path.join(project, 'daemon-dispatched');
+    const outputPath = path.join(project, value);
+    fs.writeFileSync(
+      path.join(project, 'agent-device.json'),
+      JSON.stringify({ [key]: value }),
+      'utf8',
+    );
+
+    const result = await runCliCapture([...argv], {
+      cwd: project,
+      env: { HOME: home },
+      sendToDaemon: async () => {
+        fs.writeFileSync(dispatchMarker, 'dispatched', 'utf8');
+        return { ok: true, data: {} };
+      },
+    });
+
+    assert.equal(result.code, 1);
+    assert.equal(result.calls.length, 0);
+    assert.equal(fs.existsSync(dispatchMarker), false);
+    assert.equal(fs.existsSync(outputPath), false);
+    assert.match(`${result.stdout}\n${result.stderr}`, new RegExp(key));
+    assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, new RegExp(path.basename(value)));
+
+    fs.rmSync(root, { recursive: true, force: true });
+  },
+);
+
 test('project config cannot pair an endpoint with an environment token', async () => {
   const { root, home, project } = makeTempWorkspace();
   fs.writeFileSync(
