@@ -2384,8 +2384,9 @@ user- or explicit-config only:
 - provider/cloud fields (`provider*`, `aws*`)
 - Metro endpoint/token fields (`metro*`, `bundleUrl`)
 - request headers and structured install sources
+- local code and write destinations (`reporter`, `reportJunit`, `saveScript`, `launchConsole`)
 
-Project config can use project-safe command defaults such as `snapshotDepth`, `snapshotScope`, `activity`, `relaunch`, `shutdown`, `fps`, `quality`, and `saveScript`. `stepsFile` is user- or explicit-config only because it selects a local file.
+Project config can use project-safe command defaults such as `snapshotDepth`, `snapshotScope`, `activity`, `relaunch`, `shutdown`, `fps`, and `quality`. Local path and executable-module selectors such as `stepsFile` and `reporter` are user- or explicit-config only.
 
 `install-from-source` can read a structured GitHub Actions artifact source from user or explicit config when a compatible remote daemon resolves CI artifacts server-side. Repository config rejects this operator-controlled source:
 
