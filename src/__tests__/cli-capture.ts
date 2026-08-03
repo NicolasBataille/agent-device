@@ -33,6 +33,7 @@ export type CliCaptureOptions = {
   env?: Record<string, string | undefined>;
   stateDirPrefix?: string;
   passthroughBufferWrites?: boolean;
+  useRealDaemonClient?: boolean;
   sendToDaemon?: (
     req: CapturedDaemonRequest,
     options?: DaemonTransportOptions,
@@ -105,7 +106,7 @@ export async function runCliCapture(
   };
 
   try {
-    await runCli(argv, { sendToDaemon });
+    await runCli(argv, options.useRealDaemonClient ? undefined : { sendToDaemon });
   } catch (error) {
     if (error instanceof ExitSignal) code = error.code;
     else throw error;

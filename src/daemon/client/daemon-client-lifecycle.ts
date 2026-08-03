@@ -73,9 +73,12 @@ LOOPBACK_BLOCK_LIST.addSubnet('127.0.0.0', 8, 'ipv4');
 LOOPBACK_BLOCK_LIST.addAddress('::1', 'ipv6');
 LOOPBACK_BLOCK_LIST.addSubnet('::ffff:127.0.0.0', 104, 'ipv6');
 
-export function resolveClientSettings(req: Omit<DaemonRequest, 'token'>): DaemonClientSettings {
+export function resolveClientSettings(
+  req: Omit<DaemonRequest, 'token'>,
+  suppliedAuthToken?: string,
+): DaemonClientSettings {
   const explicitStateDir = resolveExplicitStateDir(req);
-  const remote = resolveRemoteClientSettings(req);
+  const remote = resolveRemoteClientSettings(req, suppliedAuthToken);
   const transport = resolveTransportClientSettings(req, remote.remoteBaseUrl);
   const ownedStateDir = shouldUseOwnedReplayStateDir(req, explicitStateDir, remote.rawBaseUrl);
   const stateDir = ownedStateDir ? createOwnedReplayStateDir() : explicitStateDir;
@@ -93,14 +96,17 @@ function resolveExplicitStateDir(req: Omit<DaemonRequest, 'token'>): string | un
   return req.flags?.stateDir ?? process.env.AGENT_DEVICE_STATE_DIR;
 }
 
-function resolveRemoteClientSettings(req: Omit<DaemonRequest, 'token'>): {
+function resolveRemoteClientSettings(
+  req: Omit<DaemonRequest, 'token'>,
+  suppliedAuthToken: string | undefined,
+): {
   rawBaseUrl: string | undefined;
   remoteBaseUrl?: string;
   authToken?: string;
 } {
   const rawBaseUrl = req.flags?.daemonBaseUrl ?? process.env.AGENT_DEVICE_DAEMON_BASE_URL;
   const remoteBaseUrl = resolveRemoteDaemonBaseUrl(rawBaseUrl);
-  const authToken = req.flags?.daemonAuthToken ?? process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN;
+  const authToken = suppliedAuthToken ?? process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN;
   validateRemoteDaemonTrust(remoteBaseUrl, authToken);
   return { rawBaseUrl, remoteBaseUrl, authToken };
 }

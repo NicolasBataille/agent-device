@@ -170,7 +170,6 @@ test('Provider-backed integration doctor --remote skips local device inventory',
       const response = await daemon.callCommand('doctor', [], {
         remote: true,
         daemonBaseUrl: 'https://example.invalid/agent-device',
-        daemonAuthToken: 'secret',
       });
       assertRpcOk(response);
       const data = response.json.result.data;

@@ -1023,12 +1023,49 @@ test('sendToDaemon uses explicit remote daemon base URL and auth token', async (
     assert.equal((rpcRequest as any)?.params?.command, 'remote-smoke');
     assert.deepEqual((rpcRequest as any)?.params?.positionals, ['ping']);
     assert.equal((rpcRequest as any)?.params?.token, 'remote-secret');
+    assert.equal((rpcRequest as any)?.params?.flags?.daemonAuthToken, undefined);
   } finally {
     (http as unknown as { request: typeof http.request }).request = originalHttpRequest;
     if (previousBaseUrl === undefined) delete process.env.AGENT_DEVICE_DAEMON_BASE_URL;
     else process.env.AGENT_DEVICE_DAEMON_BASE_URL = previousBaseUrl;
     if (previousAuthToken === undefined) delete process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN;
     else process.env.AGENT_DEVICE_DAEMON_AUTH_TOKEN = previousAuthToken;
+  }
+});
+
+test('sendToDaemon moves a direct-dispatch auth token out of serialized flags', async () => {
+  let rpcRequest: Record<string, unknown> | undefined;
+  let authHeader = '';
+  const restoreHttpRequest = mockEventHttpRequest(({ options, body, res }) => {
+    if (options.method === 'GET') {
+      res.emit('end');
+      return;
+    }
+    authHeader = String(options.headers.authorization ?? '');
+    rpcRequest = JSON.parse(body) as Record<string, unknown>;
+    emitJsonRpcResult(res, 'req-direct-dispatch', { ok: true, data: {} });
+  });
+
+  try {
+    await withRemoteDaemonEnv(async () => {
+      const response = await sendToDaemon({
+        session: 'default',
+        command: 'remote-smoke',
+        positionals: ['ping'],
+        // React DevTools uses this direct transport path instead of the public
+        // client flag builder, so retain a counterfactual guard here.
+        flags: { daemonAuthToken: 'direct-dispatch-token' } as never,
+        meta: { requestId: 'req-direct-dispatch' },
+      });
+
+      assert.equal(response.ok, true);
+    });
+
+    assert.equal(authHeader, 'Bearer direct-dispatch-token');
+    assert.equal((rpcRequest as any)?.params?.token, 'direct-dispatch-token');
+    assert.equal((rpcRequest as any)?.params?.flags?.daemonAuthToken, undefined);
+  } finally {
+    restoreHttpRequest();
   }
 });
 

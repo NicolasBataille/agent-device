@@ -48,7 +48,9 @@ agent-device disconnect
 
 Multiple agents can share one proxy when each uses the normal `connect proxy`, `open`, commands, `close`, and `disconnect` flow. A busy device error means another agent owns the device until it closes or its inactivity lease expires.
 
-Do not commit a config file that contains a live `daemonAuthToken`.
+Do not put proxy endpoint, token, tenant, or provider fields in `./agent-device.json`: repository
+configuration is intentionally limited to project-safe automation defaults. Use `connect proxy`, user
+config, an explicit `--config` file, or protected CI environment variables for the endpoint and token.
 
 ## What Is Exposed
 

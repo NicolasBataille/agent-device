@@ -1,6 +1,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -9,6 +10,12 @@ import {
   readRemoteConnectionState,
 } from '../remote/remote-connection-state.ts';
 import { runCliCapture, type CapturedDaemonRequest } from './cli-capture.ts';
+import { readDaemonRequestAuthToken } from '../daemon/client/daemon-client-auth.ts';
+import {
+  closeLoopbackServer,
+  listenOnLoopback,
+  skipWhenLoopbackUnavailable,
+} from './test-utils/loopback.ts';
 
 function makeTempWorkspace(): { root: string; home: string; project: string } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-device-config-'));
@@ -72,11 +79,11 @@ test('config can set appsFilter through canonical enum values', async () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('config can provide install-from-source GitHub Actions artifact source', async () => {
+test('user config can provide install-from-source GitHub Actions artifact source', async () => {
   const { root, home, project } = makeTempWorkspace();
   fs.mkdirSync(path.join(home, '.agent-device'), { recursive: true });
   fs.writeFileSync(
-    path.join(project, 'agent-device.json'),
+    path.join(home, '.agent-device', 'config.json'),
     JSON.stringify({
       platform: 'android',
       installSource: {
@@ -134,7 +141,7 @@ test('command-specific config defaults are ignored for commands that do not supp
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('interaction commands preserve remote config defaults', async () => {
+test('project config rejects remote connection fields before daemon dispatch without echoing values', async () => {
   const { root, home, project } = makeTempWorkspace();
   fs.mkdirSync(path.join(home, '.agent-device'), { recursive: true });
   fs.writeFileSync(
@@ -151,35 +158,62 @@ test('interaction commands preserve remote config defaults', async () => {
     'utf8',
   );
 
-  const commands = [
-    ['press', '10', '20'],
-    ['click', '10', '20'],
-    ['fill', '10', '20', 'hello'],
-    ['longpress', '10', '20'],
-    ['get', 'text', '@e1'],
-  ];
+  const result = await runCliCapture(['press', '10', '20', '--json'], {
+    cwd: project,
+    env: { HOME: home },
+  });
 
-  for (const command of commands) {
-    const result = await runCliCapture([...command, '--json'], {
-      cwd: project,
-      env: { HOME: home },
-    });
-
-    assert.equal(result.code, null, command.join(' '));
-    assert.equal(result.calls.length, 1, command.join(' '));
-    assert.equal(result.calls[0]?.flags?.daemonBaseUrl, 'https://daemon.example.test');
-    assert.equal(result.calls[0]?.flags?.daemonAuthToken, 'token-123');
-    assert.equal(result.calls[0]?.flags?.daemonTransport, 'http');
-    assert.equal(result.calls[0]?.flags?.tenant, 'tenant-123');
-    assert.equal(result.calls[0]?.flags?.runId, 'run-123');
-    assert.equal(result.calls[0]?.flags?.leaseId, 'lease-123');
-    assert.equal(result.calls[0]?.flags?.platform, 'ios');
-  }
+  assert.equal(result.code, 1);
+  assert.equal(result.calls.length, 0);
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.match(output, /daemonBaseUrl/);
+  assert.match(output, /not allowed in project config file/i);
+  assert.doesNotMatch(output, /daemon\.example\.test|token-123|tenant-123|run-123|lease-123/);
 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('normal config can point commands at a direct remote daemon proxy', async () => {
+test.each([
+  ['daemonAuthToken', 'synthetic-token'],
+  ['daemonTransport', 'http'],
+  ['daemonServerMode', 'http'],
+  ['tenant', 'tenant-controlled-by-project'],
+  ['sessionIsolation', 'tenant'],
+  ['runId', 'project-run'],
+  ['leaseId', 'project-lease'],
+  ['leaseBackend', 'android-instance'],
+  ['provider', 'browserstack'],
+  ['metroBearerToken', 'synthetic-metro-token'],
+  ['header', ['authorization: Bearer synthetic-header-token']],
+] as const)(
+  'project config rejects protected %s without dispatching or echoing its value',
+  async (key, value) => {
+    const { root, home, project } = makeTempWorkspace();
+    fs.writeFileSync(
+      path.join(project, 'agent-device.json'),
+      JSON.stringify({ [key]: value }),
+      'utf8',
+    );
+
+    const result = await runCliCapture(['devices', '--json'], {
+      cwd: project,
+      env: { HOME: home },
+    });
+
+    assert.equal(result.code, 1);
+    assert.equal(result.calls.length, 0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.match(output, new RegExp(key));
+    assert.doesNotMatch(
+      output,
+      /synthetic-token|tenant-controlled-by-project|project-run|project-lease|browserstack|synthetic-metro-token|synthetic-header-token/,
+    );
+
+    fs.rmSync(root, { recursive: true, force: true });
+  },
+);
+
+test('project config cannot pair an endpoint with an environment token', async () => {
   const { root, home, project } = makeTempWorkspace();
   fs.mkdirSync(path.join(home, '.agent-device'), { recursive: true });
   fs.writeFileSync(
@@ -193,21 +227,92 @@ test('normal config can point commands at a direct remote daemon proxy', async (
 
   const result = await runCliCapture(['devices', '--json'], {
     cwd: project,
-    env: { HOME: home },
+    env: { HOME: home, AGENT_DEVICE_DAEMON_AUTH_TOKEN: 'operator-token' },
   });
 
-  assert.equal(result.code, null);
-  assert.equal(result.calls.length, 1);
-  assert.equal(result.calls[0]?.command, 'devices');
-  assert.equal(
-    result.calls[0]?.flags?.daemonBaseUrl,
-    'https://example.trycloudflare.com/agent-device',
+  assert.equal(result.code, 1);
+  assert.equal(result.calls.length, 0);
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.match(output, /daemonBaseUrl/);
+  assert.doesNotMatch(output, /example\.trycloudflare\.com|proxy-token|operator-token/);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('project-selected endpoint with an environment token makes no health or RPC request', async (t) => {
+  if (await skipWhenLoopbackUnavailable(t, 'project config transport rejection coverage')) return;
+  const { root, home, project } = makeTempWorkspace();
+  const requests: string[] = [];
+  const server = http.createServer((request, response) => {
+    requests.push(`${request.method} ${request.url}`);
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ ok: true, rpcProtocolVersion: 2 }));
+  });
+  const port = await listenOnLoopback(server);
+  fs.writeFileSync(
+    path.join(project, 'agent-device.json'),
+    JSON.stringify({ daemonBaseUrl: `http://127.0.0.1:${port}/agent-device` }),
+    'utf8',
   );
-  assert.equal(result.calls[0]?.flags?.daemonAuthToken, 'proxy-token');
-  assert.equal(Object.hasOwn(result.calls[0]?.flags ?? {}, 'platform'), false);
-  assert.equal(Object.hasOwn(result.calls[0]?.flags ?? {}, 'remoteConfig'), false);
-  assert.equal(Object.hasOwn(result.calls[0]?.flags ?? {}, 'tenant'), false);
-  assert.equal(Object.hasOwn(result.calls[0]?.flags ?? {}, 'runId'), false);
+
+  try {
+    const result = await runCliCapture(['devices', '--json'], {
+      cwd: project,
+      env: { HOME: home, AGENT_DEVICE_DAEMON_AUTH_TOKEN: 'operator-token' },
+      useRealDaemonClient: true,
+    });
+
+    assert.equal(result.code, 1);
+    assert.deepEqual(requests, []);
+    assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /operator-token/);
+  } finally {
+    await closeLoopbackServer(server);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('user and explicit config retain remote connection fields', async () => {
+  const { root, home, project } = makeTempWorkspace();
+  fs.mkdirSync(path.join(home, '.agent-device'), { recursive: true });
+  const userConfig = path.join(home, '.agent-device', 'config.json');
+  fs.writeFileSync(
+    userConfig,
+    JSON.stringify({
+      daemonBaseUrl: 'https://daemon.example.test',
+      daemonAuthToken: 'user-token',
+      daemonTransport: 'http',
+      tenant: 'user-tenant',
+    }),
+    'utf8',
+  );
+
+  const userResult = await runCliCapture(['devices', '--json'], {
+    cwd: project,
+    env: { HOME: home },
+  });
+  assert.equal(userResult.code, null);
+  assert.equal(userResult.calls.length, 1);
+  assert.equal(userResult.calls[0]?.flags?.daemonBaseUrl, 'https://daemon.example.test');
+  assert.equal(Object.hasOwn(userResult.calls[0]?.flags ?? {}, 'daemonAuthToken'), false);
+  assert.equal(readDaemonRequestAuthToken(userResult.calls[0]!), 'user-token');
+
+  const explicitConfig = path.join(root, 'explicit.json');
+  fs.writeFileSync(
+    explicitConfig,
+    JSON.stringify({
+      daemonBaseUrl: 'https://explicit.example.test',
+      daemonAuthToken: 'explicit-token',
+    }),
+    'utf8',
+  );
+  const explicitResult = await runCliCapture(['devices', '--config', explicitConfig, '--json'], {
+    cwd: project,
+    env: { HOME: home },
+  });
+  assert.equal(explicitResult.code, null);
+  assert.equal(explicitResult.calls[0]?.flags?.daemonBaseUrl, 'https://explicit.example.test');
+  assert.equal(Object.hasOwn(explicitResult.calls[0]?.flags ?? {}, 'daemonAuthToken'), false);
+  assert.equal(readDaemonRequestAuthToken(explicitResult.calls[0]!), 'explicit-token');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

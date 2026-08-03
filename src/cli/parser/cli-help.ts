@@ -111,8 +111,8 @@ const AGENT_QUICKSTART_LINES = [
 ] as const;
 
 const CONFIGURATION_LINES = [
-  'Default config files: ~/.agent-device/config.json, ./agent-device.json',
-  'Use --config <path> or AGENT_DEVICE_CONFIG to load one explicit config file.',
+  'Default config files: ~/.agent-device/config.json, ./agent-device.json (project-safe defaults only).',
+  'Use --config <path> or AGENT_DEVICE_CONFIG for explicit connection/provider defaults; project config cannot select endpoints or credentials.',
 ] as const;
 
 const ENVIRONMENT_LINES = [

@@ -33,6 +33,7 @@ import type {
   DaemonResponseData,
 } from '@agent-device/kernel/contracts';
 import { AppError } from '@agent-device/kernel/errors';
+import { readDaemonRequestAuthToken } from '../daemon/client/daemon-client-auth.ts';
 
 // Isolated so open/close metro-session-hint file writes never touch the real state dir.
 const TEST_STATE_DIR = mkdtempSync(path.join(os.tmpdir(), 'agent-device-client-test-'));
@@ -175,6 +176,19 @@ test('client exposes narrowed result types for closed daemon projections', async
   assert.equal(prepareResult.timing.additiveParts.connectAfterBuildMs, 10);
   assert.equal(pushResult.platform, 'android');
   assert.equal(triggerResult.transport, 'deep-link');
+});
+
+test('client keeps daemon auth tokens out of command flags and custom transport payloads', async () => {
+  const setup = createTransport(async () => ({ ok: true, data: { devices: [] } }));
+  const client = createAgentDeviceClient(setup.config, { transport: setup.transport });
+
+  await client.devices.list();
+
+  assert.equal(setup.calls.length, 1);
+  const request = setup.calls[0];
+  assert.equal(readDaemonRequestAuthToken(request!), 'secret');
+  assert.equal(Object.hasOwn(request?.flags ?? {}, 'daemonAuthToken'), false);
+  assert.doesNotMatch(JSON.stringify(request), /secret/);
 });
 
 test('deprecated client.command.rotate delegates to orientation and keeps the legacy action', async () => {

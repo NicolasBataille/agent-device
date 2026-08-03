@@ -198,7 +198,7 @@ test('usage includes agent workflows, config, environment, and examples footers'
   );
   assert.match(
     usageText,
-    /Use --config <path> or AGENT_DEVICE_CONFIG to load one explicit config file\./,
+    /Use --config <path> or AGENT_DEVICE_CONFIG for explicit connection\/provider defaults; project config cannot select endpoints or credentials\./,
   );
   assert.match(usageText, /Environment:/);
   assert.match(usageText, /AGENT_DEVICE_SESSION\s+Explicit session name/);

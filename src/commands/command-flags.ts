@@ -15,7 +15,6 @@ function buildFlags(options: InternalRequestOptions): CommandFlags {
   return stripUndefined({
     stateDir: options.stateDir,
     daemonBaseUrl: options.daemonBaseUrl,
-    daemonAuthToken: options.daemonAuthToken,
     daemonTransport: options.daemonTransport,
     daemonServerMode: options.daemonServerMode,
     ...leaseScopeToCommandFlags(leaseScope),

@@ -8,6 +8,7 @@ import {
   getConfigurableOptionSpecs,
   getOptionSpec,
   parseOptionValueFromSource,
+  type ConfigTrust,
 } from './option-schema.ts';
 import { parseInstallSourceConfig } from '../utils/install-source-config.ts';
 import type { EnvMap } from '../utils/env-map.ts';
@@ -26,18 +27,24 @@ export function resolveConfigBackedFlagDefaults(options: {
   return mergeDefinedFlags(defaults, readEnvFlagDefaults(env, options.command));
 }
 
+type ConfigFileSource = 'user' | 'project' | 'explicit';
+
+type ConfigPath = { path: string; required: boolean; source: ConfigFileSource };
+
 function resolveConfigPaths(
   cwd: string,
   explicitCliConfigPath: string | undefined,
   env: EnvMap,
-): Array<{ path: string; required: boolean }> {
+): ConfigPath[] {
   const explicitConfig = explicitCliConfigPath ?? env.AGENT_DEVICE_CONFIG;
   if (explicitConfig) {
-    return [{ path: resolveInputPath(explicitConfig, cwd, env), required: true }];
+    return [
+      { path: resolveInputPath(explicitConfig, cwd, env), required: true, source: 'explicit' },
+    ];
   }
   return [
-    { path: resolveUserConfigPath(env), required: false },
-    { path: path.resolve(cwd, 'agent-device.json'), required: false },
+    { path: resolveUserConfigPath(env), required: false, source: 'user' },
+    { path: path.resolve(cwd, 'agent-device.json'), required: false, source: 'project' },
   ];
 }
 
@@ -49,18 +56,17 @@ function resolveInputPath(inputPath: string, cwd: string, env: EnvMap): string {
   return resolveUserPath(inputPath, { cwd, env });
 }
 
-function loadConfigFileDefaults(
-  pathsToCheck: Array<{ path: string; required: boolean }>,
-): Partial<CliFlags> {
+function loadConfigFileDefaults(pathsToCheck: ConfigPath[]): Partial<CliFlags> {
   const merged: Partial<CliFlags> = {};
   for (const entry of pathsToCheck) {
-    const parsed = loadSingleConfigFile(entry.path, entry.required);
+    const parsed = loadSingleConfigFile(entry);
     mergeDefinedFlags(merged, parsed);
   }
   return merged;
 }
 
-function loadSingleConfigFile(filePath: string, required: boolean): Partial<CliFlags> {
+function loadSingleConfigFile(entry: ConfigPath): Partial<CliFlags> {
+  const { path: filePath, required } = entry;
   if (!fs.existsSync(filePath)) {
     if (required) {
       throw new AppError('INVALID_ARGS', `Config file not found: ${filePath}`);
@@ -90,35 +96,54 @@ function loadSingleConfigFile(filePath: string, required: boolean): Partial<CliF
     throw new AppError('INVALID_ARGS', `Config file must contain a JSON object: ${filePath}`);
   }
 
-  return parseConfigObject(parsed as Record<string, unknown>, `config file ${filePath}`);
+  return parseConfigObject(parsed as Record<string, unknown>, {
+    source: entry.source,
+    label: `${entry.source === 'project' ? 'project ' : ''}config file ${filePath}`,
+  });
 }
 
 function parseConfigObject(
   source: Record<string, unknown>,
-  sourceLabel: string,
+  origin: { source: ConfigFileSource; label: string },
 ): Partial<CliFlags> {
   const flags: Partial<CliFlags> = {};
   for (const [rawKey, rawValue] of Object.entries(source)) {
     if (rawKey === 'installSource') {
-      flags.installSource = parseInstallSourceConfig(rawValue, sourceLabel);
+      assertConfigTrust('installSource', 'user-or-explicit-only', origin);
+      flags.installSource = parseInstallSourceConfig(rawValue, origin.label);
       continue;
     }
     const key = rawKey as FlagKey;
     const spec = getOptionSpec(key);
     if (!spec) {
-      throw new AppError('INVALID_ARGS', `Unknown config key "${rawKey}" in ${sourceLabel}.`);
+      throw new AppError('INVALID_ARGS', `Unknown config key "${rawKey}" in ${origin.label}.`);
     }
-    if (!spec.config.enabled) {
-      throw new AppError('INVALID_ARGS', `Unsupported config key "${rawKey}" in ${sourceLabel}.`);
-    }
+    assertConfigTrust(rawKey, spec.config.trust, origin);
     (flags as Record<string, unknown>)[key] = parseOptionValueFromSource(
       spec,
       rawValue,
-      sourceLabel,
+      origin.label,
       rawKey,
     );
   }
   return flags;
+}
+
+function assertConfigTrust(
+  rawKey: string,
+  trust: ConfigTrust,
+  origin: { source: ConfigFileSource; label: string },
+): void {
+  if (trust === 'project-safe') return;
+  if (trust === 'user-or-explicit-only' && origin.source !== 'project') return;
+  const guidance =
+    trust === 'disabled'
+      ? 'This key is not supported in config files.'
+      : 'Move it to ~/.agent-device/config.json, pass it with --config or AGENT_DEVICE_CONFIG, or provide it through CLI flags/environment variables.';
+  throw new AppError(
+    'INVALID_ARGS',
+    `Config key "${rawKey}" is not allowed in ${origin.label}. ${guidance}`,
+  );
 }
 
 function readEnvFlagDefaults(env: EnvMap, command: string | null): Partial<CliFlags> {

@@ -20,6 +20,7 @@ import {
 } from './daemon-client-lifecycle.ts';
 import { sendRequest } from './daemon-client-transport.ts';
 import { resolveDaemonRequestTimeoutMs } from './daemon-client-timeout.ts';
+import { readDaemonRequestAuthToken } from './daemon-client-auth.ts';
 
 export type DaemonRequest = SharedDaemonRequest;
 export type DaemonResponse = SharedDaemonResponse;
@@ -33,75 +34,147 @@ export async function sendToDaemon(
 ): Promise<DaemonResponse> {
   const requestId = req.meta?.requestId ?? createRequestId();
   const debug = Boolean(req.meta?.debug || req.flags?.verbose);
-  const settings = resolveClientSettings(req);
-  const requestTimeoutMs = resolveDaemonRequestTimeoutMs(req);
+  // A few internal callers build DaemonRequest directly instead of using the
+  // public client flag builder. Defend this transport boundary too: credentials
+  // belong in the auth channel, never in serializable request flags.
+  const { daemonAuthToken: flagAuthToken, ...flags } = req.flags as typeof req.flags & {
+    daemonAuthToken?: string;
+  };
+  const requestWithoutAuthFlag = { ...req, flags };
+  const settings = resolveClientSettings(
+    requestWithoutAuthFlag,
+    readDaemonRequestAuthToken(req) ?? flagAuthToken,
+  );
+  const requestTimeoutMs = resolveDaemonRequestTimeoutMs(requestWithoutAuthFlag);
   const daemon = await withDiagnosticTimer(
     'daemon_startup',
     async () => await ensureDaemon(settings),
     { requestId, session: req.session },
   );
   const info = daemon.info;
-  const preparedRemoteRequest = await prepareRemoteRequestArtifacts(req, info);
-  writeInstallInProgressNotice(req.command);
+  const preparedRemoteRequest = await prepareRemoteRequestArtifacts(requestWithoutAuthFlag, info);
+  writeInstallInProgressNotice(requestWithoutAuthFlag.command);
 
-  const request: DaemonRequest = {
-    ...req,
-    positionals: preparedRemoteRequest.positionals,
-    flags: preparedRemoteRequest.flags,
-    token: info.token,
-    meta: {
-      ...(req.meta ?? {}),
-      requestId,
-      debug,
-      includeCost: req.meta?.includeCost,
-      cwd: req.meta?.cwd,
-      sessionExplicit: req.meta?.sessionExplicit,
-      tenantId: req.meta?.tenantId ?? req.flags?.tenant,
-      runId: req.meta?.runId ?? req.flags?.runId,
-      leaseId: req.meta?.leaseId ?? req.flags?.leaseId,
-      sessionIsolation: req.meta?.sessionIsolation ?? req.flags?.sessionIsolation,
-      lockPolicy: req.meta?.lockPolicy,
-      lockPlatform: req.meta?.lockPlatform,
-      ...(preparedRemoteRequest.uploadedArtifactId
-        ? { uploadedArtifactId: preparedRemoteRequest.uploadedArtifactId }
-        : {}),
-      ...(preparedRemoteRequest.clientArtifactPaths
-        ? { clientArtifactPaths: preparedRemoteRequest.clientArtifactPaths }
-        : {}),
-      ...(preparedRemoteRequest.installSource
-        ? { installSource: preparedRemoteRequest.installSource }
-        : {}),
-    },
-  };
+  const request = buildTransportRequest(
+    requestWithoutAuthFlag,
+    preparedRemoteRequest,
+    info.token,
+    requestId,
+    debug,
+  );
   emitDiagnostic({
     level: 'info',
     phase: 'daemon_request_prepare',
     data: {
       requestId,
-      command: req.command,
-      session: req.session,
+      command: requestWithoutAuthFlag.command,
+      session: requestWithoutAuthFlag.session,
     },
   });
-  return await performDaemonRequestWithCleanup(req, daemon, settings, async () => {
-    const response = await withDiagnosticTimer(
-      'daemon_request',
-      async () =>
-        await sendRequest(
-          info,
-          request,
-          settings.transportPreference,
-          settings.paths,
-          requestTimeoutMs,
-          options,
-        ),
-      { requestId, command: req.command },
-    );
-    return withActiveSessionAddressHint(
-      withRepairSessionAddressHintIfOwned(response, settings),
-      req,
-      settings,
-    );
-  });
+  return await performDaemonRequestWithCleanup(
+    requestWithoutAuthFlag,
+    daemon,
+    settings,
+    async () => {
+      const response = await withDiagnosticTimer(
+        'daemon_request',
+        async () =>
+          await sendRequest(
+            info,
+            request,
+            settings.transportPreference,
+            settings.paths,
+            requestTimeoutMs,
+            options,
+          ),
+        { requestId, command: req.command },
+      );
+      return withActiveSessionAddressHint(
+        withRepairSessionAddressHintIfOwned(response, settings),
+        requestWithoutAuthFlag,
+        settings,
+      );
+    },
+  );
+}
+
+function buildTransportRequest(
+  request: Omit<DaemonRequest, 'token'>,
+  preparedRemoteRequest: Awaited<ReturnType<typeof prepareRemoteRequestArtifacts>>,
+  token: string,
+  requestId: string,
+  debug: boolean,
+): DaemonRequest {
+  return {
+    ...request,
+    positionals: preparedRemoteRequest.positionals,
+    flags: preparedRemoteRequest.flags,
+    token,
+    meta: buildTransportRequestMeta(request, preparedRemoteRequest, requestId, debug),
+  };
+}
+
+function buildTransportRequestMeta(
+  request: Omit<DaemonRequest, 'token'>,
+  preparedRemoteRequest: Awaited<ReturnType<typeof prepareRemoteRequestArtifacts>>,
+  requestId: string,
+  debug: boolean,
+): NonNullable<DaemonRequest['meta']> {
+  const meta = request.meta ?? {};
+  return {
+    ...meta,
+    requestId,
+    debug,
+    ...buildRequestScopeMeta(meta, request.flags),
+    ...buildRemoteArtifactMeta(preparedRemoteRequest),
+  };
+}
+
+function buildRequestScopeMeta(
+  meta: NonNullable<DaemonRequest['meta']>,
+  flags: DaemonRequest['flags'],
+): Pick<
+  NonNullable<DaemonRequest['meta']>,
+  | 'includeCost'
+  | 'cwd'
+  | 'sessionExplicit'
+  | 'tenantId'
+  | 'runId'
+  | 'leaseId'
+  | 'sessionIsolation'
+  | 'lockPolicy'
+  | 'lockPlatform'
+> {
+  return {
+    includeCost: meta.includeCost,
+    cwd: meta.cwd,
+    sessionExplicit: meta.sessionExplicit,
+    tenantId: meta.tenantId ?? flags?.tenant,
+    runId: meta.runId ?? flags?.runId,
+    leaseId: meta.leaseId ?? flags?.leaseId,
+    sessionIsolation: meta.sessionIsolation ?? flags?.sessionIsolation,
+    lockPolicy: meta.lockPolicy,
+    lockPlatform: meta.lockPlatform,
+  };
+}
+
+function buildRemoteArtifactMeta(
+  preparedRemoteRequest: Awaited<ReturnType<typeof prepareRemoteRequestArtifacts>>,
+): Pick<
+  NonNullable<DaemonRequest['meta']>,
+  'uploadedArtifactId' | 'clientArtifactPaths' | 'installSource'
+> {
+  return {
+    ...(preparedRemoteRequest.uploadedArtifactId
+      ? { uploadedArtifactId: preparedRemoteRequest.uploadedArtifactId }
+      : {}),
+    ...(preparedRemoteRequest.clientArtifactPaths
+      ? { clientArtifactPaths: preparedRemoteRequest.clientArtifactPaths }
+      : {}),
+    ...(preparedRemoteRequest.installSource
+      ? { installSource: preparedRemoteRequest.installSource }
+      : {}),
+  };
 }
 
 /**

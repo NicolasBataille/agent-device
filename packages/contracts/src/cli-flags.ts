@@ -163,4 +163,10 @@ export type CliFlags = CloudProviderProfileFields &
     version: boolean;
   };
 
-export type DaemonExcludedCliFlag = 'json' | 'help' | 'version' | 'batchSteps' | 'replayMaestro';
+export type DaemonExcludedCliFlag =
+  | 'json'
+  | 'help'
+  | 'version'
+  | 'batchSteps'
+  | 'replayMaestro'
+  | 'daemonAuthToken';

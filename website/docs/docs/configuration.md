@@ -4,7 +4,8 @@ title: Configuration
 
 # Configuration
 
-Create an `agent-device.json` file to set persistent CLI defaults instead of repeating flags on every command.
+Use configuration for persistent CLI defaults instead of repeating flags on every command. Repository
+configuration and operator-controlled configuration have different trust scopes.
 
 ## Config file locations
 
@@ -12,14 +13,19 @@ agent-device checks these sources in priority order:
 
 | Priority | Location | Scope |
 | --- | --- | --- |
-| 1 (lowest) | `~/.agent-device/config.json` | User-level defaults |
-| 2 | `./agent-device.json` | Project-level overrides |
+| 1 (lowest) | `~/.agent-device/config.json` | User-level defaults, including connection/provider settings |
+| 2 | `./agent-device.json` | Repository-controlled project-safe automation defaults |
 | 3 | `AGENT_DEVICE_*` env vars | Override config values |
 | 4 (highest) | CLI flags | Override everything |
 
-Project-level values override user-level values. Environment variables override both. CLI flags always win.
+Project-level values override user-level values where they are permitted. Environment variables override
+both. CLI flags always win. `--config <path>` or `AGENT_DEVICE_CONFIG` loads one explicit,
+operator-controlled file instead of the default locations.
 
-Use `--config <path>` or `AGENT_DEVICE_CONFIG` to load one specific config file instead of the default locations.
+`./agent-device.json` cannot contain endpoint, credential, daemon transport/server, tenant/run/lease,
+provider/cloud, Metro connection, or other operator-controlled fields. The CLI rejects those keys during
+parse, before it creates a daemon transport or sends a health request. This prevents a repository from
+pairing its chosen endpoint with a token from the user environment or user config.
 
 ## Config format
 
@@ -41,37 +47,49 @@ Example:
   "platform": "ios",
   "device": "iPhone 16",
   "session": "qa-ios",
-  "snapshotDepth": 3,
-  "daemonBaseUrl": "http://127.0.0.1:4310/agent-device"
+  "snapshotDepth": 3
 }
 ```
 
-For non-loopback remote daemon URLs, also set `daemonAuthToken` or `AGENT_DEVICE_DAEMON_AUTH_TOKEN`. The client rejects non-loopback remote daemon URLs without auth.
+Use user config, an explicit config, CLI flags, environment variables, or `connect`/`--remote-config`
+for remote connections. For example, a user-owned config may contain:
 
-Common keys include:
+```json
+{
+  "daemonBaseUrl": "https://bridge.example.com/agent-device",
+  "daemonAuthToken": "<operator-managed-token>",
+  "daemonTransport": "http",
+  "tenant": "ci"
+}
+```
+
+For CI, provide both `AGENT_DEVICE_DAEMON_BASE_URL` and `AGENT_DEVICE_DAEMON_AUTH_TOKEN` from
+protected, operator-controlled configuration. Do not put either value in `./agent-device.json`.
+For non-loopback remote daemon URLs, the client still requires authentication. Saved `connect` profiles
+and explicit `--remote-config` workflows remain supported; generated profiles do not persist tokens.
+
+Project-safe keys include command defaults such as `platform`, `target`, `device`, `session`,
+`snapshotDepth`, recording/capture options, and action timing. Connection and provider keys below are
+user- or explicit-config only:
+
 - `stateDir`
 - `daemonBaseUrl`
 - `daemonAuthToken`
+- `daemonTransport`
+- `daemonServerMode`
 - `tenant`
 - `sessionIsolation`
 - `runId`
 - `leaseId`
 - `leaseBackend`
-- `sessionLock`
-- `platform`
-- `target`
-- `device`
-- `udid`
-- `serial`
-- `iosSimulatorDeviceSet`
-- `androidDeviceAllowlist`
-- `session`
-- `verbose`
-- `json`
+- `sessionLock` when paired with an explicitly named session
+- provider/cloud fields (`provider*`, `aws*`)
+- Metro endpoint/token fields (`metro*`, `bundleUrl`)
+- request headers and structured install sources
 
-Command-specific defaults are supported too, for example `snapshotDepth`, `snapshotScope`, `activity`, `relaunch`, `shutdown`, `fps`, `quality`, `stepsFile`, or `saveScript`.
+Project config can use project-safe command defaults such as `snapshotDepth`, `snapshotScope`, `activity`, `relaunch`, `shutdown`, `fps`, `quality`, and `saveScript`. `stepsFile` is user- or explicit-config only because it selects a local file.
 
-`install-from-source` can also read a structured GitHub Actions artifact source from config when a compatible remote daemon resolves CI artifacts server-side:
+`install-from-source` can read a structured GitHub Actions artifact source from user or explicit config when a compatible remote daemon resolves CI artifacts server-side. Repository config rejects this operator-controlled source:
 
 ```json
 {
@@ -86,7 +104,7 @@ Command-specific defaults are supported too, for example `snapshotDepth`, `snaps
 
 Use a numeric `artifact` value for an artifact ID. Use a string `artifact` value for an artifact name.
 
-Explicit named-session lock defaults use the same config and env mapping too:
+Explicit named-session lock defaults use project-safe config and the same env mapping:
 - `sessionLock` -> `AGENT_DEVICE_SESSION_LOCK`
 
 Most local automation can omit this because implicit `default` sessions are workspace-scoped; use `sessionLock`, `--session-lock`, or `AGENT_DEVICE_SESSION_LOCK` when intentionally running an explicitly named session.
@@ -118,4 +136,4 @@ This keeps one shared config file usable across different command families.
 ## Failure behavior
 
 - If `--config` or `AGENT_DEVICE_CONFIG` points to a missing file, agent-device fails during CLI parse before contacting the daemon.
-- Invalid JSON, unknown keys, or invalid values in config files also fail during CLI parse with `INVALID_ARGS`.
+- Invalid JSON, unknown keys, invalid values, or an operator-controlled key in project config also fail during CLI parse with `INVALID_ARGS`. Rejections name the key and never echo its value.

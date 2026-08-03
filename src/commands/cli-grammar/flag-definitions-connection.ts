@@ -7,7 +7,8 @@ export const CONNECTION_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
     names: ['--config'],
     type: 'string',
     usageLabel: '--config <path>',
-    usageDescription: 'Load CLI defaults from a specific config file',
+    usageDescription:
+      'Load CLI defaults from a specific config file (required for connection/provider defaults outside user config)',
   },
   {
     key: 'remoteConfig',
