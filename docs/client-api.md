@@ -587,5 +587,4 @@ const match = findSelectorChainMatch(snapshot.nodes, chain, {
 
 if (!match) {
   // Build a daemon-shaped error with formatSelectorFailure(...) if needed.
-}
 ```
