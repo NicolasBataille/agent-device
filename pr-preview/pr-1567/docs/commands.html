@@ -5,11 +5,11 @@
 <title>Commands - agent-device</title>
 <script>{;const saved = localStorage.getItem('rspress-theme-appearance');const preferDark = window.matchMedia('(prefers-color-scheme: dark)').matches;const isDark = !saved || saved === 'auto' ? preferDark : saved === 'dark';document.documentElement.classList.toggle('dark', isDark);document.documentElement.classList.toggle('rp-dark', isDark);document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';}</script>
 <link href="/agent-device/pr-preview/pr-1567/static/css/styles.995cc7590f.css" rel="stylesheet">
-<script defer src="/agent-device/pr-preview/pr-1567/static/js/styles.a59c5e0ff5.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1567/static/js/styles.308ea4bafe.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1567/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1567/static/js/lib-router.7cf88a311a.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1567/static/js/56.6e0af2a80d.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1567/static/js/index.963ba398a9.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1567/static/js/476.cf0323f326.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1567/static/js/index.00bf9e9d03.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -313,6 +313,7 @@ the capture.</li>
 <li><code>wait @ref</code> resolves the ref to its label/text from that stored snapshot, then polls for that text; it does not track the original node identity.</li>
 <li>Because <code>wait @ref</code> is text-based after resolution, duplicate labels can match a different element than the original ref target.</li>
 <li><code>wait</code> shares the selector/snapshot resolution flow used by <code>click</code>, <code>fill</code>, <code>get</code>, and <code>is</code>.</li>
+<li>Wait failures carry a structured <code>error.details.reason</code> in <code>--json</code> output: <code>wait_target_absent</code> proves at least one readable capture saw no match; <code>wait_capture_stalled</code> means no readable capture arrived and is retriable; <code>wait_deadline_exceeded</code> means a later capture consumed the remaining budget after an earlier readable capture; <code>wait_landmark_identity_mismatch</code> is a replay destination-guard refusal; and <code>wait_stable_timeout</code> means the UI did not settle. Use <code>readableCaptures</code> and <code>waitedMs</code> instead of parsing error text.</li>
 <li><code>alert</code> inspects or handles system alerts on iOS simulator, macOS desktop, and Android native/runtime permission dialogs.</li>
 <li><code>alert</code> without an action is equivalent to <code>alert get</code>.</li>
 <li>Use <code>alert get</code> for an immediate cheap check. Use <code>alert wait &lt;short-ms&gt;</code> only when a prompt may appear after async work.</li>
@@ -359,6 +360,7 @@ Repeated coordinate swipes accept at most 200 repetitions and 10000ms pauses, an
 gesture/pause schedule must fit within 60000ms.
 <code>gesture pan</code> accepts <code>x y dx dy [durationMs]</code> for deliberate drags. It uses one pointer by default. Add <code>--pointer-count 2</code> for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
 <code>gesture drag</code> accepts <code>source destination [sourceHoldMs] [moveMs] [destinationHoldMs]</code>, where each endpoint is a selector or a snapshot ref. It resolves both endpoints before dispatch and keeps one pointer down continuously through activation, movement, and the optional destination hold. Defaults are 800ms, 500ms, and 0ms; the combined gesture is capped at 10000ms. Recordings convert refs to selector chains so saved <code>.ad</code> scripts remain portable.
+Target-authored drag is supported on Android touch devices and iOS/iPadOS. Backends that cannot preserve all three authored phases reject it before injection.
 <code>gesture fling</code> accepts <code>up|down|left|right x y [distance]</code> for fast directional throws.
 <code>gesture rotate</code> accepts <code>degrees [x] [y]</code>; the degree sign controls direction. Pacing is derived from the requested rotation.
 <code>gesture transform</code> accepts <code>x y dx dy scale degrees [durationMs]</code> for one combined two-finger pan/zoom/rotate gesture on Android and iOS simulators. Pinch, rotate, two-finger pan, and transform use the same viewport-aware pointer planning; impossible paths fail before injection instead of clamping or distorting the requested motion.
@@ -903,7 +905,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <li><code>connect</code> without <code>--remote-config</code> authenticates to cloud when needed, fetches the connection profile, writes a generated local profile, stores the remote scope locally, and defers tenant lease allocation plus Metro preparation until a later command needs them.</li>
 <li>Cloud connection profile responses must return a JSON object at <code>connection.remoteConfigProfile</code>. The older <code>connection.remoteConfig</code> JSON string shape is no longer accepted.</li>
 <li><code>--remote-config &lt;path&gt;</code> points to a local remote workflow profile that captures stable host, tenant/run, and any optional session, platform, lease backend, or Metro overrides for <code>connect</code>.</li>
-<li><code>connect --remote-config ...</code> follows the same state and deferred-preparation flow using the local profile instead of cloud discovery.</li>
+<li><code>connect --remote-config ...</code> follows the same verification, state, and deferred-preparation flow using the local profile instead of cloud discovery. Direct-provider profiles therefore require their provider credentials when <code>connect</code> runs; no device lease is created until a later device command.</li>
 <li>Auth management commands are available for inspection and recovery: <code>agent-device auth status</code>, <code>agent-device auth login</code>, and <code>agent-device auth logout</code>. Human login stores a revocable CLI session locally; it does not create or persist an <code>adc_live_...</code> service token.</li>
 <li>Cloud auth uses three credential classes: <code>adc_agent_...</code> short-lived command tokens, revocable CLI session refresh credentials, and explicit <code>adc_live_...</code> service/API tokens for CI. The CLI implements credential selection, CI refusal, local storage permissions, logout, and output redaction; the cloud API must enforce token expiry, tenant/run scope, revocation, one-time device approval, polling rate limits, and dashboard/API separation.</li>
 <li><code>AGENT_DEVICE_CLOUD_BASE_URL</code> should point at the bridge/control-plane API origin, not necessarily the dashboard origin. API-token setup links use <code>/api-keys</code> on that origin so the bridge can redirect users to the right dashboard page.</li>

@@ -1204,7 +1204,6 @@ const match = findSelectorChainMatch(snapshot.nodes, chain, {
 
 if (!match) {
   // Build a daemon-shaped error with formatSelectorFailure(...) if needed.
-}
 ```
 
 
@@ -1558,6 +1557,7 @@ agent-device alert dismiss
 - `wait @ref` resolves the ref to its label/text from that stored snapshot, then polls for that text; it does not track the original node identity.
 - Because `wait @ref` is text-based after resolution, duplicate labels can match a different element than the original ref target.
 - `wait` shares the selector/snapshot resolution flow used by `click`, `fill`, `get`, and `is`.
+- Wait failures carry a structured `error.details.reason` in `--json` output: `wait_target_absent` proves at least one readable capture saw no match; `wait_capture_stalled` means no readable capture arrived and is retriable; `wait_deadline_exceeded` means a later capture consumed the remaining budget after an earlier readable capture; `wait_landmark_identity_mismatch` is a replay destination-guard refusal; and `wait_stable_timeout` means the UI did not settle. Use `readableCaptures` and `waitedMs` instead of parsing error text.
 - `alert` inspects or handles system alerts on iOS simulator, macOS desktop, and Android native/runtime permission dialogs.
 - `alert` without an action is equivalent to `alert get`.
 - Use `alert get` for an immediate cheap check. Use `alert wait <short-ms>` only when a prompt may appear after async work.
@@ -1608,6 +1608,7 @@ Repeated coordinate swipes accept at most 200 repetitions and 10000ms pauses, an
 gesture/pause schedule must fit within 60000ms.
 `gesture pan` accepts `x y dx dy [durationMs]` for deliberate drags. It uses one pointer by default. Add `--pointer-count 2` for a parallel two-finger pan with constant contact span and angle; this shares the bounded two-contact synthesizer used by transform while retaining pan intent. Android preserves the requested travel duration; iOS uses XCTest drag primitives for one-pointer pan and private XCTest synthesis for two-pointer pan.
 `gesture drag` accepts `source destination [sourceHoldMs] [moveMs] [destinationHoldMs]`, where each endpoint is a selector or a snapshot ref. It resolves both endpoints before dispatch and keeps one pointer down continuously through activation, movement, and the optional destination hold. Defaults are 800ms, 500ms, and 0ms; the combined gesture is capped at 10000ms. Recordings convert refs to selector chains so saved `.ad` scripts remain portable.
+Target-authored drag is supported on Android touch devices and iOS/iPadOS. Backends that cannot preserve all three authored phases reject it before injection.
 `gesture fling` accepts `up|down|left|right x y [distance]` for fast directional throws.
 `gesture rotate` accepts `degrees [x] [y]`; the degree sign controls direction. Pacing is derived from the requested rotation.
 `gesture transform` accepts `x y dx dy scale degrees [durationMs]` for one combined two-finger pan/zoom/rotate gesture on Android and iOS simulators. Pinch, rotate, two-finger pan, and transform use the same viewport-aware pointer planning; impossible paths fail before injection instead of clamping or distorting the requested motion.
@@ -2223,7 +2224,7 @@ agent-device disconnect --remote-config ./agent-device.remote.json
 - `connect` without `--remote-config` authenticates to cloud when needed, fetches the connection profile, writes a generated local profile, stores the remote scope locally, and defers tenant lease allocation plus Metro preparation until a later command needs them.
 - Cloud connection profile responses must return a JSON object at `connection.remoteConfigProfile`. The older `connection.remoteConfig` JSON string shape is no longer accepted.
 - `--remote-config <path>` points to a local remote workflow profile that captures stable host, tenant/run, and any optional session, platform, lease backend, or Metro overrides for `connect`.
-- `connect --remote-config ...` follows the same state and deferred-preparation flow using the local profile instead of cloud discovery.
+- `connect --remote-config ...` follows the same verification, state, and deferred-preparation flow using the local profile instead of cloud discovery. Direct-provider profiles therefore require their provider credentials when `connect` runs; no device lease is created until a later device command.
 - Auth management commands are available for inspection and recovery: `agent-device auth status`, `agent-device auth login`, and `agent-device auth logout`. Human login stores a revocable CLI session locally; it does not create or persist an `adc_live_...` service token.
 - Cloud auth uses three credential classes: `adc_agent_...` short-lived command tokens, revocable CLI session refresh credentials, and explicit `adc_live_...` service/API tokens for CI. The CLI implements credential selection, CI refusal, local storage permissions, logout, and output redaction; the cloud API must enforce token expiry, tenant/run scope, revocation, one-time device approval, polling rate limits, and dashboard/API separation.
 - `AGENT_DEVICE_CLOUD_BASE_URL` should point at the bridge/control-plane API origin, not necessarily the dashboard origin. API-token setup links use `/api-keys` on that origin so the bridge can redirect users to the right dashboard page.
@@ -2304,22 +2305,28 @@ url: /agent-device/pr-preview/pr-1567/docs/configuration.md
 
 # Configuration
 
-Create an `agent-device.json` file to set persistent CLI defaults instead of repeating flags on every command.
+Use configuration for persistent CLI defaults instead of repeating flags on every command. Repository
+configuration and operator-controlled configuration have different trust scopes.
 
 ## Config file locations
 
 agent-device checks these sources in priority order:
 
-| Priority    | Location                      | Scope                   |
-| ----------- | ----------------------------- | ----------------------- |
-| 1 (lowest)  | `~/.agent-device/config.json` | User-level defaults     |
-| 2           | `./agent-device.json`         | Project-level overrides |
-| 3           | `AGENT_DEVICE_*` env vars     | Override config values  |
-| 4 (highest) | CLI flags                     | Override everything     |
+| Priority    | Location                      | Scope                                                       |
+| ----------- | ----------------------------- | ----------------------------------------------------------- |
+| 1 (lowest)  | `~/.agent-device/config.json` | User-level defaults, including connection/provider settings |
+| 2           | `./agent-device.json`         | Repository-controlled project-safe automation defaults      |
+| 3           | `AGENT_DEVICE_*` env vars     | Override config values                                      |
+| 4 (highest) | CLI flags                     | Override everything                                         |
 
-Project-level values override user-level values. Environment variables override both. CLI flags always win.
+Project-level values override user-level values where they are permitted. Environment variables override
+both. CLI flags always win. `--config <path>` or `AGENT_DEVICE_CONFIG` loads one explicit,
+operator-controlled file instead of the default locations.
 
-Use `--config <path>` or `AGENT_DEVICE_CONFIG` to load one specific config file instead of the default locations.
+`./agent-device.json` cannot contain endpoint, credential, daemon transport/server, tenant/run/lease,
+provider/cloud, Metro connection, or other operator-controlled fields. The CLI rejects those keys during
+parse, before it creates a daemon transport or sends a health request. This prevents a repository from
+pairing its chosen endpoint with a token from the user environment or user config.
 
 ## Config format
 
@@ -2343,38 +2350,49 @@ Example:
   "platform": "ios",
   "device": "iPhone 16",
   "session": "qa-ios",
-  "snapshotDepth": 3,
-  "daemonBaseUrl": "http://127.0.0.1:4310/agent-device"
+  "snapshotDepth": 3
 }
 ```
 
-For non-loopback remote daemon URLs, also set `daemonAuthToken` or `AGENT_DEVICE_DAEMON_AUTH_TOKEN`. The client rejects non-loopback remote daemon URLs without auth.
+Use user config, an explicit config, CLI flags, environment variables, or `connect`/`--remote-config`
+for remote connections. For example, a user-owned config may contain:
 
-Common keys include:
+```json
+{
+  "daemonBaseUrl": "https://bridge.example.com/agent-device",
+  "daemonAuthToken": "<operator-managed-token>",
+  "daemonTransport": "http",
+  "tenant": "ci"
+}
+```
+
+For CI, provide both `AGENT_DEVICE_DAEMON_BASE_URL` and `AGENT_DEVICE_DAEMON_AUTH_TOKEN` from
+protected, operator-controlled configuration. Do not put either value in `./agent-device.json`.
+For non-loopback remote daemon URLs, the client still requires authentication. Saved `connect` profiles
+and explicit `--remote-config` workflows remain supported; generated profiles do not persist tokens.
+
+Project-safe keys include command defaults such as `platform`, `target`, `device`, `session`,
+`snapshotDepth`, recording/capture options, and action timing. Connection and provider keys below are
+user- or explicit-config only:
 
 - `stateDir`
 - `daemonBaseUrl`
 - `daemonAuthToken`
+- `daemonTransport`
+- `daemonServerMode`
 - `tenant`
 - `sessionIsolation`
 - `runId`
 - `leaseId`
 - `leaseBackend`
-- `sessionLock`
-- `platform`
-- `target`
-- `device`
-- `udid`
-- `serial`
-- `iosSimulatorDeviceSet`
-- `androidDeviceAllowlist`
-- `session`
-- `verbose`
-- `json`
+- provider/cloud fields (`provider*`, `aws*`)
+- Metro endpoint/token fields (`metro*`, `bundleUrl`)
+- request headers and structured install sources
+- local code and write destinations (`reporter`, `reportJunit`, `saveScript`, `launchConsole`)
 
-Command-specific defaults are supported too, for example `snapshotDepth`, `snapshotScope`, `activity`, `relaunch`, `shutdown`, `fps`, `quality`, `stepsFile`, or `saveScript`.
+Project config can use project-safe command defaults such as `snapshotDepth`, `snapshotScope`, `activity`, `relaunch`, `shutdown`, `fps`, and `quality`. Local path and executable-module selectors such as `stepsFile` and `reporter` are user- or explicit-config only.
 
-`install-from-source` can also read a structured GitHub Actions artifact source from config when a compatible remote daemon resolves CI artifacts server-side:
+`install-from-source` can read a structured GitHub Actions artifact source from user or explicit config when a compatible remote daemon resolves CI artifacts server-side. Repository config rejects this operator-controlled source:
 
 ```json
 {
@@ -2389,7 +2407,7 @@ Command-specific defaults are supported too, for example `snapshotDepth`, `snaps
 
 Use a numeric `artifact` value for an artifact ID. Use a string `artifact` value for an artifact name.
 
-Explicit named-session lock defaults use the same config and env mapping too:
+Explicit named-session lock defaults use project-safe config and the same env mapping:
 
 - `sessionLock` -> `AGENT_DEVICE_SESSION_LOCK`
 
@@ -2423,7 +2441,7 @@ This keeps one shared config file usable across different command families.
 ## Failure behavior
 
 - If `--config` or `AGENT_DEVICE_CONFIG` points to a missing file, agent-device fails during CLI parse before contacting the daemon.
-- Invalid JSON, unknown keys, or invalid values in config files also fail during CLI parse with `INVALID_ARGS`.
+- Invalid JSON, unknown keys, invalid values, or an operator-controlled key in project config also fail during CLI parse with `INVALID_ARGS`. Rejections name the key and never echo its value.
 
 
 
@@ -2640,7 +2658,9 @@ agent-device connect aws-device-farm ...
 agent-device connect limrun ...
 ```
 
-These providers are not remote `agent-device` daemons. `connect` writes a local generated profile, then the first lease-allocating command such as `open` creates the provider session. BrowserStack and AWS Device Farm use hosted WebDriver sessions; Limrun uses its direct iOS/Android provider runtime.
+These providers are not remote `agent-device` daemons. `connect` makes read-only provider calls to verify credentials and the configured resources, then saves active connection state. It does not allocate a device. BrowserStack and AWS Device Farm create hosted WebDriver sessions on `open`; Limrun allocates its direct iOS/Android instance on the first device command, which can be `install` or `open`.
+
+Successful human output names the verified or deferred device, explains the app state, and prints copy-pasteable next commands and workflow notes. `--json` exposes the same information in `verification`, `device`, `app`, `liveSession`, `nextSteps`, and `notes`. Do not use `devices` or `apps` as a preflight catalog for these direct providers: they inspect a live leased device and can therefore allocate the deferred session.
 
 ## Interface Summary
 
@@ -2668,8 +2688,8 @@ Agents can connect autonomously when all required credentials and selectors are 
 The CLI experience is:
 
 1. Export provider credentials.
-2. Run `agent-device connect <provider>` with provider selectors.
-3. Run normal `agent-device` commands.
+2. Run `agent-device connect <provider>` with provider selectors. Connection state is activated only after the provider verifies access.
+3. Follow the printed `Next` commands to install or open the app.
 4. Run `agent-device close` to stop the hosted session.
 5. Run `agent-device artifacts --json` to retrieve provider-hosted video/log/dashboard URLs.
 6. Run `agent-device disconnect` to clear local connection state.
@@ -2698,7 +2718,8 @@ Full Android flow:
 export LIMRUN_API_KEY=...
 
 agent-device connect limrun --platform android
-agent-device open com.example.app
+agent-device install com.example.app ./app.apk
+agent-device open com.example.app --relaunch
 agent-device snapshot -i
 agent-device click 'label="Continue"'
 agent-device close
@@ -2706,6 +2727,8 @@ agent-device disconnect
 ```
 
 Limrun Android uses the direct ADB tunnel, so the normal Android helper-backed snapshots, installs, and port reverse flow are available. This makes a local Metro server reachable through the normal Android reverse setup.
+
+A newly allocated Limrun instance does not contain your app. `connect` therefore recommends `install <package-or-bundle-id> <app-path-or-url>` before `open`. The install command allocates the instance when needed; it is not necessary to run `devices` first.
 
 Limrun iOS uses the direct Limrun iOS client. It supports normal app lifecycle, snapshots, screenshots, taps, text input, scrolling, and app install, but it cannot reverse a remote device port to a local host port. For iOS Metro or React DevTools, use a publicly reachable HTTPS endpoint or a bridge URL rather than a local-only address. Limrun does not currently expose provider artifacts through `agent-device artifacts`.
 
@@ -2729,6 +2752,8 @@ agent-device connect browserstack \
 ```
 
 `--provider-app` accepts a BrowserStack app reference such as `bs://...`, an HTTP(S) app URL, or an existing local app path. Local paths are uploaded to BrowserStack when the hosted session is allocated.
+
+At connect time, BrowserStack credentials and the exact device/OS pair are verified. A `bs://` reference is checked against recent uploaded apps; a local artifact is checked on disk and persisted as an absolute path; a public URL remains configured but is validated by BrowserStack when the session is created. `open` still requires the app's installed package or bundle identifier, not its upload name.
 
 Optional labels:
 
@@ -2829,6 +2854,8 @@ export AWS_DEVICE_FARM_APP_ARN=...
 ```
 
 `AGENT_DEVICE_AWS_DEVICE_FARM_PROJECT_ARN`, `AGENT_DEVICE_AWS_DEVICE_FARM_DEVICE_ARN`, and `AGENT_DEVICE_AWS_DEVICE_FARM_APP_ARN` are accepted as agent-device-specific aliases.
+
+`connect` runs read-only `get-project`, `get-device`, and, when supplied, `get-upload` calls. It rejects a device or app for the wrong platform and an app upload that is not ready. If no app ARN is supplied, the output says so explicitly. AWS Device Farm does not support installing an app after the remote access session is allocated; reconnect with `--aws-app-arn <arn> --force` before `open` when the app is required.
 
 Full flow:
 
@@ -2969,9 +2996,9 @@ BrowserStack can return session video, Appium logs, device logs, dashboard URL, 
 
 ## Troubleshooting
 
-- If BrowserStack connect fails before opening a session, check `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY`, `--provider-app`, `--provider-os-version`, and `--device`.
-- If AWS allocation fails, first run `aws sts get-caller-identity` in the same CI step to confirm the AWS CLI credential chain is active, then verify the Device Farm ARNs and region.
-- If Limrun allocation fails, check `LIMRUN_API_KEY`, `--platform ios|android`, and the optional `LIMRUN_REGION`. Keep the key available in the environment used to start the local daemon.
+- If BrowserStack connect fails, its error distinguishes rejected credentials, an unavailable device/OS pair, a missing `bs://` upload, and a missing local artifact.
+- If AWS connect fails, use its reported `aws devicefarm get-*` error to check the credential chain, ARN, region, resource platform, or upload readiness. Allocation has not happened yet.
+- If Limrun connect fails, check `LIMRUN_API_KEY` and the optional `LIMRUN_REGION`. A successful connect verifies the selected instance service without creating an instance.
 - If artifact lookup is pending immediately after `close`, retry `agent-device artifacts --json`. Some providers finalize video/log URLs asynchronously after the hosted session stops.
 
 
@@ -3635,7 +3662,9 @@ agent-device disconnect
 
 Multiple agents can share one proxy when each uses the normal `connect proxy`, `open`, commands, `close`, and `disconnect` flow. A busy device error means another agent owns the device until it closes or its inactivity lease expires.
 
-Do not commit a config file that contains a live `daemonAuthToken`.
+Do not put proxy endpoint, token, tenant, or provider fields in `./agent-device.json`: repository
+configuration is intentionally limited to project-safe automation defaults. Use `connect proxy`, user
+config, an explicit `--config` file, or protected CI environment variables for the endpoint and token.
 
 ## What Is Exposed
 
