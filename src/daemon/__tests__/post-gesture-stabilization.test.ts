@@ -216,6 +216,44 @@ test('a backend flip mid-poll still yields the no-effect claim (#1620)', async (
   );
 });
 
+test('no pre-gesture snapshot means no no-effect claim, even after a backend flip (#1622 P1)', async () => {
+  // `markPostGestureStabilization` records an EMPTY baseline when the session
+  // has no pre-gesture snapshot, and `[]` is truthy. Rebasing it on a backend
+  // flip would swap "no before-state" for a post-gesture capture, inventing the
+  // very evidence the claim is supposed to rest on — the loop would then agree
+  // with itself and report a gesture as inert with nothing to compare against.
+  vi.useFakeTimers();
+  const session = makeSession('ios');
+  session.snapshot = undefined; // nothing captured before the gesture
+  markPostGestureStabilization(session, 'scroll', ['up']);
+
+  // Steady private-AX captures: quiet, self-consistent, and a different backend
+  // from the (absent) baseline, so the rebase branch is reached.
+  const capture = vi.fn(async () =>
+    makeSnapshotState(pickupSnapshot(500).nodes, {
+      snapshotQuality: { state: 'recovered', backend: 'private-ax' },
+    }),
+  );
+
+  const resultPromise = withDiagnosticsScope(
+    {},
+    async () =>
+      await capturePostGestureStabilizedResult({
+        session,
+        capture,
+        readSnapshot: (snapshot) => snapshot,
+      }),
+  );
+  await vi.advanceTimersByTimeAsync(10_000);
+  const result = await resultPromise;
+
+  assert.equal(
+    result.gestureNoEffect,
+    undefined,
+    'a no-effect claim needs a real pre-gesture baseline, never one the loop invented for itself',
+  );
+});
+
 test('a replaced list under fixed chrome now settles outright, and still claims no no-effect (#1601 P1, #1569)', async () => {
   // The reviewer's counterexample: a SUCCESSFUL scroll swapped every list cell
   // while the tab-bar chrome (discriminating, shared, unmoved) kept the

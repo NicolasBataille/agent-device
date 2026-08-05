@@ -214,7 +214,13 @@ export async function capturePostGestureStabilizedResult<T>(params: {
       // not agree on which nodes exist, so this pair says nothing about the
       // gesture: adopt it as the baseline and keep going rather than concluding
       // from it (#1569).
-      if (baselineSignature && baselineBackend !== current.backend) {
+      // `?.length`, not truthiness: `markPostGestureStabilization` records an
+      // EMPTY signature when there was no pre-gesture snapshot, and `[]` is
+      // truthy. Rebasing that would replace "no before-state" with a
+      // post-gesture capture — inventing a baseline the gesture is then judged
+      // against, which `decidePostGestureStabilityVerdict` (guarding on
+      // `?.length`) had deliberately refused to do (#1622 review P1).
+      if (baselineSignature?.length && baselineBackend !== current.backend) {
         emitDiagnostic({
           level: 'debug',
           phase: 'post_gesture_snapshot_baseline_rebased',
