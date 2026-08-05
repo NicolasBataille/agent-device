@@ -158,6 +158,64 @@ test('capturePostGestureStabilizedResult keeps polling past the normal deadline 
   assert.ok(captureCount > 8, `expected sustained polling, saw ${captureCount} captures`);
 });
 
+test('a backend flip mid-poll still yields the no-effect claim (#1620)', async () => {
+  // The screens this warning exists for are the hostile ones — #1600's
+  // element-18 was a Bluesky feed — and those are exactly the screens whose
+  // capture plan falls back mid-sequence. The loop already handles that: on a
+  // backend change it REBASES (#1569) and keeps polling against a comparable
+  // pair. The corroboration then read `pending.baselineSignature` instead, i.e.
+  // the pre-gesture signature from the OTHER backend, so set equality could
+  // never hold and the claim was vetoed on every fallback.
+  vi.useFakeTimers();
+  const session = makeSession('ios');
+  // Pre-gesture baseline captured by the TREE backend. The two backends do not
+  // agree on which nodes exist — that disagreement is the entire premise of
+  // #1569 — so private-ax additionally reports a scrolled-away row the tree
+  // backend prunes. Same screen, different view of it.
+  session.snapshot = makeSnapshotState(pickupSnapshot(500).nodes, {
+    snapshotQuality: { state: 'healthy', backend: 'tree' },
+  });
+  markPostGestureStabilization(session, 'scroll', ['up']);
+
+  // Every post-gesture capture comes from private-ax: the penalty armed during
+  // the gesture. They are byte-identical to EACH OTHER — the gesture genuinely
+  // moved nothing — while differing from the tree baseline by that extra row.
+  const privateAxNodes = [
+    ...pickupSnapshot(500).nodes,
+    {
+      index: 2,
+      parentIndex: 0,
+      type: 'StaticText',
+      identifier: 'scrolled-away-row',
+      label: 'Above the fold',
+      rect: { x: 20, y: -80, width: 200, height: 44 },
+    },
+  ];
+  const capture = vi.fn(async () =>
+    makeSnapshotState(privateAxNodes, {
+      snapshotQuality: { state: 'recovered', backend: 'private-ax' },
+    }),
+  );
+
+  const resultPromise = withDiagnosticsScope(
+    {},
+    async () =>
+      await capturePostGestureStabilizedResult({
+        session,
+        capture,
+        readSnapshot: (snapshot) => snapshot,
+      }),
+  );
+  await vi.advanceTimersByTimeAsync(10_000);
+  const result = await resultPromise;
+
+  assert.equal(
+    result.gestureNoEffect?.action,
+    'scroll',
+    'a proven-inert gesture must still be reported after the capture backend falls back',
+  );
+});
+
 test('a replaced list under fixed chrome now settles outright, and still claims no no-effect (#1601 P1, #1569)', async () => {
   // The reviewer's counterexample: a SUCCESSFUL scroll swapped every list cell
   // while the tab-bar chrome (discriminating, shared, unmoved) kept the

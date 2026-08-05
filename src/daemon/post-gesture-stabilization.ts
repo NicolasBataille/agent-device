@@ -239,7 +239,7 @@ export async function capturePostGestureStabilizedResult<T>(params: {
       }
       clearPostGestureStabilization(session);
       emitPostGestureSettleDiagnostic(verdict, pending.action, attempts, elapsedMs);
-      return buildAcceptedStabilizedResult(verdict, pending, current);
+      return buildAcceptedStabilizedResult(verdict, pending, current, baselineSignature);
     }
     previous = current;
   }
@@ -280,15 +280,26 @@ export function formatGestureNoEffectWarning(action: string, positionals: string
  * corroboration (`haveIdenticalDiscriminatingSurfaces`): the verdict alone is
  * subset-tolerant, and a successful scroll that replaced every list cell
  * under fixed chrome still reads accept-stale (#1601 review P1).
+ *
+ * Corroborates against the loop's CURRENT baseline, not `pending`'s original
+ * one (#1620). When the capture backend flips mid-poll the loop rebases —
+ * `pending`'s pre-gesture signature came from a backend that does not agree
+ * with this one about which nodes exist, so #1569 already ruled it out for the
+ * verdict. Reading it back here re-introduced exactly that comparison, and set
+ * equality across two backends never holds: the corroboration was guaranteed to
+ * veto on any screen whose capture plan fell back — which is every hostile
+ * screen, i.e. the ones the warning exists for (#1600's element-18 was a
+ * Bluesky feed).
  */
 function buildAcceptedStabilizedResult<T>(
   verdict: 'trust' | 'accept-stale',
   pending: NonNullable<SessionState['postGestureStabilization']>,
   current: CapturedSurface<T>,
+  baselineSignature: InteractionSurfaceSignature | undefined,
 ): PostGestureStabilizedResult<T> {
   const corroborated =
     verdict === 'accept-stale' &&
-    haveIdenticalDiscriminatingSurfaces(pending.baselineSignature ?? [], current.signature);
+    haveIdenticalDiscriminatingSurfaces(baselineSignature ?? [], current.signature);
   if (!corroborated) return { value: current.value };
   return {
     value: current.value,
