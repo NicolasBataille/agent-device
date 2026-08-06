@@ -285,6 +285,13 @@ const COMMON_SAFE_FLAG_SPEC = {
   ],
 } as const satisfies SafeFlagSpec;
 
+// The `--settle` (#1101) request shape, shown for every command that accepts it:
+// the touch commands, and the generic-route `scroll`/`back` (#1638).
+const SETTLE_SAFE_FLAGS = {
+  booleans: [{ source: 'settle' }],
+  numbers: [{ source: 'settleQuietMs' }],
+} as const satisfies Required<Pick<SafeFlagSpec, 'booleans' | 'numbers'>>;
+
 const SAFE_ACTION_FLAG_SPECS: Record<string, SafeFlagSpec> = {
   [PUBLIC_COMMANDS.open]: {
     booleans: [{ source: 'relaunch' }, { source: 'testIme' }],
@@ -296,7 +303,8 @@ const SAFE_ACTION_FLAG_SPECS: Record<string, SafeFlagSpec> = {
   [PUBLIC_COMMANDS.fill]: textEntrySafeFlagSpec(),
   [PUBLIC_COMMANDS.type]: textEntrySafeFlagSpec(),
   [PUBLIC_COMMANDS.scroll]: {
-    numbers: [{ source: 'pixels' }, { source: 'durationMs' }],
+    booleans: SETTLE_SAFE_FLAGS.booleans,
+    numbers: [{ source: 'pixels' }, { source: 'durationMs' }, ...SETTLE_SAFE_FLAGS.numbers],
   },
   [PUBLIC_COMMANDS.gesture]: gestureSafeFlagSpec(),
   [PUBLIC_COMMANDS.swipe]: gestureSafeFlagSpec(),
@@ -322,6 +330,7 @@ const SAFE_ACTION_FLAG_SPECS: Record<string, SafeFlagSpec> = {
     numbers: [{ source: 'snapshotDepth', output: 'depth' }],
   },
   [PUBLIC_COMMANDS.back]: {
+    ...SETTLE_SAFE_FLAGS,
     enums: [{ source: 'backMode', output: 'mode', values: BACK_MODES }],
   },
   [PUBLIC_COMMANDS.record]: {
@@ -353,13 +362,13 @@ function buildSafeActionFlags(action: SessionAction): Record<string, unknown> | 
 
 function touchSafeFlagSpec(): SafeFlagSpec {
   return {
-    booleans: [{ source: 'doubleTap' }, { source: 'settle' }],
+    booleans: [{ source: 'doubleTap' }, ...SETTLE_SAFE_FLAGS.booleans],
     numbers: [
       { source: 'count' },
       { source: 'intervalMs' },
       { source: 'holdMs' },
       { source: 'jitterPx' },
-      { source: 'settleQuietMs' },
+      ...SETTLE_SAFE_FLAGS.numbers,
     ],
     enums: [{ source: 'clickButton', values: CLICK_BUTTONS }],
   };
@@ -367,8 +376,8 @@ function touchSafeFlagSpec(): SafeFlagSpec {
 
 function textEntrySafeFlagSpec(): SafeFlagSpec {
   return {
-    booleans: [{ source: 'settle' }],
-    numbers: [{ source: 'delayMs' }, { source: 'settleQuietMs' }],
+    booleans: SETTLE_SAFE_FLAGS.booleans,
+    numbers: [{ source: 'delayMs' }, ...SETTLE_SAFE_FLAGS.numbers],
   };
 }
 

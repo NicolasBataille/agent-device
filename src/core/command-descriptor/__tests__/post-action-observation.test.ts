@@ -11,10 +11,12 @@ import {
 } from '../registry.ts';
 
 const SETTLE_OBSERVATION_COMMANDS = [
+  PUBLIC_COMMANDS.back,
   PUBLIC_COMMANDS.click,
   PUBLIC_COMMANDS.fill,
   PUBLIC_COMMANDS.longPress,
   PUBLIC_COMMANDS.press,
+  PUBLIC_COMMANDS.scroll,
 ] as const;
 
 test('post-action observation descriptor traits are the source for settle command support', () => {
@@ -31,6 +33,12 @@ test('post-action observation descriptor traits are the source for settle comman
   assert.equal(resolveCommandPostActionObservationSupport('fill'), 'settle-and-verify');
   assert.equal(resolveCommandPostActionObservationSupport('longpress'), 'settle');
   assert.equal(commandSupportsVerifyEvidence('longpress'), false);
+  // #1638: the generic-route pair resolves no target, so there is no pre-action
+  // node to digest into evidence — settle without verify.
+  assert.equal(resolveCommandPostActionObservationSupport('scroll'), 'settle');
+  assert.equal(commandSupportsVerifyEvidence('scroll'), false);
+  assert.equal(resolveCommandPostActionObservationSupport('back'), 'settle');
+  assert.equal(commandSupportsVerifyEvidence('back'), false);
 });
 
 test('post-action observation CLI flags follow descriptor traits', () => {

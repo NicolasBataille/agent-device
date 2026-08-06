@@ -16,6 +16,7 @@ import type {
   SettleParams,
   SettleTailEntry,
 } from '@agent-device/contracts/interaction';
+import type { RuntimeCommand } from '../../runtime-types.ts';
 import type { CapturedSnapshot } from './selector-read-shared.ts';
 import {
   DEFAULT_STABLE_QUIET_MS,
@@ -63,6 +64,55 @@ export async function settleAfterInteraction(
   options: CommandContext,
   params: SettleParams & { resolved: ResolvedInteractionTarget },
 ): Promise<SettleOutcome> {
+  const { resolved, ...settleParams } = params;
+  return await settleAfterAction(runtime, options, {
+    ...settleParams,
+    baselineNodes: resolveBaselineNodes(resolved),
+    ...(resolved.point ? { actionPoint: resolved.point } : {}),
+  });
+}
+
+export type SettleObservationCommandOptions = CommandContext &
+  SettleParams & {
+    /** The pre-action tree the settled capture is diffed against. */
+    baselineNodes: SnapshotNode[];
+  };
+
+/**
+ * The target-less settle as a runtime command (#1638), so a caller that never
+ * resolved a target — the daemon's generic scroll/back route — reaches the same
+ * observation through the same runtime seam every other settle-carrying command
+ * uses, instead of reaching into the engine directly.
+ *
+ * Returns only the observation: with no resolved target there is no `--verify`
+ * evidence to pair the settled nodes with.
+ */
+export const settleObservationCommand: RuntimeCommand<
+  SettleObservationCommandOptions,
+  SettleObservation
+> = async (runtime, options) => {
+  const { baselineNodes, ...settle } = options;
+  const outcome = await settleAfterAction(runtime, options, { ...settle, baselineNodes });
+  return outcome.observation;
+};
+
+/**
+ * The target-less settle (#1638): same stable-capture loop, storage rules and
+ * hints as {@link settleAfterInteraction}, but the caller supplies the diff
+ * baseline instead of it coming from a freshly resolved target, and there is
+ * no action point to recognize self-echo added lines by.
+ *
+ * The generic route (scroll/back) passes the session's STORED pre-action
+ * snapshot nodes as the baseline. That tree can be several commands older than
+ * the action — which is the honest reading of the #1101 contract ("the settled
+ * diff vs the pre-action tree"), but is a weaker baseline than press's
+ * freshly-resolved one.
+ */
+async function settleAfterAction(
+  runtime: AgentDeviceRuntime,
+  options: CommandContext,
+  params: SettleParams & { baselineNodes: SnapshotNode[]; actionPoint?: Point },
+): Promise<SettleOutcome> {
   const quietMs = params.quietMs ?? DEFAULT_STABLE_QUIET_MS;
   const timeoutMs = params.timeoutMs ?? DEFAULT_STABLE_TIMEOUT_MS;
   const base: SettleObservation = { settled: false, waitedMs: 0, captures: 0, quietMs, timeoutMs };
@@ -72,44 +122,7 @@ export async function settleAfterInteraction(
       timeoutMs,
       resetBudgetOnPrivateAxRecovery: true,
     });
-    const observation: SettleObservation = {
-      ...base,
-      settled: outcome.settled,
-      waitedMs: outcome.waitedMs,
-      captures: outcome.captures,
-    };
-    if (!outcome.lastCapture) {
-      return {
-        observation: {
-          ...observation,
-          hint: outcome.stalled ? SETTLE_CAPTURE_STALLED_HINT : NEVER_SETTLED_HINT,
-        },
-      };
-    }
-    const { stored, session } = await storeSettledSnapshot(runtime, options, outcome.lastCapture);
-    const settledNodes = outcome.lastCapture.snapshot.nodes;
-    return {
-      observation: {
-        ...observation,
-        // The diff (with its added-line refs) is only attached when the settled
-        // tree actually became the stored session snapshot: those refs must be
-        // valid against the tree the next @ref command resolves on. The daemon
-        // treats `diff` presence as "this response issues refs". Unsettled
-        // captures are intentionally diff-less: they are not a stable
-        // observation, so surfacing refs would invite agents to act on
-        // advisory state.
-        ...(outcome.settled && stored
-          ? buildSettleDiffAndTail(
-              resolveBaselineNodes(params.resolved),
-              settledNodes,
-              params.resolved.point,
-              session?.appBundleId,
-            )
-          : {}),
-        ...resolveSettleHint(outcome, stored, settledNodes.length),
-      },
-      settledNodes,
-    };
+    return await buildSettleOutcome(runtime, options, { ...params, base, outcome });
   } catch (error) {
     // Never fail the action over the observation: report that settling itself
     // broke and let the caller fall back to an explicit snapshot.
@@ -120,6 +133,60 @@ export async function settleAfterInteraction(
       },
     };
   }
+}
+
+type StableCaptureOutcome = Awaited<ReturnType<typeof runStableCaptureLoop>>;
+
+/** Turns a completed stable-capture loop into the settle observation it reports. */
+async function buildSettleOutcome(
+  runtime: AgentDeviceRuntime,
+  options: CommandContext,
+  params: {
+    baselineNodes: SnapshotNode[];
+    actionPoint?: Point;
+    base: SettleObservation;
+    outcome: StableCaptureOutcome;
+  },
+): Promise<SettleOutcome> {
+  const { base, outcome } = params;
+  const observation: SettleObservation = {
+    ...base,
+    settled: outcome.settled,
+    waitedMs: outcome.waitedMs,
+    captures: outcome.captures,
+  };
+  if (!outcome.lastCapture) {
+    return {
+      observation: {
+        ...observation,
+        hint: outcome.stalled ? SETTLE_CAPTURE_STALLED_HINT : NEVER_SETTLED_HINT,
+      },
+    };
+  }
+  const { stored, session } = await storeSettledSnapshot(runtime, options, outcome.lastCapture);
+  const settledNodes = outcome.lastCapture.snapshot.nodes;
+  return {
+    observation: {
+      ...observation,
+      // The diff (with its added-line refs) is only attached when the settled
+      // tree actually became the stored session snapshot: those refs must be
+      // valid against the tree the next @ref command resolves on. The daemon
+      // treats `diff` presence as "this response issues refs". Unsettled
+      // captures are intentionally diff-less: they are not a stable
+      // observation, so surfacing refs would invite agents to act on
+      // advisory state.
+      ...(outcome.settled && stored
+        ? buildSettleDiffAndTail(
+            params.baselineNodes,
+            settledNodes,
+            params.actionPoint,
+            session?.appBundleId,
+          )
+        : {}),
+      ...resolveSettleHint(outcome, stored, settledNodes.length),
+    },
+    settledNodes,
+  };
 }
 
 /**

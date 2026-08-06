@@ -13,6 +13,9 @@ const formatFill = (result: Record<string, unknown>) =>
 const formatLongPress = (result: Record<string, unknown>) =>
   interactionCliOutputFormatters.longpress({ input: {}, result });
 
+const formatScroll = (result: Record<string, unknown>) =>
+  interactionCliOutputFormatters.scroll({ input: {}, result });
+
 describe('find CLI output', () => {
   test('click prints the same success line as a direct press', () => {
     const output = formatFind({
@@ -271,6 +274,42 @@ describe('longpress CLI output', () => {
         'Long pressed (60, 40)',
         'settled after 600ms: +1 -0 (~6 unchanged)',
         '+ @e12 [button] "Copy"',
+      ].join('\n'),
+    );
+  });
+});
+
+describe('scroll CLI output', () => {
+  test('prints the scroll message alone without a settle observation', () => {
+    const output = formatScroll({ message: 'Scrolled down' });
+
+    expect(output.text).toBe('Scrolled down');
+  });
+
+  // #1638: the generic-route settle renders exactly like the touch commands.
+  test('appends settle verdict and diff lines when present', () => {
+    const output = formatScroll({
+      message: 'Scrolled down',
+      settle: {
+        settled: true,
+        waitedMs: 400,
+        refsGeneration: 7,
+        diff: {
+          summary: { additions: 1, removals: 1, unchanged: 9 },
+          lines: [
+            { kind: 'removed', text: '@e2 [button] "Load more"' },
+            { kind: 'added', text: '@e2 [button] "Next page"', ref: 'e2' },
+          ],
+        },
+      },
+    });
+
+    expect(output.text).toBe(
+      [
+        'Scrolled down',
+        'settled after 400ms: +1 -1 (~9 unchanged)',
+        '- @e2 [button] "Load more"',
+        '+ @e2 [button] "Next page"',
       ].join('\n'),
     );
   });

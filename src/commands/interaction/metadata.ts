@@ -16,13 +16,9 @@ import {
   type SwipeGesturePayload,
   type TransformGesturePayload,
 } from '@agent-device/contracts/interaction';
-import type { PostActionObservationSupportFor } from '../../core/command-descriptor/post-action-observation.ts';
-import {
-  commandSupportsSettleObservation,
-  commandSupportsVerifyEvidence,
-} from '../../core/command-descriptor/registry.ts';
 import { FIND_LOCATORS } from '@agent-device/selectors';
 import { defineCommandMetadata } from '../command-contract.ts';
+import { postActionObservationFields } from '../post-action-observation-surface.ts';
 import {
   booleanField,
   elementTargetField,
@@ -70,7 +66,8 @@ const interactionCommandDescriptions = {
   focus:
     'Move input focus to explicit screen coordinates without entering text. Prefer semantic interactions when a snapshot ref or selector is available; use type or fill after focus.',
   type: 'Append text to the currently focused input. Use fill when the existing field value should be replaced, and focus first when no input is active.',
-  scroll: 'Scroll in a direction, or toward the top/bottom edge of scrollable content.',
+  scroll:
+    'Scroll in a direction, or toward the top/bottom edge of scrollable content. Use settle to get the scrolled-into-view diff without a follow-up snapshot.',
   get: 'Read text or accessibility attributes from a snapshot ref or selector without changing the app. Use format text for visible content or attrs for the element attribute map.',
   is: 'Check whether a selector satisfies a UI predicate such as visible, hidden, editable, selected, focused, or text. Use wait when the condition may appear asynchronously.',
   find: 'Find by text/label/value/role/id and run action',
@@ -79,37 +76,6 @@ const interactionCommandDescriptions = {
 } as const;
 
 type InteractionCommandName = keyof typeof interactionCommandDescriptions;
-
-const verifyField = () =>
-  booleanField(
-    'Capture cheap post-action evidence (AX digest, node counts, changedFromBefore) instead of a follow-up snapshot.',
-  );
-
-const settleFields = () => ({
-  settle: booleanField(
-    'After the action, wait for the UI to go quiet and return the settled diff vs the pre-action tree in the same response. Best-effort; never fails the action.',
-  ),
-  settleQuietMs: integerField('Settle: quiet window in milliseconds (default 500).', { min: 0 }),
-  timeoutMs: integerField('Settle: wait deadline in milliseconds (default 10000).', { min: 1 }),
-});
-
-type VerifyFieldMap = { verify: ReturnType<typeof verifyField> };
-type SettleFieldMap = ReturnType<typeof settleFields>;
-type PostActionObservationFields<TName extends string> =
-  PostActionObservationSupportFor<TName> extends 'settle-and-verify'
-    ? VerifyFieldMap & SettleFieldMap
-    : PostActionObservationSupportFor<TName> extends 'settle'
-      ? SettleFieldMap
-      : {};
-
-function postActionObservationFields<const TName extends InteractionCommandName>(
-  command: TName,
-): PostActionObservationFields<TName> {
-  return {
-    ...(commandSupportsVerifyEvidence(command) ? { verify: verifyField() } : {}),
-    ...(commandSupportsSettleObservation(command) ? settleFields() : {}),
-  } as PostActionObservationFields<TName>;
-}
 
 const clickFields = {
   target: requiredField(interactionTargetField()),
@@ -170,6 +136,7 @@ const scrollFields = {
     min: 0,
     max: SCROLL_DURATION_MAX_MS,
   }),
+  ...postActionObservationFields('scroll'),
 };
 
 // #1271 stage 2 (ADR 0012 amendment): `get`/`is`/`find` are observation-only,

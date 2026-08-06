@@ -1,5 +1,7 @@
 import type { CommandFlags } from '@agent-device/contracts/command';
+import type { SettleObservation, SettleParams } from '@agent-device/contracts/interaction';
 import { dispatchCommand } from '../core/dispatch.ts';
+import { commandSupportsSettleObservation } from '../core/command-descriptor/registry.ts';
 import { requireCommandSupported } from './handlers/response.ts';
 import { SessionStore } from './session-store.ts';
 import type { DaemonCommandContext } from './context.ts';
@@ -51,11 +53,19 @@ export async function dispatchGenericCommand(params: {
 
   const readinessResponse = await ensureGenericCommandReady(session, platformCommand);
   if (readinessResponse) return readinessResponse;
+  const settleReadiness = await readGenericSettleRequest(platformCommand, req.flags);
+  if ('response' in settleReadiness) return settleReadiness.response;
+  const settleRequest = settleReadiness.settle;
   const preflightReadiness = await ensureNoAndroidBlockingDialogReady(session, platformCommand);
   if ('response' in preflightReadiness) return preflightReadiness.response;
 
   const { resolvedPositionals, resolvedOut, recordedPositionals, recordedFlags } =
     resolveCommandPositionals(req);
+  // #1638 `--settle` baseline: the STORED pre-action tree, captured before the
+  // action replaces it. Unlike press — whose baseline is the tree it just
+  // resolved its target against — this can be several commands old; that is the
+  // honest reading of the #1101 contract, and the diff says so by construction.
+  const preActionNodes = session.snapshot?.nodes ?? [];
 
   const actionStartedAt = Date.now();
   const dispatchContext = {
@@ -117,7 +127,42 @@ export async function dispatchGenericCommand(params: {
     flags: req.flags,
   });
 
-  return { ok: true, data: data ?? {} };
+  // Ordering is load-bearing: settle runs AFTER markDeferredInteractionOutcome
+  // so its first capture is the one that folds the #1542 post-gesture
+  // stabilization, and after the Android blocking-dialog postflight so a
+  // recovered dialog is not what the settled diff describes.
+  const settleData = settleRequest
+    ? await observeGenericSettle({
+        ...params,
+        settle: settleRequest,
+        baselineNodes: preActionNodes,
+      })
+    : undefined;
+
+  return { ok: true, data: { ...(data ?? {}), ...(settleData ?? {}) } };
+}
+
+/**
+ * The generic route's `--settle` seam, kept behind a lazy import on purpose:
+ * only `scroll` and `back` carry the descriptor post-action observation trait,
+ * and observing pulls in the whole interaction runtime. Every other generic leaf
+ * answers here without loading it, and reaches the rest of dispatch with no
+ * settle request.
+ */
+async function readGenericSettleRequest(
+  command: string,
+  flags: CommandFlags | undefined,
+): Promise<{ settle: SettleParams | undefined } | { response: DaemonResponse }> {
+  if (!commandSupportsSettleObservation(command)) return { settle: undefined };
+  const settleObservation = await import('./generic-settle-observation.ts');
+  return settleObservation.readGenericSettleRequest(command, flags);
+}
+
+async function observeGenericSettle(
+  params: Parameters<(typeof import('./generic-settle-observation.ts'))['observeGenericSettle']>[0],
+): Promise<{ settle: SettleObservation }> {
+  const settleObservation = await import('./generic-settle-observation.ts');
+  return await settleObservation.observeGenericSettle(params);
 }
 
 async function ensureNoAndroidBlockingDialogReady(

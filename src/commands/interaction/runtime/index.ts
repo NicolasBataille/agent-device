@@ -53,6 +53,8 @@ import {
   type GestureCommandOptions,
   type GestureCommandResult,
 } from './gesture-command.ts';
+import { settleObservationCommand, type SettleObservationCommandOptions } from './settle.ts';
+import type { SettleObservation } from '@agent-device/contracts/interaction';
 
 export type SelectorCommands = {
   find: RuntimeCommand<FindReadCommandOptions, FindReadCommandResult>;
@@ -78,6 +80,12 @@ export type InteractionCommands = {
   longPress: RuntimeCommand<LongPressCommandOptions, LongPressCommandResult>;
   scroll: RuntimeCommand<ScrollCommandOptions, ScrollCommandResult>;
   gesture: RuntimeCommand<GestureCommandOptions, GestureCommandResult>;
+  /**
+   * `--settle` (#1101) for a caller that resolved no target — the daemon's
+   * generic scroll/back route (#1638). Every other settle-carrying command gets
+   * its observation folded into its own result.
+   */
+  observeSettle: RuntimeCommand<SettleObservationCommandOptions, SettleObservation>;
 };
 
 export type BoundSelectorCommands = {
@@ -135,6 +143,7 @@ export type BoundInteractionCommands = {
   ) => Promise<LongPressCommandResult>;
   scroll: BoundRuntimeCommand<ScrollCommandOptions, ScrollCommandResult>;
   gesture: BoundRuntimeCommand<GestureCommandOptions, GestureCommandResult>;
+  observeSettle: BoundRuntimeCommand<SettleObservationCommandOptions, SettleObservation>;
 };
 
 export const selectorCommands: SelectorCommands = {
@@ -158,6 +167,7 @@ export const interactionCommands: InteractionCommands = {
   longPress: longPressCommand,
   scroll: scrollCommand,
   gesture: gestureCommand,
+  observeSettle: settleObservationCommand,
 };
 
 export function bindSelectorCommands(runtime: AgentDeviceRuntime): BoundSelectorCommands {
@@ -188,6 +198,7 @@ export function bindInteractionCommands(runtime: AgentDeviceRuntime): BoundInter
       interactionCommands.longPress(runtime, { ...options, target }),
     scroll: (options) => interactionCommands.scroll(runtime, options),
     gesture: (options) => interactionCommands.gesture(runtime, options),
+    observeSettle: (options) => interactionCommands.observeSettle(runtime, options),
   };
 }
 

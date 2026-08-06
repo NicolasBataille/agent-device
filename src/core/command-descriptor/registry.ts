@@ -287,10 +287,24 @@ const FILL_INTERACTION_RESPONSE_DATA_TRANSFORM = {
   },
 } as const satisfies CommandResponseDataTransform;
 
-function interactionTimeoutPolicy(command: string): CommandTimeoutPolicy {
+/**
+ * Timeout policy for a command that MAY carry the post-action observation
+ * trait: the settle policy when the observation map lists it, the caller's
+ * baseline otherwise. Keeping the map the enumerator means adding `--settle`
+ * to a command cannot leave its request envelope too narrow for the settle
+ * wait it now accepts.
+ */
+function postActionObservationTimeoutPolicy(
+  command: string,
+  withoutObservation: CommandTimeoutPolicy,
+): CommandTimeoutPolicy {
   return resolvePostActionObservationSupport(command) !== undefined
     ? SETTLE_FLAG_PRESERVE_DAEMON_TIMEOUT_POLICY
-    : PRESERVE_DAEMON_TIMEOUT_POLICY;
+    : withoutObservation;
+}
+
+function interactionTimeoutPolicy(command: string): CommandTimeoutPolicy {
+  return postActionObservationTimeoutPolicy(command, PRESERVE_DAEMON_TIMEOUT_POLICY);
 }
 
 function postActionObservation(command: string): PostActionObservationSupport {
@@ -1030,6 +1044,14 @@ export const RAW_COMMAND_DESCRIPTORS = [
       ...GENERIC_MUTATING_LINUX_DEVICE_COMMAND_TRAITS.capability,
       vega: VEGA_VVD,
     },
+    // #1638: back-then-observe in one round trip. The settle wait runs on the
+    // generic route (src/daemon/request-generic-dispatch.ts), after Android's
+    // blocking-dialog postflight.
+    timeoutPolicy: postActionObservationTimeoutPolicy(
+      'back',
+      GENERIC_MUTATING_LINUX_DEVICE_COMMAND_TRAITS.timeoutPolicy,
+    ),
+    postActionObservation: postActionObservation('back'),
   },
   {
     name: 'gesture',
@@ -1103,6 +1125,12 @@ export const RAW_COMMAND_DESCRIPTORS = [
     ...(ownerFilesEnabled ? { ownerFiles: ['src/commands/interaction/index.ts'] as const } : {}),
     catalog: { group: 'public' },
     ...GENERIC_MUTATING_LINUX_DEVICE_COMMAND_TRAITS,
+    // #1638: scroll-then-observe in one round trip; see `back` above.
+    timeoutPolicy: postActionObservationTimeoutPolicy(
+      'scroll',
+      GENERIC_MUTATING_LINUX_DEVICE_COMMAND_TRAITS.timeoutPolicy,
+    ),
+    postActionObservation: postActionObservation('scroll'),
   },
   {
     name: 'swipe',

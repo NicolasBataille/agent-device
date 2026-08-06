@@ -1,3 +1,4 @@
+import type { SettleCommandOptions } from '@agent-device/contracts/client';
 import { DEVICE_ROTATIONS, type DeviceRotation } from '@agent-device/contracts/device';
 import {
   BACK_MODES,
@@ -39,7 +40,16 @@ function defineNavigationCommandProjection<
 }
 
 export const NAVIGATION_COMMAND_PROJECTIONS = {
-  back: defineNavigationCommandProjection<{ mode?: BackMode }, BackCommandResult, false, 'back'>({
+  // #1638: `back` carries the descriptor post-action observation trait, so its
+  // options accept `--settle`. The settled observation itself rides the payload
+  // additively — these schemas are never strict, exactly so an opt-in field can
+  // (like `cost`) validate without every projection re-declaring it.
+  back: defineNavigationCommandProjection<
+    { mode?: BackMode } & SettleCommandOptions,
+    BackCommandResult,
+    false,
+    'back'
+  >({
     clientMethod: 'back',
     outputSchema: {
       type: 'object',

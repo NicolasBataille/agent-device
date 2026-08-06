@@ -10,6 +10,7 @@ import {
   resultOutput,
   type CliOutputFormatter,
 } from '../output-common.ts';
+import { appendResponseNotes } from '../settle-output.ts';
 
 function appStateCliOutput(result: AppStateCommandResult): CliOutput {
   return {
@@ -40,9 +41,16 @@ function clipboardCliOutput(result: ClipboardCommandResult): CliOutput {
   return messageCliOutput(result);
 }
 
+// #1638: back takes --settle on the generic route, so its line renders the
+// settled diff exactly like the touch commands.
+function backCliOutput(result: Record<string, unknown>): CliOutput {
+  const output = messageCliOutput(result);
+  return { data: output.data, text: appendResponseNotes(output.text, result) };
+}
+
 export const systemCliOutputFormatters = {
   appstate: resultOutput(appStateCliOutput),
-  back: messageOutput,
+  back: resultOutput(backCliOutput),
   home: messageOutput,
   orientation: messageOutput,
   'app-switcher': messageOutput,
