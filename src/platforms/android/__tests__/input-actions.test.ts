@@ -208,6 +208,47 @@ test('typeAndroid sends one character at a time when delay is requested', async 
   );
 });
 
+test('typeAndroid shell-quotes text containing shell metacharacters', async () => {
+  await withScriptedAdb(
+    'agent-device-android-type-shell-metacharacters-',
+    [
+      '#!/bin/sh',
+      'printf "__CMD__\\n" >> "$AGENT_DEVICE_TEST_ARGS_FILE"',
+      'printf "%s\\n" "$@" >> "$AGENT_DEVICE_TEST_ARGS_FILE"',
+      'exit 0',
+      '',
+    ].join('\n'),
+    async ({ argsLogPath, device }) => {
+      await typeAndroid(device, 'otp; echo pwned');
+      const logged = await fs.readFile(argsLogPath, 'utf8');
+      // The chunk carrying `;` is single-quoted so the device shell cannot
+      // re-tokenize it into a second command.
+      assert.match(logged, /shell\ninput\ntext\n'otp;%sech'/);
+      // The next chunk has no shell-significant characters and stays unquoted.
+      assert.match(logged, /shell\ninput\ntext\no%spwned\n/);
+    },
+  );
+});
+
+test('typeAndroid leaves safe text unquoted', async () => {
+  await withScriptedAdb(
+    'agent-device-android-type-safe-unquoted-',
+    [
+      '#!/bin/sh',
+      'printf "__CMD__\\n" >> "$AGENT_DEVICE_TEST_ARGS_FILE"',
+      'printf "%s\\n" "$@" >> "$AGENT_DEVICE_TEST_ARGS_FILE"',
+      'exit 0',
+      '',
+    ].join('\n'),
+    async ({ argsLogPath, device }) => {
+      await typeAndroid(device, 'hello');
+      const logged = await fs.readFile(argsLogPath, 'utf8');
+      assert.match(logged, /shell\ninput\ntext\nhello\n/);
+      assert.doesNotMatch(logged, /shell\ninput\ntext\n'/);
+    },
+  );
+});
+
 test('fillAndroid uses chunk-safe shell input and retries when verification still fails', async () => {
   await withScriptedAdb(
     'agent-device-android-fill-fallback-',
