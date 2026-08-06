@@ -223,9 +223,9 @@ function matchingCaptureFlags(
   flags: CommandFlags | undefined,
   presentation: SnapshotPresentation | undefined,
 ): CommandFlags | undefined {
-  if (!flags) return undefined;
+  if (!flags && !presentation) return undefined;
   return {
-    ...flags,
+    ...(flags ?? {}),
     out: undefined,
     ...(presentation
       ? {
