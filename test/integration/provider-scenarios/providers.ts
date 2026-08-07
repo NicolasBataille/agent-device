@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import type { AppleRunnerProvider } from '../../../src/platforms/apple/core/runner/runner-provider.ts';
 import type { RunnerCommand } from '../../../src/platforms/apple/core/runner/runner-contract.ts';
 import type {

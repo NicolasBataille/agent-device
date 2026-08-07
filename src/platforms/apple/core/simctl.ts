@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { isIosFamily, type DeviceInfo } from '@agent-device/kernel/device';
 import type { ExecOptions } from '../../../utils/exec.ts';
 import { resolveIosSimulatorDeviceSetPath } from '../../../utils/device-isolation.ts';

@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { runCmd, runCmdSync } from '../../src/utils/exec.ts';
 
 const CLI_TIMEOUT_MS = 120_000;

@@ -24,7 +24,8 @@ import type { ExecBackgroundResult } from '../utils/exec.ts';
 // here, so this back-edge must stay type-only to avoid a runtime cycle.
 import type { SnapshotDiagnosticsState } from '@agent-device/contracts/capture';
 import type { DeviceLease } from '@agent-device/contracts/device';
-import type { AudioProbeSource, ExecResult } from '@agent-device/contracts/platform';
+import type { AudioProbeSource } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import type { AndroidNativePerfSession } from '../platforms/android/perf.ts';
 import type { SessionScriptPublicationState } from './session-script-publication-state.ts';
 import type {

@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import type { ExecOptions } from './exec.ts';
 import { runCmd, runCmdSync } from './exec.ts';
 import { sleep } from './timeouts.ts';

@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { sleep } from '../../utils/timeouts.ts';
 import { emitDiagnostic } from '../../utils/diagnostics.ts';
 

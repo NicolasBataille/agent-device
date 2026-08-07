@@ -3,7 +3,8 @@ import { runCmdBackground, type ExecBackgroundResult } from '../../../../utils/e
 import { withKeyedLock } from '../../../../utils/keyed-lock.ts';
 import { Deadline } from '../../../../utils/retry.ts';
 import { isIosFamily, isApplePlatform, type DeviceInfo } from '@agent-device/kernel/device';
-import type { ExecResult, RunnerLogicalLeaseContext } from '@agent-device/contracts/platform';
+import type { RunnerLogicalLeaseContext } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import type { AppleRunnerLifecycleOptions } from './runner-provider.ts';
 import { emitRequestProgress } from '../../../../request/progress.ts';
 import { createRequestCanceledError } from '../../../../request/cancel.ts';

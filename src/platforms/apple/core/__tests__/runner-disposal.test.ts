@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   IOS_SIMULATOR,

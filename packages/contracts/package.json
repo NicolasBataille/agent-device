@@ -32,6 +32,10 @@
       "types": "./src/facades/platform.ts",
       "default": "./src/facades/platform.ts"
     },
+    "./host": {
+      "types": "./src/facades/host.ts",
+      "default": "./src/facades/host.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "default": "./src/settings.ts"

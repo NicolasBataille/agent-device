@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import os from 'node:os';

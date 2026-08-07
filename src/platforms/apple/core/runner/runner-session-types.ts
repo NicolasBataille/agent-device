@@ -1,4 +1,5 @@
-import type { ExecResult, RunnerLogicalLeaseContext } from '@agent-device/contracts/platform';
+import type { RunnerLogicalLeaseContext } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import type { RunnerXctestrunArtifact } from './runner-xctestrun.ts';

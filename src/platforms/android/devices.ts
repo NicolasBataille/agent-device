@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { requireExecSuccess, runCmd, runCmdDetached, whichCmd } from '../../utils/exec.ts';
 
 import { sleep } from '../../utils/timeouts.ts';

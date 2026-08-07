@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

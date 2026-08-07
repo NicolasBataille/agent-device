@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readProcessCommand, readProcessStartTime } from '../utils/host-process.ts';

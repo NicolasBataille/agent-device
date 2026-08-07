@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { buildSimctlArgsForDevice } from '../platforms/apple/core/simctl.ts';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { runCmdBackground, type ExecBackgroundResult } from '../utils/exec.ts';

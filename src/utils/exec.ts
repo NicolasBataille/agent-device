@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';

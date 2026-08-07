@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import type { AppsFilter } from '@agent-device/contracts/device';
 import type { ExecOptions } from '../../../utils/exec.ts';
 import type { IosAppInfo } from './app-info.ts';

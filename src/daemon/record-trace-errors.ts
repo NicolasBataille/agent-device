@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 
 export function formatRecordTraceError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

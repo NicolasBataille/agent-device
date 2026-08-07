@@ -49,6 +49,7 @@ const CONTRACT_EXPORTS = [
   '@agent-device/contracts/command',
   '@agent-device/contracts/device',
   '@agent-device/contracts/divergence',
+  '@agent-device/contracts/host',
   '@agent-device/contracts/interaction',
   '@agent-device/contracts/observability',
   '@agent-device/contracts/platform',

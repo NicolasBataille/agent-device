@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import { beforeEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { appendFileSync, existsSync, promises as fs, writeFileSync } from 'node:fs';

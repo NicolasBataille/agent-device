@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import fs from 'node:fs';
 import type { Readable } from 'node:stream';
 

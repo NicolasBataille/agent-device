@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import assert from 'node:assert/strict';
 import { afterEach, test, vi } from 'vitest';
 import { AppError } from '@agent-device/kernel/errors';

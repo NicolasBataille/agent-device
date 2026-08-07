@@ -1,4 +1,4 @@
-import type { ExecResult } from '@agent-device/contracts/platform';
+import type { ExecResult } from '@agent-device/contracts/host';
 import path from 'node:path';
 import { resolveIosSimulatorDeviceSetPath } from '../../../../utils/device-isolation.ts';
 import { emitDiagnostic } from '../../../../utils/diagnostics.ts';
