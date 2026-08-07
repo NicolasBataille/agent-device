@@ -1,13 +1,9 @@
 import { AppError, toAppErrorCode } from '@agent-device/kernel/errors';
-import {
-  runCmdBackground,
-  type ExecResult,
-  type ExecBackgroundResult,
-} from '../../../../utils/exec.ts';
+import { runCmdBackground, type ExecBackgroundResult } from '../../../../utils/exec.ts';
 import { withKeyedLock } from '../../../../utils/keyed-lock.ts';
 import { Deadline } from '../../../../utils/retry.ts';
 import { isIosFamily, isApplePlatform, type DeviceInfo } from '@agent-device/kernel/device';
-import type { RunnerLogicalLeaseContext } from '@agent-device/contracts/platform';
+import type { ExecResult, RunnerLogicalLeaseContext } from '@agent-device/contracts/platform';
 import type { AppleRunnerLifecycleOptions } from './runner-provider.ts';
 import { emitRequestProgress } from '../../../../request/progress.ts';
 import { createRequestCanceledError } from '../../../../request/cancel.ts';

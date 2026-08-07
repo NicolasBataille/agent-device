@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,7 +12,7 @@ import {
 } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
 import { parseXmlDocumentSync, type XmlNode } from '@agent-device/xml';
-import { execFailureDetails, requireExecSuccess, type ExecResult } from '../../../utils/exec.ts';
+import { execFailureDetails, requireExecSuccess } from '../../../utils/exec.ts';
 import { splitNonEmptyTrimmedLines } from '../../../utils/parsing.ts';
 import { roundPercent } from '../../perf-utils.ts';
 import { uniqueStrings } from '@agent-device/kernel/collections';

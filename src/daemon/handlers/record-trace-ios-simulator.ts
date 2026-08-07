@@ -1,6 +1,7 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { sleep } from '../../utils/timeouts.ts';
 import { emitDiagnostic } from '../../utils/diagnostics.ts';
-import type { ExecResult } from '../../utils/exec.ts';
+
 import { signalPidsBestEffort, uniquePositivePids } from '../../utils/host-process.ts';
 import { formatRecordTraceError } from '../record-trace-errors.ts';
 import type { SessionState } from '../types.ts';

@@ -1,6 +1,6 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import fs from 'node:fs';
 import type { Readable } from 'node:stream';
-import type { ExecResult } from '../utils/exec.ts';
 
 export async function waitForChildExit(
   wait: Promise<ExecResult>,

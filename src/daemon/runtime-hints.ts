@@ -1,7 +1,8 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { isIosFamily, type DeviceInfo } from '@agent-device/kernel/device';
 import { AppError, asAppError } from '@agent-device/kernel/errors';
 import { escapeXmlTextAndAttribute } from '@agent-device/xml';
-import { execFailureDetails, type ExecResult } from '../utils/exec.ts';
+import { execFailureDetails } from '../utils/exec.ts';
 import type { SessionRuntimeHints } from './types.ts';
 import {
   resolveRuntimeTransportHints,

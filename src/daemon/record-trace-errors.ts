@@ -1,4 +1,4 @@
-import type { ExecResult } from '../utils/exec.ts';
+import type { ExecResult } from '@agent-device/contracts/platform';
 
 export function formatRecordTraceError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

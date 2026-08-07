@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +17,6 @@ import {
   requireExecSuccess,
   runCmdBackground,
   type ExecBackgroundResult,
-  type ExecResult,
 } from '../../../utils/exec.ts';
 import { uniqueStrings } from '@agent-device/kernel/collections';
 import { findAllXmlNodes } from './perf-xml.ts';

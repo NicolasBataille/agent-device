@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,7 +15,6 @@ import { trackDownloadableArtifact } from '../../../src/daemon/artifact-tracking
 import { LeaseRegistry } from '../../../src/daemon/lease-registry.ts';
 import { SessionStore } from '../../../src/daemon/session-store.ts';
 import type { DaemonRequest, DaemonResponse, SessionState } from '../../../src/daemon/types.ts';
-import type { ExecResult } from '../../../src/utils/exec.ts';
 
 const PROVIDER_SCENARIO_TOKEN = 'provider-scenario-token';
 const PROVIDER_SCENARIO_TEMP_REMOVE_OPTIONS = {

@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { beforeEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { appendFileSync, existsSync, promises as fs, writeFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ const execActual =
 
 import { AppError } from '@agent-device/kernel/errors';
 import { runCmdDetached, withCommandExecutorOverride } from '../../../utils/exec.ts';
-import type { CommandExecutorOverride, ExecResult } from '../../../utils/exec.ts';
+import type { CommandExecutorOverride } from '../../../utils/exec.ts';
 import {
   ensureAndroidEmulatorBooted,
   listAndroidDevices,

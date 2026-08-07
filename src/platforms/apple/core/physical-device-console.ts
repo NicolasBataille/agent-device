@@ -1,4 +1,5 @@
-import type { ExecResult } from '../../../utils/exec.ts';
+import type { ExecResult } from '@agent-device/contracts/platform';
+
 import { runXcrun } from './tool-provider.ts';
 
 export type CoreDeviceConsoleCaptureSupport =

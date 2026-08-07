@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Readable, Writable } from 'node:stream';
 import type { DeviceInfo } from '@agent-device/kernel/device';
@@ -14,7 +15,6 @@ import {
   type CommandExecutorOverride,
   type ExecBackgroundOptions,
   type ExecOptions,
-  type ExecResult,
 } from '../../utils/exec.ts';
 import { AppError } from '@agent-device/kernel/errors';
 

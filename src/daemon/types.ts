@@ -19,12 +19,12 @@ import type {
 } from '@agent-device/kernel/contracts';
 import type { DeviceInfo, Platform, PlatformSelector } from '@agent-device/kernel/device';
 import type { Rect, SnapshotState, SnapshotCaptureBackend } from '@agent-device/kernel/snapshot';
-import type { ExecBackgroundResult, ExecResult } from '../utils/exec.ts';
+import type { ExecBackgroundResult } from '../utils/exec.ts';
 // Type-only import; erased at runtime. ref-frame.ts imports SessionState from
 // here, so this back-edge must stay type-only to avoid a runtime cycle.
 import type { SnapshotDiagnosticsState } from '@agent-device/contracts/capture';
 import type { DeviceLease } from '@agent-device/contracts/device';
-import type { AudioProbeSource } from '@agent-device/contracts/platform';
+import type { AudioProbeSource, ExecResult } from '@agent-device/contracts/platform';
 import type { AndroidNativePerfSession } from '../platforms/android/perf.ts';
 import type { SessionScriptPublicationState } from './session-script-publication-state.ts';
 import type {

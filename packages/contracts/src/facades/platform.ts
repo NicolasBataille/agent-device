@@ -32,6 +32,7 @@ export {
   isAudioProbeSupportedDevice,
   isHostSystemAudioProbeDevice,
 } from '../audio-probe-support.ts';
+export type { ExecResult } from '../host-command.ts';
 export type { PlatformPlugin } from '../platform-plugin.ts';
 export type { PlatformGatedProviderResolverKey } from '../platform-providers.ts';
 export type { RunnerLogicalLeaseContext } from '../runner-lease-context.ts';

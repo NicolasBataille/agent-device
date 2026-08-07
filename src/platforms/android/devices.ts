@@ -1,5 +1,6 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { requireExecSuccess, runCmd, runCmdDetached, whichCmd } from '../../utils/exec.ts';
-import type { ExecResult } from '../../utils/exec.ts';
+
 import { sleep } from '../../utils/timeouts.ts';
 import { AppError, asAppError } from '@agent-device/kernel/errors';
 import type { DeviceInfo } from '@agent-device/kernel/device';

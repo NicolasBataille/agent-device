@@ -1,10 +1,11 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   IOS_SIMULATOR,
   MACOS_DEVICE,
   TVOS_SIMULATOR,
 } from '../../../../__tests__/test-utils/index.ts';
-import type { ExecResult } from '../../../../utils/exec.ts';
+
 import type { RunnerSession } from '../runner/runner-session-types.ts';
 
 const {

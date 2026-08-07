@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +19,7 @@ vi.mock('./agent-browser-lifecycle.ts', async (importOriginal) => {
 
 import { createAgentBrowserWebProvider } from './agent-browser-provider.ts';
 import type { WebSnapshotResult } from './provider.ts';
-import { withCommandExecutorOverride, type ExecResult } from '../../utils/exec.ts';
+import { withCommandExecutorOverride } from '../../utils/exec.ts';
 import { AppError } from '@agent-device/kernel/errors';
 import { buildSelectorChainForNode, resolveSelectorChain } from '@agent-device/selectors';
 import { attachRefs } from '@agent-device/kernel/snapshot';

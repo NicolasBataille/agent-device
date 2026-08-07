@@ -1,5 +1,6 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { isIosFamily, type DeviceInfo } from '@agent-device/kernel/device';
-import type { ExecOptions, ExecResult } from '../../../utils/exec.ts';
+import type { ExecOptions } from '../../../utils/exec.ts';
 import { resolveIosSimulatorDeviceSetPath } from '../../../utils/device-isolation.ts';
 import { runXcrun } from './tool-provider.ts';
 

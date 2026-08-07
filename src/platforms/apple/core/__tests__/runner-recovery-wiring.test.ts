@@ -1,8 +1,9 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import assert from 'node:assert/strict';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AppError } from '@agent-device/kernel/errors';
 import { IOS_SIMULATOR } from '../../../../__tests__/test-utils/device-fixtures.ts';
-import type { ExecResult } from '../../../../utils/exec.ts';
+
 import type { RunnerSession } from '../runner/runner-session.ts';
 import { startFakeRunnerServer, type FakeRunnerServer } from './fake-runner-server.ts';
 

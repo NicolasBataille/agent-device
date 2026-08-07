@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { isIosFamily } from '@agent-device/kernel/device';
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -12,7 +13,6 @@ import {
   resolveAppleTargetFromDevicectlDevice,
 } from '../devices.ts';
 import { createLocalAppleToolProvider, withAppleToolProvider } from '../tool-provider.ts';
-import type { ExecResult } from '../../../../utils/exec.ts';
 
 const toolCalls: Array<[string, string[]]> = [];
 let mockRunCommand: (cmd: string, args: string[]) => Promise<ExecResult>;

@@ -1,10 +1,5 @@
-import {
-  coerceExecResult,
-  runCmd,
-  whichCmd,
-  type ExecOptions,
-  type ExecResult,
-} from '../../../utils/exec.ts';
+import type { ExecResult } from '@agent-device/contracts/platform';
+import { coerceExecResult, runCmd, whichCmd, type ExecOptions } from '../../../utils/exec.ts';
 import { createScopedProvider } from '../../../utils/scoped-provider.ts';
 import { createLocalAppleMacOsHostProvider } from '../os/macos/host-provider.ts';
 import type {

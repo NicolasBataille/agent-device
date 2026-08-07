@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,6 @@ import {
   runCmdStreaming,
   runCmdSync,
   whichCmd,
-  type ExecResult,
 } from '../exec.ts';
 import { AppError } from '@agent-device/kernel/errors';
 import { mkdtempForTestSync } from '../../__tests__/test-utils/tmp-dir.ts';

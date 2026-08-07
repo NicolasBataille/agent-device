@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
@@ -8,13 +9,6 @@ import { pipeline } from 'node:stream/promises';
 import { AppError } from '@agent-device/kernel/errors';
 import { emitDiagnostic, getDiagnosticsMeta, updateDiagnosticsScope } from './diagnostics.ts';
 import { parseBooleanLiteral } from './source-value.ts';
-
-export type ExecResult = {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-  stdoutBuffer?: Buffer;
-};
 
 export type ExecOptions = {
   cwd?: string;

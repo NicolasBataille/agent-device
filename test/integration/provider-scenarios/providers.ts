@@ -1,3 +1,4 @@
+import type { ExecResult } from '@agent-device/contracts/platform';
 import type { AppleRunnerProvider } from '../../../src/platforms/apple/core/runner/runner-provider.ts';
 import type { RunnerCommand } from '../../../src/platforms/apple/core/runner/runner-contract.ts';
 import type {
@@ -6,7 +7,7 @@ import type {
   AppleToolProvider,
   AppleToolSubcommandExecutor,
 } from '../../../src/platforms/apple/core/tool-provider.ts';
-import type { ExecResult } from '../../../src/utils/exec.ts';
+
 import type { ProviderScenarioTranscript } from './transcript.ts';
 
 export type FlatToolCall = [string, ...string[]];
