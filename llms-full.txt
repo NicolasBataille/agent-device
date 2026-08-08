@@ -2235,7 +2235,8 @@ agent-device disconnect --remote-config ./agent-device.remote.json
 - Cloud auth uses three credential classes: `adc_agent_...` short-lived command tokens, revocable CLI session refresh credentials, and explicit `adc_live_...` service/API tokens for CI. The CLI implements credential selection, CI refusal, local storage permissions, logout, and output redaction; the cloud API must enforce token expiry, tenant/run scope, revocation, one-time device approval, polling rate limits, and dashboard/API separation.
 - `AGENT_DEVICE_CLOUD_BASE_URL` should point at the bridge/control-plane API origin, not necessarily the dashboard origin. API-token setup links use `/api-keys` on that origin so the bridge can redirect users to the right dashboard page.
 - Deferred Metro preparation also applies to `batch` when any step opens an app and the batch does not provide its own per-step runtime.
-- After `connect`, `install-from-source`, `open`, `snapshot`, `devices`, `press`, `fill`, `screenshot`, and other normal commands reuse active connection state so agents do not repeat remote host/session/lease selectors inline. If `connection status` shows `leaseId=pending`, the first platform-bound command allocates or refreshes the lease. Passing the same `--remote-config` to a normal command is also supported for self-contained scripts; the CLI reuses matching saved state or creates it before dispatch.
+- `connect` without `--session` always creates a fresh remote session. Its human and JSON next steps include the generated `--session`; concurrent processes must preserve that value on every command so they cannot adopt another process's ambient connection. The active connection fallback remains a convenience for one sequential workflow only. To replace a connection, pass its returned session explicitly with `--session <name> --force`; `--force` without a session creates another connection without overwriting or releasing the previous one.
+- After `connect`, `install-from-source`, `open`, `snapshot`, `devices`, `press`, `fill`, `screenshot`, and other normal commands can reuse active connection state in a single sequential workflow so agents do not repeat remote host/session/lease selectors inline. If `connection status` shows `leaseId=pending`, the first platform-bound command allocates or refreshes the lease. Passing the same `--remote-config` to a normal command is also supported for self-contained scripts; the CLI reuses matching saved state or creates it before dispatch.
 - Self-contained remote scripts should end with `disconnect --remote-config <path>` or `disconnect` to release the lease and stop the owned Metro companion.
 - Explicit command-line flags override connected defaults. When `open` uses explicit remote daemon or tenant flags without saved runtime hints, the CLI warns because React Native apps may launch without Metro bundle/runtime hints.
 - `metroProxyBaseUrl` is the bridge origin. Do not prebuild `/api/metro/...` paths in the client profile; the CLI calls the bridge endpoints itself.
@@ -2863,7 +2864,9 @@ export AWS_DEVICE_FARM_APP_ARN=...
 
 `AGENT_DEVICE_AWS_DEVICE_FARM_PROJECT_ARN`, `AGENT_DEVICE_AWS_DEVICE_FARM_DEVICE_ARN`, and `AGENT_DEVICE_AWS_DEVICE_FARM_APP_ARN` are accepted as agent-device-specific aliases.
 
-`connect` runs read-only `get-project`, `get-device`, and, when supplied, `get-upload` calls. It rejects a device or app for the wrong platform and an app upload that is not ready. If no app ARN is supplied, the output says so explicitly. AWS Device Farm does not support installing an app after the remote access session is allocated; reconnect with `--aws-app-arn <arn> --force` before `open` when the app is required.
+`connect` runs read-only `get-project`, `get-device`, and, when supplied, `get-upload` calls. It rejects a device or app for the wrong platform and an app upload that is not ready. If no app ARN is supplied, the output says so explicitly. AWS Device Farm does not support installing an app after the remote access session is allocated; use the printed reconnect command, including its `--session <name> --force`, before `open` when the app is required.
+
+Every unscoped `connect` creates a fresh remote session. The printed next steps carry its generated `--session`; keep that flag on every command when multiple processes or CI jobs share a host. The ambient active connection is only safe as a convenience for one sequential workflow. Replacing a connection also requires naming it explicitly: use `connect ... --session <name> --force`. An unscoped `--force` creates a new connection and leaves existing sessions untouched.
 
 Full flow:
 
@@ -3001,6 +3004,8 @@ agent-device artifacts <session-arn> --provider aws-device-farm --json
 ```
 
 BrowserStack can return session video, Appium logs, device logs, dashboard URL, and public URL. AWS Device Farm can return remote-access video and log artifacts after the provider finalizes them.
+
+Add `--session <name>` when a host runs more than one connection. Without it, `artifacts` resolves through the ambient active connection and can return another concurrent job's provider video and logs. `connect` prints the artifacts command already carrying its own session.
 
 ## Troubleshooting
 
