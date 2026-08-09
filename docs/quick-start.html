@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/56.6e0af2a80d.js"></script>
-<script defer src="/agent-device/static/js/index.5684414d1f.js"></script>
+<script defer src="/agent-device/static/js/index.9519f2e668.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -25,10 +25,10 @@
 <p>For client-specific setup in Cursor, Codex, Claude Code, Windsurf, Cline, Goose, and other coding agents, see <a href="/agent-device/docs/agent-setup" class="rp-link">AI Agent Setup</a>. For a single text bundle that agents can ingest, use <a href="https://oss.callstack.com/agent-device/llms-full.txt" target="_blank" rel="noopener noreferrer" class="rp-link">llms-full.txt</a>.</p>
 <p>Every device automation follows this pattern:</p>
 <div class="rp-codeblock language-bash"><div class="rp-codeblock__content"><div class="rp-codeblock__content__scroll-container rp-scrollbar rp-scrollbar--always"><pre class="shiki css-variables" style="background-color:var(--shiki-background);color:var(--shiki-foreground)" tabindex="0" data-lang="bash"><code><span class="line"><span style="color:var(--shiki-token-comment)"># 1. Discover the installed app identifier when needed</span></span>
-<span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> apps</span><span style="color:var(--shiki-token-string)"> --platform</span><span style="color:var(--shiki-token-string)"> ios</span><span style="color:var(--shiki-token-comment)"> # or android</span></span>
+<span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> apps</span><span style="color:var(--shiki-token-string)"> --platform</span><span style="color:var(--shiki-token-string)"> ios</span><span style="color:var(--shiki-token-comment)"> # or android or harmonyos</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:var(--shiki-token-comment)"># 2. Navigate</span></span>
-<span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> open</span><span style="color:var(--shiki-token-string)"> SampleApp</span><span style="color:var(--shiki-token-string)"> --platform</span><span style="color:var(--shiki-token-string)"> ios</span><span style="color:var(--shiki-token-comment)"> # or android</span></span>
+<span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> open</span><span style="color:var(--shiki-token-string)"> SampleApp</span><span style="color:var(--shiki-token-string)"> --platform</span><span style="color:var(--shiki-token-string)"> ios</span><span style="color:var(--shiki-token-comment)"> # or android or harmonyos</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:var(--shiki-token-comment)"># 3. Snapshot to get element refs</span></span>
 <span class="line"><span style="color:var(--shiki-token-function)">agent-device</span><span style="color:var(--shiki-token-string)"> snapshot</span><span style="color:var(--shiki-token-string)"> -i</span></span>
@@ -78,6 +78,7 @@
 <ul>
 <li>Android: <code>.apk</code> and <code>.aab</code></li>
 <li>iOS: <code>.app</code> and <code>.ipa</code></li>
+<li>HarmonyOS: <code>.hap</code></li>
 <li><code>.aab</code> requires <code>bundletool</code> in <code>PATH</code>, or <code>AGENT_DEVICE_BUNDLETOOL_JAR=&lt;absolute-path-to-bundletool-all.jar&gt;</code> with <code>java</code> in <code>PATH</code>.</li>
 <li><code>.aab</code> installs use bundletool <code>build-apks --mode universal</code>.</li>
 <li><code>.ipa</code> installs extract <code>Payload/*.app</code>; if multiple app bundles exist, <code>&lt;app&gt;</code> selects the target by bundle id or bundle name.</li>

@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/56.6e0af2a80d.js"></script>
-<script defer src="/agent-device/static/js/index.5684414d1f.js"></script>
+<script defer src="/agent-device/static/js/index.9519f2e668.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -174,7 +174,7 @@
 <li>Android native profiling uses <code>perf cpu profile ... --kind simpleperf</code>; Android native trace capture uses <code>perf trace ... --kind perfetto</code>. These commands require an active Android app session and return artifact paths/summaries instead of dumping profile or trace contents.</li>
 <li>Use the compact native perf result as agent evidence. For example, a successful Perfetto stop may return <code>state: &quot;stopped&quot;</code>, <code>outPath: &quot;/tmp/app.perfetto-trace&quot;</code>, <code>sizeBytes: 5392410</code>, and <code>method: &quot;adb-shell-perfetto&quot;</code> while the 5.3 MB raw trace remains on disk as the artifact.</li>
 <li>Startup is measured around the <code>open</code> command; it is not first-frame instrumentation.</li>
-<li>CPU, memory, and Android frame-health availability depend on platform and whether the active session is bound to an app/package.</li>
+<li>CPU, memory, and Android frame-health availability depend on platform and whether the active session is bound to an app/package. HarmonyOS reports process CPU and RSS through HDC; frame sampling and memory-snapshot artifacts remain unavailable on the public HDC surface.</li>
 <li>On Android and supported Apple targets, use <code>metrics.fps.droppedFramePercent</code> for the health check and <code>metrics.fps.worstWindows</code> to line up jank clusters with logs, network activity, or recent actions.</li>
 </ul>
 <h2 class="rp-toc-include" id="where-to-go-deeper"><a href="#where-to-go-deeper" class="rp-header-anchor rp-link" aria-hidden="true">#</a>Where to go deeper</h2>

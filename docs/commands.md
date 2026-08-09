@@ -164,6 +164,7 @@ agent-device devices --platform android --android-device-allowlist emulator-5554
 agent-device devices
 agent-device devices --platform ios
 agent-device devices --platform android
+agent-device devices --platform harmonyos
 agent-device devices --platform vega --target tv
 agent-device devices --platform ios --ios-simulator-device-set /tmp/tenant-a/simulators
 agent-device devices --platform android --android-device-allowlist emulator-5554,device-1234
@@ -172,10 +173,19 @@ agent-device capabilities --session checkout --json
 ```
 
 - `devices` lists available targets after applying any platform selector or isolation scope flags.
-- Use `--platform` to narrow discovery to Apple-family (`ios`, `tvOS`, `macOS`), Android, or Vega OS targets.
+- Use `--platform` to narrow discovery to Apple-family (`ios`, `tvOS`, `macOS`), Android, HarmonyOS, or Vega OS targets.
 - Use `--ios-simulator-device-set` and `--android-device-allowlist` when you need tenant- or lab-scoped discovery.
 - `capabilities` reports the command names supported by the selected session device or an explicit `--platform`/`--device`/`--udid`/`--serial` target.
 - In JSON output, `capabilities` returns `{ device, availableCommands }`. Use `availableCommands` for dynamic integrations instead of maintaining a separate platform support table.
+
+### HarmonyOS command boundary
+
+HarmonyOS support uses HDC and ArkUI `uitest`. On current API 24 devices it supports lifecycle and HAP deployment, ArkUI snapshot/screenshot and selector reads, one-pointer touch and text actions, keyboard `enter`/`dismiss`, app logs, foreground app state, process CPU/RSS samples, and `settings clear-app-state`. Run `agent-device capabilities --platform harmonyos` for the authoritative command list for a selected device.
+
+- `gesture pan|fling|swipe` and `swipe` use HDC's single-pointer input primitives. Multi-touch gestures and target-authored `gesture drag` return `UNSUPPORTED_OPERATION` rather than approximating the interaction.
+- Physical HarmonyOS devices support whole-screen recording through `record start <path> --scope device` or `--scope system`. This uses the device ScreenRecorder service, not HDC `screenrecord`; emulator recording is explicitly rejected. HarmonyOS recording does not support `--fps`, `--quality`, or `--hide-touches`.
+- Orientation control, clipboard, alert automation, network/audio capture, push and app-event delivery, React Native helpers, and trace capture are not advertised for HarmonyOS. The public API 24 HDC surface has no usable `pasteboard`, notification, or `aa send` command on the supported emulator and physical device.
+- `settings` intentionally supports only `clear-app-state`; other system settings are not changed through undocumented parameter writes. `perf` provides process CPU/RSS only: frame health and memory-snapshot artifacts remain unavailable.
 
 ## Diagnostics
 
