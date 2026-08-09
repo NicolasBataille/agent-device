@@ -5,11 +5,11 @@
 <title>Commands - agent-device</title>
 <script>{;const saved = localStorage.getItem('rspress-theme-appearance');const preferDark = window.matchMedia('(prefers-color-scheme: dark)').matches;const isDark = !saved || saved === 'auto' ? preferDark : saved === 'dark';document.documentElement.classList.toggle('dark', isDark);document.documentElement.classList.toggle('rp-dark', isDark);document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';}</script>
 <link href="/agent-device/static/css/styles.cf5e9ab9a4.css" rel="stylesheet">
-<script defer src="/agent-device/static/js/styles.308ea4bafe.js"></script>
+<script defer src="/agent-device/static/js/styles.a59c5e0ff5.js"></script>
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
-<script defer src="/agent-device/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/static/js/index.17ed05b3fe.js"></script>
+<script defer src="/agent-device/static/js/56.6e0af2a80d.js"></script>
+<script defer src="/agent-device/static/js/index.57773853c9.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -479,6 +479,9 @@ Two-finger <code>gesture pan</code> and <code>gesture transform</code> are suppo
 <li>Use <code>install</code> or <code>reinstall</code> for local <code>.apk</code>, <code>.aab</code>, <code>.app</code>, and <code>.ipa</code> paths; use <code>install-from-source</code> when the artifact already exists at a URL reachable by the daemon.</li>
 <li>Direct Android URL sources may be <code>.apk</code> or <code>.aab</code>.</li>
 <li>Trusted artifact service URLs may resolve to archives containing one installable <code>.apk</code>, <code>.aab</code>, <code>.ipa</code>, or iOS <code>.app</code> tar archive. Prefer <code>--github-actions-artifact</code> for GitHub Actions artifacts that a compatible remote daemon can resolve with its own credentials.</li>
+<li>Downloads resolve and approve every redirect destination, pin each connection to the approved address, reject HTTPS downgrades, and follow at most five redirects. Sensitive caller headers are not forwarded across origins.</li>
+<li>Downloaded artifacts are limited to 2 GiB compressed. Archive materialization is limited to 4 GiB expanded data, 100,000 entries, and three nested archive layers; links and special archive entries are rejected.</li>
+<li>Standard <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code>, and <code>NO_PROXY</code> configuration is honored without delegating destination DNS resolution to the proxy.</li>
 <li><code>--retain-paths</code> keeps retained materialized artifact paths after install, and <code>--retention-ms &lt;ms&gt;</code> sets their TTL.</li>
 <li>URL downloads follow the same <code>installFromSource()</code> safety checks and host restrictions as the JS client API.</li>
 </ul>
