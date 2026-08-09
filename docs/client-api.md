@@ -219,7 +219,7 @@ await client.capture.snapshot({ interactiveOnly: true });
 const closed = await client.sessions.close();
 ```
 
-Use `client.sessions.artifacts({ provider, providerSessionId })` with `closed.provider?.providerSessionId` to fetch hosted video/log URLs after close when the provider supports them. See [Device Clouds & Farms](/agent-device/docs/device-clouds.md) for Limrun, BrowserStack, AWS Device Farm, CLI, JavaScript, and MCP flows.
+Use `client.sessions.artifacts({ provider, providerSessionId })` with `closed.provider?.providerSessionId` to fetch provider-hosted video and log URLs after close. See the [BrowserStack](/agent-device/docs/browserstack.md), [AWS Device Farm](/agent-device/docs/aws-device-farm.md), and [Limrun](/agent-device/docs/limrun.md) guides for provider-specific setup.
 
 ## Web sessions
 
