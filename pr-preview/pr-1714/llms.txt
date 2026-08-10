@@ -9,7 +9,7 @@
 ## Others
 
 - [](/agent-device/pr-preview/pr-1714/404.md)
-- [AI Agent Setup](/agent-device/pr-preview/pr-1714/docs/agent-setup.md): Configure Cursor, Codex, Claude Code, Windsurf, Cline, Goose, skills, and MCP for agent-device mobile, TV, desktop, and web app verification.
+- [AI Agent Setup](/agent-device/pr-preview/pr-1714/docs/agent-setup.md): Configure Cursor, Codex, Claude Code, Windsurf, Cline, Goose, iOS Simulator and Android Emulator skills, and MCP for agent-device app verification.
 - [AI SDK](/agent-device/pr-preview/pr-1714/docs/ai-sdk.md): Vercel's AI SDK can expose agent-device client methods as typed tools in a Node.js agent. ToolLoopAgent owns the model loop, while createAgentDeviceClient() owns the device session and keeps tool implementations aligned with the CLI command contracts. Install the integration dependencies: The example below gives the model two deliberately small tools: one for observing the current UI and one for pressing an element returned by that observation. Set AI_MODEL to a model available through your configured AI SDK provider. See the AI SDK references for ToolLoopAgent and tool().
 - [AWS Device Farm](/agent-device/pr-preview/pr-1714/docs/aws-device-farm.md): Drive AWS Device Farm remote-access sessions with agent-device.
 - [Batching](/agent-device/pr-preview/pr-1714/docs/batching.md): Use batch to run multiple commands in a single daemon request. This is useful for agent workflows that already know the next sequence of actions and want to reduce orchestration overhead.
