@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1713/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1713/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1713/static/js/56.6e0af2a80d.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1713/static/js/index.1003c84326.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1713/static/js/index.b80ff18aba.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -306,7 +306,9 @@ the capture.</li>
 controls are not separate elements still lists them. It is iOS-simulator-only and exists for
 planning, not invocation: there is no API to trigger a named action, so reach the affordance
 through the element&#x27;s detail screen, the same control exposed as a labeled element elsewhere, or
-coordinates from its rect. See <a href="/agent-device/pr-preview/pr-1713/docs/snapshots" class="rp-link">Snapshots</a> for the full constraints.</li>
+coordinates from its rect. It is mutually exclusive with <code>--raw</code>, which takes a capture path that
+cannot carry custom actions: the pair is rejected as <code>INVALID_ARGS</code> before any device work. See
+<a href="/agent-device/pr-preview/pr-1713/docs/snapshots" class="rp-link">Snapshots</a> for the full constraints.</li>
 <li><code>diff snapshot</code> compares the current snapshot with the previous session baseline and then updates baseline.</li>
 <li><code>snapshot --diff</code> is an alias for <code>diff snapshot</code>.</li>
 <li>Default snapshot text is an agent-facing, token-efficient view for planning and targeting actions. It may collapse helper/accessibility noise; use <code>--raw</code> or <code>--json</code> when you need the full provider tree.</li>
