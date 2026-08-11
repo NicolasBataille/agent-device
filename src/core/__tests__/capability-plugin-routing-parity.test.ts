@@ -131,7 +131,6 @@ const coreDeviceOnlyPhysicalOperationHint = (device: DeviceInfo): string | undef
 // end-to-end assertions cross-check this map against production: a command that
 // gains/loses a closure (or whose closure body changes) breaks parity.
 const SUPPORTS_REF: Record<string, (device: DeviceInfo) => boolean> = {
-  boot: isNotMacOs,
   apps: supportsCoreDevicePhysicalOperation,
   install: supportsAppInstallation,
   reinstall: supportsAppInstallation,
@@ -337,8 +336,10 @@ test('(b.2) unsupportedHint closures are verbatim across the full device matrix'
 });
 
 test('the capability catalog includes runtime-backed commands without restoring legacy admission', () => {
+  assert.ok(listCapabilityCommands().includes('boot'));
   assert.ok(listCapabilityCommands().includes('logs'));
   assert.ok(listCapabilityCommands().includes('network'));
+  assert.equal(BASE_COMMAND_CAPABILITY_MATRIX['boot'], undefined);
   assert.equal(BASE_COMMAND_CAPABILITY_MATRIX['logs'], undefined);
   assert.equal(BASE_COMMAND_CAPABILITY_MATRIX['network'], undefined);
 });

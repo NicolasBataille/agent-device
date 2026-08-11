@@ -67,7 +67,6 @@ const coreDeviceOnlyPhysicalOperationHint = (device: DeviceInfo): string | undef
     ? undefined
     : 'This command requires a CoreDevice-backed physical iOS device. The selected XCTest backend supports open, close, interactions, snapshots, and screenshots.';
 const SUPPORTS_REF: Record<string, (device: DeviceInfo) => boolean> = {
-  boot: isNotMacOs,
   apps: supportsCoreDevicePhysicalOperation,
   install: supportsAppInstallation,
   reinstall: supportsAppInstallation,

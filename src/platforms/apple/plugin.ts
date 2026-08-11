@@ -20,7 +20,7 @@ import type { RunnerContext } from '@agent-device/contracts/interaction';
 // the full {command x sample-device} matrix (iOS/iPadOS/tvOS/macOS/visionOS).
 // ---------------------------------------------------------------------------
 
-// `install`/`boot`/`reinstall`/`install-from-source`/`push`/`home`/`app-switcher`
+// `install`/`reinstall`/`install-from-source`/`push`/`home`/`app-switcher`
 // (was `!isMacOs(device)`). Off Apple (caps undefined) the original was
 // always true — no non-Apple platform is macOS.
 const supportsAppAndDeviceLifecycle = (device: DeviceInfo): boolean => {
@@ -76,7 +76,6 @@ const supportsTvRemote = (device: DeviceInfo): boolean => {
 // Per-command support gates the Apple family applies by default, keyed exactly as in
 // the command-descriptor registry (a command absent here has no Apple gate).
 const APPLE_SUPPORTS_BY_DEFAULT: Record<string, (device: DeviceInfo) => boolean> = {
-  [PUBLIC_COMMANDS.boot]: supportsAppAndDeviceLifecycle,
   [PUBLIC_COMMANDS.apps]: supportsCoreDevicePhysicalOperation,
   [PUBLIC_COMMANDS.install]: supportsAppInstallation,
   [PUBLIC_COMMANDS.reinstall]: supportsAppInstallation,

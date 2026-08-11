@@ -11,10 +11,31 @@ import { recordRuntimeDaemonMechanicsViolations } from './record-runtime-mechani
  * mechanism in `runtime-command-cutover-policy.ts` carries one planted-red proof for
  * every row, and `cutoverRowDefects` rejects a row that leaves its claims unstated.
  *
- * Rule ids are per row: the layering report groups violations under R17 devices,
- * R14 logs, R15 network, R16 record.
+ * Rule ids are per row: the layering report groups violations under R18 boot,
+ * R17 devices, R14 logs, R15 network, R16 record.
  */
 export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
+  {
+    rule: 'R18 boot-runtime-cutover',
+    command: 'boot',
+    subject: 'device readiness',
+    tier: 'request-scoped',
+    execution: 'device-runtime',
+    legacyRetirement: {
+      routeNames: ['ensureAndroidEmulatorBoot', 'resolveAndroidEmulatorAvdName'],
+    },
+    admissionMember: {
+      forms: ['computed-property'],
+      files: ['src/platforms/apple/plugin.ts'],
+      message: 'Apple plugin retains legacy boot support or hint closure',
+    },
+    runtimeTypeNames: ['DeviceReadinessRuntimeOperations'],
+    operations: { names: ['bootTarget', 'bootTargetHeadless'] },
+    singularExecution: {
+      routes: ['handleSessionStateCommands'],
+      operations: ['bootTarget', 'bootTargetHeadless'],
+    },
+  },
   {
     rule: 'R17 device-inventory-cutover',
     command: 'devices',
