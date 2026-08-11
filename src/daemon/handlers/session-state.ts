@@ -1,7 +1,6 @@
 import { AppError, asAppError } from '@agent-device/kernel/errors';
 import {
-  ensureReadyHeadlessUse,
-  ensureReadyUse,
+  resolveDeviceReadinessRuntimePlan,
   type RuntimeOperationFact,
 } from '@agent-device/contracts/platform';
 import {
@@ -207,7 +206,7 @@ export async function handleSessionStateCommands(params: {
     const androidSerialAllowlist = resolvedAndroidSerialAllowlist
       ? [...resolvedAndroidSerialAllowlist].sort()
       : undefined;
-    const headless = flags.headless === true;
+    const plan = resolveDeviceReadinessRuntimePlan({ headless: flags.headless === true });
 
     let device: DeviceInfo;
     try {
@@ -220,7 +219,7 @@ export async function handleSessionStateCommands(params: {
     } catch (error) {
       const appErr = asAppError(error);
       if (
-        headless &&
+        plan.kind === 'boot-target-headless' &&
         !hasAndroidAvdIdentity(flags.device, session?.device) &&
         appErr.code === 'DEVICE_NOT_FOUND'
       ) {
@@ -241,17 +240,17 @@ export async function handleSessionStateCommands(params: {
 
     const inspectFacts = requireInspectFacts(params.inspectFacts);
     const facts = await inspectFacts(device);
-    const fact = headless ? facts.operations.ensureReadyHeadless : facts.operations.ensureReady;
-    const unsupported = bootUnavailableResponse(fact, headless);
+    const fact = facts.operations[plan.operation];
+    const unsupported = bootUnavailableResponse(fact, plan.kind === 'boot-target-headless');
     if (unsupported) return unsupported;
 
     const bindDevice = requireBindDevice(params.bindDevice);
     const input = { serial: flags.serial, androidSerialAllowlist };
-    device = headless
-      ? await (
-          await bindDevice(device, ensureReadyHeadlessUse)
-        ).operations.ensureReadyHeadless(input)
-      : await (await bindDevice(device, ensureReadyUse)).operations.ensureReady(input);
+    if (plan.kind === 'boot-target-headless') {
+      device = await (await bindDevice(device, plan.use)).operations.bootTargetHeadless(input);
+    } else {
+      device = await (await bindDevice(device, plan.use)).operations.bootTarget(input);
+    }
 
     return {
       ok: true,

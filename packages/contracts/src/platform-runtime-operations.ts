@@ -26,12 +26,43 @@ export type PlatformRuntimeOperations = AppLogRuntimeOperations &
  */
 export const defineUse = runtimeUse<PlatformRuntimeOperations>();
 
-export const ensureReadyUse = defineUse({ required: ['ensureReady'] });
-export const ensureReadyHeadlessUse = defineUse({ required: ['ensureReadyHeadless'] });
-export const deviceReadinessRuntimeUses = Object.freeze([
-  ensureReadyUse,
-  ensureReadyHeadlessUse,
-] as const);
+export const bootTargetUse = defineUse({ required: ['bootTarget'] });
+export const bootTargetHeadlessUse = defineUse({
+  required: ['bootTargetHeadless'],
+});
+export const deviceBootRuntimeUses = Object.freeze([bootTargetUse, bootTargetHeadlessUse] as const);
+
+export type DeviceReadinessRuntimePlan =
+  | Readonly<{
+      kind: 'boot-target';
+      operation: 'bootTarget';
+      use: typeof bootTargetUse;
+    }>
+  | Readonly<{
+      kind: 'boot-target-headless';
+      operation: 'bootTargetHeadless';
+      use: typeof bootTargetHeadlessUse;
+    }>;
+
+const bootTargetPlan = Object.freeze({
+  kind: 'boot-target',
+  operation: 'bootTarget',
+  use: bootTargetUse,
+} as const satisfies DeviceReadinessRuntimePlan);
+
+const bootTargetHeadlessPlan = Object.freeze({
+  kind: 'boot-target-headless',
+  operation: 'bootTargetHeadless',
+  use: bootTargetHeadlessUse,
+} as const satisfies DeviceReadinessRuntimePlan);
+
+export function resolveDeviceReadinessRuntimePlan(
+  input: Readonly<{
+    headless: boolean;
+  }>,
+): DeviceReadinessRuntimePlan {
+  return input.headless ? bootTargetHeadlessPlan : bootTargetPlan;
+}
 
 export type PlatformRuntimeHost = AppLogRuntimeHost &
   NetworkRuntimeHost &

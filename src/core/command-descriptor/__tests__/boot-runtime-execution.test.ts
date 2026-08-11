@@ -1,7 +1,7 @@
 import {
-  deviceReadinessRuntimeUses,
-  ensureReadyHeadlessUse,
-  ensureReadyUse,
+  bootTargetHeadlessUse,
+  bootTargetUse,
+  deviceBootRuntimeUses,
 } from '@agent-device/contracts/platform';
 import { expect, test } from 'vitest';
 import { commandDescriptors } from '../registry.ts';
@@ -12,9 +12,7 @@ test('boot descriptor declares both readiness uses instead of a capability bucke
   expect(boot).not.toHaveProperty('capability');
   expect(boot?.platformExecution).toEqual({
     kind: 'device-runtime',
-    uses: deviceReadinessRuntimeUses,
+    uses: deviceBootRuntimeUses,
   });
-  expect(new Set(deviceReadinessRuntimeUses)).toEqual(
-    new Set([ensureReadyUse, ensureReadyHeadlessUse]),
-  );
+  expect(new Set(deviceBootRuntimeUses)).toEqual(new Set([bootTargetUse, bootTargetHeadlessUse]));
 });

@@ -34,7 +34,8 @@ test('preserves a narrow web provider dump including empty successful entries', 
   expect(binding.facts.device.providerMode).toBe('transport-composed');
   expect(binding.facts.operations.networkDump).toEqual({ available: true });
   expect(binding.facts.operations.ensureReady).toMatchObject({ available: false });
-  expect(binding.facts.operations.ensureReadyHeadless).toMatchObject({ available: false });
+  expect(binding.facts.operations.bootTarget).toMatchObject({ available: false });
+  expect(binding.facts.operations.bootTargetHeadless).toMatchObject({ available: false });
 });
 
 test('keeps a web transport without dumpNetwork unavailable instead of throwing a stub', async () => {

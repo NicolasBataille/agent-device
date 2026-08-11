@@ -92,7 +92,8 @@ export function createUnavailablePlatformRuntimeFacts(
       screenRecordingReattach: screenRecording,
       screenRecordingCleanup: screenRecording,
       ensureReady: readiness,
-      ensureReadyHeadless: readiness,
+      bootTarget: readiness,
+      bootTargetHeadless: readiness,
     },
   });
 }

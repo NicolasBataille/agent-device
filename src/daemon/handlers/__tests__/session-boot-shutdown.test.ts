@@ -83,6 +83,10 @@ test('boot prefers explicit device selector over active session device', async (
   expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledOnce();
   expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledWith(selectedDevice);
   expect(mockBindDeviceRuntime).toHaveBeenCalledOnce();
+  expect(mockBindDeviceRuntime).toHaveBeenCalledWith(selectedDevice, {
+    required: ['bootTarget'],
+    preferred: [],
+  });
   expect(mockEnsureReadyRuntime).toHaveBeenCalledOnce();
   expect(mockEnsureReadyHeadlessRuntime).not.toHaveBeenCalled();
   expect(mockEnsureDeviceReady).not.toHaveBeenCalled();
@@ -126,6 +130,10 @@ test('boot --headless admits a stopped Android emulator through facts and binds 
   expect(response?.ok).toBe(true);
   expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledWith(placeholder);
   expect(mockBindDeviceRuntime).toHaveBeenCalledOnce();
+  expect(mockBindDeviceRuntime).toHaveBeenCalledWith(placeholder, {
+    required: ['bootTargetHeadless'],
+    preferred: [],
+  });
   expect(mockEnsureReadyHeadlessRuntime).toHaveBeenCalledOnce();
   expect(mockEnsureReadyRuntime).not.toHaveBeenCalled();
   if (response && response.ok) {
@@ -133,6 +141,39 @@ test('boot --headless admits a stopped Android emulator through facts and binds 
     expect(response.data?.id).toBe('emulator-5554');
     expect(response.data?.device).toBe('Pixel_9_Pro_XL');
   }
+});
+
+test('boot rejects the macOS host boot cell after one facts inspection and before binding', async () => {
+  const sessionStore = makeSessionStore();
+  const device: SessionState['device'] = {
+    platform: 'apple',
+    appleOs: 'macos',
+    id: 'host-macos-local',
+    name: 'Mac',
+    kind: 'device',
+    target: 'desktop',
+    booted: true,
+  };
+  mockResolveTargetDevice.mockResolvedValue(device);
+
+  const response = await handleSessionCommands({
+    req: {
+      token: 't',
+      session: 'default',
+      command: 'boot',
+      positionals: [],
+      flags: { platform: 'macos' },
+    },
+    sessionName: 'default',
+    logPath: path.join(os.tmpdir(), 'daemon.log'),
+    sessionStore,
+    invoke: noopInvoke,
+  });
+
+  expect(response?.ok).toBe(false);
+  expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledOnce();
+  expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledWith(device);
+  expect(mockBindDeviceRuntime).not.toHaveBeenCalled();
 });
 
 test('boot admits a stopped Android emulator through normal readiness', async () => {

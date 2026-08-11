@@ -42,7 +42,8 @@ export function createApplePlatformRuntime(host: PlatformRuntimeHost): PlatformR
             hint: hostAvailability.hint,
           })
         : leafRecordingFacts;
-    const readiness = isMacOs(device) || device.appleOs === 'watchos' ? unavailable : available;
+    const readiness = device.appleOs === 'watchos' ? unavailable : available;
+    const boot = isMacOs(device) || device.appleOs === 'watchos' ? unavailable : available;
     return Object.freeze({
       device: logs.device,
       operations: {
@@ -52,7 +53,8 @@ export function createApplePlatformRuntime(host: PlatformRuntimeHost): PlatformR
         screenRecordingReattach: recordingFacts,
         screenRecordingCleanup: recordingFacts,
         ensureReady: readiness,
-        ensureReadyHeadless: headlessUnavailable,
+        bootTarget: boot,
+        bootTargetHeadless: headlessUnavailable,
       },
     });
   };
@@ -82,18 +84,14 @@ export function createApplePlatformRuntime(host: PlatformRuntimeHost): PlatformR
             : {}),
           ...(facts.operations.ensureReady.available
             ? {
-                ensureReady: async () => {
-                  await host.deviceReadiness.apple.ensureReady(
-                    request.device,
-                    {
-                      onColdBootStart: () =>
-                        host.deviceReadiness.apple.keepAutomationReady(request.device),
-                    },
-                    request.scope.signal,
-                  );
-                  host.deviceReadiness.apple.keepAutomationReady(request.device);
-                  return { ...request.device, booted: true };
-                },
+                ensureReady: async () =>
+                  await ensureAppleReady(host, request.device, request.scope.signal),
+              }
+            : {}),
+          ...(facts.operations.bootTarget.available
+            ? {
+                bootTarget: async () =>
+                  await ensureAppleReady(host, request.device, request.scope.signal),
               }
             : {}),
         }),
@@ -102,4 +100,20 @@ export function createApplePlatformRuntime(host: PlatformRuntimeHost): PlatformR
     },
     shutdown: async () => await appLogs.shutdown(),
   });
+}
+
+async function ensureAppleReady(
+  host: PlatformRuntimeHost,
+  device: DeviceInfo,
+  signal: AbortSignal,
+) {
+  if (!isMacOs(device)) {
+    await host.deviceReadiness.apple.ensureReady(
+      device,
+      { onColdBootStart: () => host.deviceReadiness.apple.keepAutomationReady(device) },
+      signal,
+    );
+    host.deviceReadiness.apple.keepAutomationReady(device);
+  }
+  return { ...device, booted: true };
 }

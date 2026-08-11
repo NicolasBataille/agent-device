@@ -35,6 +35,8 @@ test('classifies the HarmonyOS runtime denominator', async () => {
   expect(facts.operations.screenRecordingStart).toEqual({ available: true });
   expect(facts.operations.screenRecordingReattach).toEqual({ available: true });
   expect(facts.operations.screenRecordingCleanup).toEqual({ available: true });
-  expect(facts.operations.ensureReady).toMatchObject({ available: false });
-  expect(facts.operations.ensureReadyHeadless).toMatchObject({ available: false });
+  expect(facts.operations.ensureReady).toEqual({ available: true });
+  expect(facts.operations.bootTarget).toMatchObject({ available: false });
+  expect(facts.operations.bootTargetHeadless).toMatchObject({ available: false });
+  await expect(binding.operations.ensureReady?.({})).resolves.toMatchObject({ booted: true });
 });

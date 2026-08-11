@@ -69,6 +69,7 @@ function bindWebDriverPlatformRuntime(
   const facts = webDriverFacts(owner, device);
   const operations: DeviceBinding<PlatformRuntimeOperations>['operations'] = Object.freeze({
     ensureReady: async () => ({ ...device, booted: true }),
+    bootTarget: async () => ({ ...device, booted: true }),
     networkDump: async (input) => {
       const recent = await host.appLogs.readRecent(input.sessionId, input.maxScanLines);
       const dump = readRecentNetworkTrafficFromText(recent.text, {
@@ -121,7 +122,8 @@ function webDriverFacts(
       screenRecordingReattach: recordingUnavailable,
       screenRecordingCleanup: recordingUnavailable,
       ensureReady: available,
-      ensureReadyHeadless: headlessUnavailable,
+      bootTarget: available,
+      bootTargetHeadless: headlessUnavailable,
     },
   });
 }

@@ -7,7 +7,8 @@ export type EnsureReadyInput = Readonly<{
 
 export type DeviceReadinessRuntimeOperations = Readonly<{
   ensureReady(input: EnsureReadyInput): Promise<DeviceInfo>;
-  ensureReadyHeadless(input: EnsureReadyInput): Promise<DeviceInfo>;
+  bootTarget(input: EnsureReadyInput): Promise<DeviceInfo>;
+  bootTargetHeadless(input: EnsureReadyInput): Promise<DeviceInfo>;
 }>;
 
 export type DeviceReadinessRuntimeHost = Readonly<{

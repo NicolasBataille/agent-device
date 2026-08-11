@@ -304,6 +304,7 @@ function unavailableFacts() {
     screenRecordingReattach: unavailable,
     screenRecordingCleanup: unavailable,
     ensureReady: unavailable,
-    ensureReadyHeadless: unavailable,
+    bootTarget: unavailable,
+    bootTargetHeadless: unavailable,
   };
 }

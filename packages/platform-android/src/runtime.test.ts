@@ -61,7 +61,8 @@ test.each([
   expect(facts.operations.screenRecordingReattach).toEqual({ available: true });
   expect(facts.operations.screenRecordingCleanup).toEqual({ available: true });
   expect(facts.operations.ensureReady).toEqual({ available: true });
-  expect(facts.operations.ensureReadyHeadless.available).toBe(runtimeDevice.kind === 'emulator');
+  expect(facts.operations.bootTarget).toEqual({ available: true });
+  expect(facts.operations.bootTargetHeadless.available).toBe(runtimeDevice.kind === 'emulator');
 
   await expect(binding.operations.ensureReady?.({})).resolves.toMatchObject({
     id: 'refreshed-device',
@@ -73,8 +74,18 @@ test.each([
     expect.any(AbortSignal),
   );
 
+  await expect(binding.operations.bootTarget?.({})).resolves.toMatchObject({
+    id: 'refreshed-device',
+    booted: true,
+  });
+  expect(ensureReady).toHaveBeenLastCalledWith(
+    runtimeDevice,
+    { headless: false },
+    expect.any(AbortSignal),
+  );
+
   if (runtimeDevice.kind === 'emulator') {
-    await expect(binding.operations.ensureReadyHeadless?.({})).resolves.toMatchObject({
+    await expect(binding.operations.bootTargetHeadless?.({})).resolves.toMatchObject({
       id: 'refreshed-device',
       booted: true,
     });
@@ -84,6 +95,6 @@ test.each([
       expect.any(AbortSignal),
     );
   } else {
-    expect(binding.operations.ensureReadyHeadless).toBeUndefined();
+    expect(binding.operations.bootTargetHeadless).toBeUndefined();
   }
 });

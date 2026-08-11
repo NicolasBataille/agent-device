@@ -129,7 +129,8 @@ function webRuntimeFacts(
       screenRecordingReattach: recordingAvailable ? available : recordingUnavailable,
       screenRecordingCleanup: recordingAvailable ? available : recordingUnavailable,
       ensureReady: readinessUnavailable,
-      ensureReadyHeadless: readinessUnavailable,
+      bootTarget: readinessUnavailable,
+      bootTargetHeadless: readinessUnavailable,
     },
   });
 }

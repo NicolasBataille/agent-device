@@ -62,7 +62,8 @@ test('reconciles the dead owner session resources through their exact runtime ow
         screenRecordingReattach: unavailable,
         screenRecordingCleanup: unavailable,
         ensureReady: unavailable,
-        ensureReadyHeadless: unavailable,
+        bootTarget: unavailable,
+        bootTargetHeadless: unavailable,
       },
     },
     operations: {

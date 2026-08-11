@@ -232,7 +232,8 @@ function createRecordingPlatformRuntimeGateway(params: {
             screenRecordingReattach: unavailableRecording,
             screenRecordingCleanup: unavailableRecording,
             ensureReady: { available: true },
-            ensureReadyHeadless: unavailableRecording,
+            bootTarget: unavailableRecording,
+            bootTargetHeadless: unavailableRecording,
           },
         },
         operations: {

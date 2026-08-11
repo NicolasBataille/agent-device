@@ -71,8 +71,9 @@ function readinessFacts(device: DeviceInfo): RuntimeFacts<PlatformRuntimeOperati
       screenRecordingStart: unavailable,
       screenRecordingReattach: unavailable,
       screenRecordingCleanup: unavailable,
-      ensureReady: normalAvailable ? available : unavailable,
-      ensureReadyHeadless: headlessAvailable ? available : unavailable,
+      ensureReady: device.appleOs === 'watchos' ? unavailable : available,
+      bootTarget: normalAvailable ? available : unavailable,
+      bootTargetHeadless: headlessAvailable ? available : unavailable,
     },
   };
 }
@@ -85,9 +86,15 @@ function readinessBinding(device: DeviceInfo): DeviceBinding<PlatformRuntimeOper
     operations: {
       ensureReady: async (input) =>
         (await mockEnsureReadyRuntime(input)) ?? { ...device, booted: true },
+      ...(readinessFacts(device).operations.bootTarget.available
+        ? {
+            bootTarget: async (input) =>
+              (await mockEnsureReadyRuntime(input)) ?? { ...device, booted: true },
+          }
+        : {}),
       ...(device.platform === 'android' && device.kind === 'emulator'
         ? {
-            ensureReadyHeadless: async (input) =>
+            bootTargetHeadless: async (input) =>
               (await mockEnsureReadyHeadlessRuntime(input)) ?? { ...device, booted: true },
           }
         : {}),

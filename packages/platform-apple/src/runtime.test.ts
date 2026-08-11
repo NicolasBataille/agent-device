@@ -79,13 +79,14 @@ test.each([
       hint: 'watchOS recording is not supported.',
     });
   }
-  expect(facts.operations.ensureReady.available).toBe(
+  expect(facts.operations.ensureReady.available).toBe(device.appleOs !== 'watchos');
+  expect(facts.operations.bootTarget.available).toBe(
     device.appleOs !== 'macos' && device.appleOs !== 'watchos',
   );
-  expect(facts.operations.ensureReadyHeadless.available).toBe(false);
+  expect(facts.operations.bootTargetHeadless.available).toBe(false);
 });
 
-test('readiness keeps the Apple automation helper warm inside the platform runtime', async () => {
+test('readiness and boot keep the Apple automation helper warm inside the platform runtime', async () => {
   const host = platformRuntimeHostFixture();
   const keepAutomationReady = vi.fn();
   const ensureReady = vi.fn(async (_device, options: { onColdBootStart?: () => void }) => {
@@ -110,9 +111,36 @@ test('readiness keeps the Apple automation helper warm inside the platform runti
   });
 
   await binding.operations.ensureReady?.({});
+  await binding.operations.bootTarget?.({});
 
-  expect(ensureReady).toHaveBeenCalledOnce();
-  expect(keepAutomationReady).toHaveBeenCalledTimes(2);
+  expect(ensureReady).toHaveBeenCalledTimes(2);
+  expect(keepAutomationReady).toHaveBeenCalledTimes(4);
   expect(keepAutomationReady).toHaveBeenNthCalledWith(1, device);
   expect(keepAutomationReady).toHaveBeenNthCalledWith(2, device);
+  expect(keepAutomationReady).toHaveBeenNthCalledWith(3, device);
+  expect(keepAutomationReady).toHaveBeenNthCalledWith(4, device);
+});
+
+test('macOS readiness is a no-op while boot remains unavailable', async () => {
+  const host = platformRuntimeHostFixture();
+  const ensureReady = vi.fn(host.deviceReadiness.apple.ensureReady);
+  const binding = await createApplePlatformRuntime({
+    ...host,
+    deviceReadiness: {
+      ...host.deviceReadiness,
+      apple: { ...host.deviceReadiness.apple, ensureReady },
+    },
+  }).bind({
+    device: leaves.macos,
+    intent: { kind: 'ordinary' },
+    scope: {
+      signal: new AbortController().signal,
+      diagnostics: { emit: () => {} },
+      progress: { report: () => {} },
+    },
+  });
+
+  await expect(binding.operations.ensureReady?.({})).resolves.toMatchObject({ booted: true });
+  expect(ensureReady).not.toHaveBeenCalled();
+  expect(binding.operations.bootTarget).toBeUndefined();
 });

@@ -50,7 +50,8 @@ test('recovery cleans a recording through its exact runtime owner', async () => 
         screenRecordingReattach: { available: true as const },
         screenRecordingCleanup: { available: true as const },
         ensureReady: unavailable,
-        ensureReadyHeadless: unavailable,
+        bootTarget: unavailable,
+        bootTargetHeadless: unavailable,
       },
     },
     operations: {

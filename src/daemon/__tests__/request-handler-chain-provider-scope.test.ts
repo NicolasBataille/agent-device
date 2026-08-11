@@ -16,6 +16,7 @@ import { makeSessionStore } from '../../__tests__/test-utils/store-factory.ts';
 import {
   unavailableBindDevice,
   unavailableBindExactDevice,
+  unavailableInspectFacts,
 } from './test-device-runtime-gateway.ts';
 import { createScreenRecordingAdmissionLedger } from '../screen-recording-admission-ledger.ts';
 import type { DaemonRequest } from '../types.ts';
@@ -43,6 +44,7 @@ function baseChainParams(sessionName: string) {
     leaseRegistry: new LeaseRegistry(),
     invoke: async () => ({ ok: true, data: {} }) as const,
     bindDevice: unavailableBindDevice,
+    inspectFacts: unavailableInspectFacts,
     bindExactDevice: unavailableBindExactDevice,
     reconcileOrphanedDeviceClaim: async () => ({
       status: 'retained' as const,

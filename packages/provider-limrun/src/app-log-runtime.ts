@@ -182,6 +182,7 @@ function bindLimrunAppLogs(
       return Object.freeze({ source: 'app-log' as const, backend, dump, notes });
     },
     ensureReady: async () => ({ ...device, booted: true }),
+    bootTarget: async () => ({ ...device, booted: true }),
   } satisfies DeviceBinding<PlatformRuntimeOperations>['operations'];
   return Object.freeze({
     device,
@@ -231,7 +232,8 @@ function facts(device: DeviceInfo): RuntimeFacts<PlatformRuntimeOperations> {
       screenRecordingReattach: recordingUnavailable,
       screenRecordingCleanup: recordingUnavailable,
       ensureReady: available,
-      ensureReadyHeadless: headlessUnavailable,
+      bootTarget: available,
+      bootTargetHeadless: headlessUnavailable,
     },
   });
 }

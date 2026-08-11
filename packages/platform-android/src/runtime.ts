@@ -32,7 +32,8 @@ export function createAndroidPlatformRuntime(host: PlatformRuntimeHost): Platfor
         screenRecordingReattach: available,
         screenRecordingCleanup: available,
         ensureReady: available,
-        ensureReadyHeadless: device.kind === 'emulator' ? available : headlessUnavailable,
+        bootTarget: available,
+        bootTargetHeadless: device.kind === 'emulator' ? available : headlessUnavailable,
       },
     });
   };
@@ -64,9 +65,15 @@ export function createAndroidPlatformRuntime(host: PlatformRuntimeHost): Platfor
               { ...input, headless: false },
               request.scope.signal,
             ),
-          ...(facts.operations.ensureReadyHeadless.available
+          bootTarget: async (input: EnsureReadyInput) =>
+            await host.deviceReadiness.android.ensureReady(
+              request.device,
+              { ...input, headless: false },
+              request.scope.signal,
+            ),
+          ...(facts.operations.bootTargetHeadless.available
             ? {
-                ensureReadyHeadless: async (input: EnsureReadyInput) =>
+                bootTargetHeadless: async (input: EnsureReadyInput) =>
                   await host.deviceReadiness.android.ensureReady(
                     request.device,
                     { ...input, headless: true },

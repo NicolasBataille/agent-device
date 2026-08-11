@@ -167,7 +167,8 @@ function makeRecordingGateway(firstStartBlocked: Promise<void>) {
           screenRecordingReattach: { available: true },
           screenRecordingCleanup: { available: true },
           ensureReady: unavailable,
-          ensureReadyHeadless: unavailable,
+          bootTarget: unavailable,
+          bootTargetHeadless: unavailable,
         },
       },
       operations: {

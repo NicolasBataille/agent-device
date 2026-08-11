@@ -16,6 +16,7 @@ const unavailable = Object.freeze({
   available: false,
   reason: 'unsupported-platform-leaf',
 } as const);
+const available = Object.freeze({ available: true } as const);
 
 export function createHarmonyPlatformRuntime(host: PlatformRuntimeHost): PlatformRuntimeOwner {
   const appLogs = createHarmonyAppLogRuntime(host);
@@ -30,8 +31,9 @@ export function createHarmonyPlatformRuntime(host: PlatformRuntimeHost): Platfor
         screenRecordingStart: recordingFacts,
         screenRecordingReattach: recordingFacts,
         screenRecordingCleanup: recordingFacts,
-        ensureReady: unavailable,
-        ensureReadyHeadless: unavailable,
+        ensureReady: available,
+        bootTarget: unavailable,
+        bootTargetHeadless: unavailable,
       },
     });
   };
@@ -57,6 +59,7 @@ export function createHarmonyPlatformRuntime(host: PlatformRuntimeHost): Platfor
                 signal: request.scope.signal,
               })
             : {}),
+          ensureReady: async () => ({ ...request.device, booted: true }),
         }),
         [Symbol.asyncDispose]: async () => await logs[Symbol.asyncDispose](),
       }) satisfies DeviceBinding<PlatformRuntimeOperations>;
