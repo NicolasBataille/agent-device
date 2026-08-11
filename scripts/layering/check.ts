@@ -33,10 +33,10 @@
 //     owner" shape as R7's SessionState ownership, applied to bin.ts's `--help` fast path.
 //   - Over PLATFORM PACKAGE COMPOSITION: six private metadata façades meet at the exact root
 //     composition file; premature implementation loading and forbidden cross-boundary edges fail (R13).
-//   - Over COMMAND-ATOMIC RUNTIME CUTOVERS: retired logs, network, and record routes/admission cannot
-//     coexist with their operation-fact-derived descriptor and handler paths (R14-R16).
-//   - Over the DEVICES COMMAND CUTOVER: the handler calls the neutral inventory gateway and no
-//     superseded inventory module, import, or identifier remains in production (R17).
+//   - Over COMMAND-ATOMIC RUNTIME CUTOVERS: one parametrized gate reads the migrated-command
+//     table (devices R17, logs R14, network R15, record R16) and proves each command keeps
+//     exactly one platform-execution path — retired routes, admission, modules, and widened
+//     runtime access cannot coexist with its operation-fact-derived descriptor and handler.
 //   - Over CONTRACTS PRODUCTION SOURCE: contracts owns vocabulary only — host, process, and timer
 //     mechanics belong in capture-kit or an adapter (R18).
 // Only `(root)` is unranked among src/ zones (see `UNRANKED_ZONES` in model.ts):
@@ -89,33 +89,16 @@ import {
   platformPackagePolicySummary,
 } from './platform-package-policy.ts';
 import {
-  checkDeviceInventoryCutover,
-  deviceInventoryCutoverSummary,
-} from './device-inventory-cutover-policy.ts';
+  checkRuntimeCommandCutover,
+  runtimeCommandCutoverSummary,
+} from './runtime-command-cutover-policy.ts';
 import {
   listUntrackedProductionTypeScriptFiles,
   readTrackedPlatformPackageDeclarations,
 } from './platform-package-repository.ts';
 import { policyLead, policyViolation, ZONE_POLICIES } from './zone-policy.ts';
-import {
-  logsLegacyRouteViolations,
-  logsRuntimeNarrowingViolations,
-  logsSessionStateOwnershipViolations,
-  sourceExecutedUsingDeclarationViolations,
-} from './logs-runtime-cutover-policy.ts';
 import { contractsImplementationAuthorityViolations } from './contracts-implementation-policy.ts';
 import { selectorPipelineOwnershipViolations } from './selector-pipeline-ownership.ts';
-import {
-  networkLegacyRouteViolations,
-  networkRuntimeNarrowingViolations,
-  networkRuntimeRouteViolations,
-} from './network-runtime-cutover-policy.ts';
-import {
-  recordLegacyRouteViolations,
-  recordRuntimeNarrowingViolations,
-  recordRuntimeRouteViolations,
-} from './record-runtime-cutover-policy.ts';
-import { recordRuntimeDaemonMechanicsViolations } from './record-runtime-mechanics-policy.ts';
 import { recordRuntimeRegistryJoinViolations } from './record-runtime-registry-policy.ts';
 
 const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
@@ -194,16 +177,6 @@ function checkCycles(edges: readonly ResolvedImportEdge[]): LayeringViolation[] 
   }));
 }
 
-function checkLogsRuntimeCutover(sources: ReadonlyMap<string, string>): LayeringViolation[] {
-  const production = [...sources].map(([file, source]) => ({ path: file, source }));
-  return [
-    ...logsLegacyRouteViolations(production),
-    ...logsRuntimeNarrowingViolations(production),
-    ...logsSessionStateOwnershipViolations(production),
-    ...sourceExecutedUsingDeclarationViolations(production),
-  ];
-}
-
 function checkContractsImplementationAuthority(
   sources: ReadonlyMap<string, string>,
 ): LayeringViolation[] {
@@ -212,32 +185,14 @@ function checkContractsImplementationAuthority(
   );
 }
 
-function checkNetworkRuntimeCutover(sources: ReadonlyMap<string, string>): LayeringViolation[] {
+/**
+ * The record registry-join scan is a descriptor-shape check, not a cutover claim, so it
+ * stays its own module. Record's daemon-mechanics scan is the row's lifecycle proof and
+ * runs from the cutover table. Both report under R16.
+ */
+function checkRecordRuntimeRegistryJoin(sources: ReadonlyMap<string, string>): LayeringViolation[] {
   const production = [...sources].map(([file, source]) => ({ path: file, source }));
-  return [
-    ...networkLegacyRouteViolations(production),
-    ...networkRuntimeNarrowingViolations(production),
-    ...networkRuntimeRouteViolations(production),
-  ].map((violation) => {
-    const separator = violation.indexOf(': ');
-    return {
-      rule: 'R15 network-runtime-cutover',
-      file: separator < 0 ? '(network runtime)' : violation.slice(0, separator),
-      line: 1,
-      message: separator < 0 ? violation : violation.slice(separator + 2),
-    };
-  });
-}
-
-function checkRecordRuntimeCutover(sources: ReadonlyMap<string, string>): LayeringViolation[] {
-  const production = [...sources].map(([file, source]) => ({ path: file, source }));
-  return [
-    ...recordLegacyRouteViolations(production),
-    ...recordRuntimeDaemonMechanicsViolations(production),
-    ...recordRuntimeNarrowingViolations(production),
-    ...recordRuntimeRegistryJoinViolations(production),
-    ...recordRuntimeRouteViolations(production),
-  ].map((violation) => {
+  return recordRuntimeRegistryJoinViolations(production).map((violation) => {
     const separator = violation.indexOf(': ');
     return {
       rule: 'R16 record-runtime-cutover',
@@ -621,7 +576,7 @@ function report(
         `inside its declared owner (R7); every zero-dep CI job resolves without ` +
         `node_modules (R8); ${typeCycleNote(typeCycle)}; ${daemonModularitySummary()}; ` +
         `${packageBoundariesSummary(repoRoot)}; ${platformPackagePolicySummary()}; ` +
-        `${deviceInventoryCutoverSummary()}; and bin.ts imports normalizeCliCommandAlias, ` +
+        `${runtimeCommandCutoverSummary()}; and bin.ts imports normalizeCliCommandAlias, ` +
         `actually passes it into buildCommandUsageText, and holds no local alias literals ` +
         `(R12).\n`,
     );
@@ -671,11 +626,10 @@ export type LayeringRule = (context: LayeringContext) => LayeringViolation[];
 export const LAYERING_RULE_IDS = [
   'zone-policies',
   'value-import-cycles',
-  'logs-runtime-cutover',
+  'runtime-command-cutover',
+  'record-runtime-registry-join',
   'contracts-implementation-authority',
   'selector-pipeline-ownership',
-  'network-runtime-cutover',
-  'record-runtime-cutover',
   'back-edges',
   'type-spine-inversions',
   'session-state-ownership',
@@ -684,7 +638,6 @@ export const LAYERING_RULE_IDS = [
   'bin-alias-fast-path',
   'package-boundaries',
   'platform-package-policy',
-  'device-inventory-cutover',
 ] as const;
 
 export type LayeringRuleId = (typeof LAYERING_RULE_IDS)[number];
@@ -692,13 +645,12 @@ export type LayeringRuleId = (typeof LAYERING_RULE_IDS)[number];
 export const LAYERING_RULES: Readonly<Record<LayeringRuleId, LayeringRule>> = {
   'zone-policies': (context) => checkLayeringRules(context.edges),
   'value-import-cycles': (context) => checkCycles(context.edges),
-  'logs-runtime-cutover': (context) => checkLogsRuntimeCutover(context.sources),
+  'runtime-command-cutover': (context) => checkRuntimeCommandCutover(context.sources),
+  'record-runtime-registry-join': (context) => checkRecordRuntimeRegistryJoin(context.sources),
   'contracts-implementation-authority': (context) =>
     checkContractsImplementationAuthority(context.sources),
   'selector-pipeline-ownership': (context) =>
     selectorPipelineOwnershipViolations(context.edges, workspaceSpecifierTargets(repoRoot)),
-  'network-runtime-cutover': (context) => checkNetworkRuntimeCutover(context.sources),
-  'record-runtime-cutover': (context) => checkRecordRuntimeCutover(context.sources),
   'back-edges': (context) => checkBackEdges(context.edges),
   'type-spine-inversions': (context) => checkTypeInversions(context.edges),
   'session-state-ownership': (context) => checkSessionStateOwnership(context.sources),
@@ -717,7 +669,6 @@ export const LAYERING_RULES: Readonly<Record<LayeringRuleId, LayeringRule>> = {
       readTrackedPlatformPackageDeclarations(repoRoot),
       { untrackedProductionFiles: listUntrackedProductionTypeScriptFiles(repoRoot) },
     ),
-  'device-inventory-cutover': (context) => checkDeviceInventoryCutover(context.sources),
 };
 
 export function main(): number {

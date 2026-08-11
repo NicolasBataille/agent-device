@@ -1,4 +1,5 @@
-export type RecordRuntimeProductionSource = Readonly<{ path: string; source: string }>;
+/** A production file the cutover policies scan: repo-relative path plus its source. */
+export type ProductionSource = Readonly<{ path: string; source: string }>;
 
 export function memberName(node: Record<string, unknown>): string | undefined {
   const property = node.property as Record<string, unknown> | undefined;

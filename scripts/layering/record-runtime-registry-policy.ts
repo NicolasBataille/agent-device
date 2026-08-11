@@ -1,12 +1,8 @@
 import { parseSync } from 'oxc-parser';
-import {
-  memberName,
-  type RecordRuntimeProductionSource,
-  visitAst,
-} from './record-runtime-policy-ast.ts';
+import { memberName, type ProductionSource, visitAst } from './cutover-policy-ast.ts';
 
 export function recordRuntimeRegistryJoinViolations(
-  sources: readonly RecordRuntimeProductionSource[],
+  sources: readonly ProductionSource[],
 ): string[] {
   const file = sources.find(({ path }) => path === 'src/core/command-descriptor/registry.ts');
   if (!file) return [missingRecordRuntimeRegistryJoin()];

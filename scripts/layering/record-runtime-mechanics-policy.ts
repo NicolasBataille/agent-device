@@ -1,9 +1,5 @@
 import { parseSync } from 'oxc-parser';
-import {
-  memberName,
-  type RecordRuntimeProductionSource,
-  visitAst,
-} from './record-runtime-policy-ast.ts';
+import { memberName, type ProductionSource, visitAst } from './cutover-policy-ast.ts';
 
 const DAEMON_RECORD_MECHANIC_CALLS = new Set([
   'runCmd',
@@ -19,7 +15,7 @@ const DAEMON_RECORD_MECHANIC_CALLS = new Set([
 
 /** The daemon record owner coordinates runtime operations; native mechanics stay behind owners. */
 export function recordRuntimeDaemonMechanicsViolations(
-  sources: readonly RecordRuntimeProductionSource[],
+  sources: readonly ProductionSource[],
 ): string[] {
   const violations: string[] = [];
   for (const file of sources.filter(({ path }) => isDaemonRecordOwner(path))) {
