@@ -21,11 +21,26 @@ const recordingUnavailable = Object.freeze({
   reason: 'owner-capability-missing',
   hint: 'record is not supported by this web provider',
 } as const);
+const readinessUnavailable = Object.freeze({
+  available: false,
+  reason: 'unsupported-platform-leaf',
+} as const);
 
 export function createWebPlatformRuntime(host: PlatformRuntimeHost): PlatformRuntimeOwner {
+  const inspectFacts = async (device: DeviceInfo) => {
+    const transport = await host.networkTransports.resolve(device);
+    const recording = await bindWebScreenRecordingRuntime({
+      host,
+      device,
+      owner,
+      signal: new AbortController().signal,
+    });
+    return webRuntimeFacts(device, transport, recording.available);
+  };
   return Object.freeze({
     owner,
     ownsDevice: (device) => device.platform === 'web',
+    inspectFacts,
     bind: async (request) => {
       if (request.intent.kind === 'exact-owner' && !sameRuntimeOwner(request.intent.owner, owner)) {
         throw new AppError('UNSUPPORTED_OPERATION', 'Web runtime owner identity does not match');
@@ -43,7 +58,13 @@ export function createWebPlatformRuntime(host: PlatformRuntimeHost): PlatformRun
         owner,
         signal: request.scope.signal,
       });
-      return bindWebRuntime(request.device, request.scope.signal, transport, recording);
+      return bindWebRuntime(
+        request.device,
+        request.scope.signal,
+        transport,
+        recording,
+        webRuntimeFacts(request.device, transport, recording.available),
+      );
     },
     shutdown: async () => undefined,
   });
@@ -54,12 +75,8 @@ function bindWebRuntime(
   signal: AbortSignal,
   transport: Awaited<ReturnType<PlatformRuntimeHost['networkTransports']['resolve']>>,
   recording: Awaited<ReturnType<typeof bindWebScreenRecordingRuntime>>,
+  facts: RuntimeFacts<PlatformRuntimeOperations>,
 ): DeviceBinding<PlatformRuntimeOperations> {
-  const networkUnavailable = Object.freeze({
-    available: false,
-    reason: 'owner-capability-missing',
-    hint: 'network is not supported by this web provider',
-  } as const);
   const dump = transport.dump;
   const operations: DeviceBinding<PlatformRuntimeOperations>['operations'] = {
     ...(dump
@@ -75,7 +92,26 @@ function bindWebRuntime(
       : {}),
     ...recording.operations,
   };
-  const facts: RuntimeFacts<PlatformRuntimeOperations> = Object.freeze({
+  return Object.freeze({
+    device,
+    owner,
+    facts,
+    operations: Object.freeze(operations),
+    [Symbol.asyncDispose]: async () => undefined,
+  });
+}
+
+function webRuntimeFacts(
+  device: DeviceInfo,
+  transport: Awaited<ReturnType<PlatformRuntimeHost['networkTransports']['resolve']>>,
+  recordingAvailable: boolean,
+): RuntimeFacts<PlatformRuntimeOperations> {
+  const networkUnavailable = Object.freeze({
+    available: false,
+    reason: 'owner-capability-missing',
+    hint: 'network is not supported by this web provider',
+  } as const);
+  return Object.freeze({
     device: {
       family: 'web',
       kind: device.kind,
@@ -89,16 +125,11 @@ function bindWebRuntime(
       appLogReattach: appLogUnavailable,
       appLogCleanup: appLogUnavailable,
       networkDump: transport.dump ? available : networkUnavailable,
-      screenRecordingStart: recording.available ? available : recordingUnavailable,
-      screenRecordingReattach: recording.available ? available : recordingUnavailable,
-      screenRecordingCleanup: recording.available ? available : recordingUnavailable,
+      screenRecordingStart: recordingAvailable ? available : recordingUnavailable,
+      screenRecordingReattach: recordingAvailable ? available : recordingUnavailable,
+      screenRecordingCleanup: recordingAvailable ? available : recordingUnavailable,
+      ensureReady: readinessUnavailable,
+      ensureReadyHeadless: readinessUnavailable,
     },
-  });
-  return Object.freeze({
-    device,
-    owner,
-    facts,
-    operations: Object.freeze(operations),
-    [Symbol.asyncDispose]: async () => undefined,
   });
 }

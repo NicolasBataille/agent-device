@@ -349,6 +349,8 @@ function makeGateway(
           screenRecordingStart: unavailableRecording,
           screenRecordingReattach: unavailableRecording,
           screenRecordingCleanup: unavailableRecording,
+          ensureReady: { available: true as const },
+          ensureReadyHeadless: unavailableRecording,
         },
       },
       operations,
@@ -356,6 +358,9 @@ function makeGateway(
     };
   });
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => {
+      throw new Error('unused');
+    },
     bind,
     shutdown: async () => {},
   };

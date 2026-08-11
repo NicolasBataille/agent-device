@@ -174,7 +174,7 @@ async function capabilitiesInventoryResponse(params: {
   const resolution = await resolveInventoryCommandDevice({
     ...params,
     ensureReady: false,
-    allowStoppedAndroidAvdPlaceholders: true,
+    androidAvdSelection: 'include-stopped',
   });
   if ('response' in resolution) return resolution.response;
   const { device } = resolution;
@@ -255,10 +255,9 @@ async function resolveInventoryCommandDevice(params: {
   sessionName: string;
   sessionStore: SessionStore;
   ensureReady: boolean;
-  allowStoppedAndroidAvdPlaceholders?: boolean;
+  androidAvdSelection?: 'running-only' | 'include-stopped';
 }): Promise<{ device: DeviceInfo } | { response: DaemonResponse }> {
-  const { req, sessionName, sessionStore, ensureReady, allowStoppedAndroidAvdPlaceholders } =
-    params;
+  const { req, sessionName, sessionStore, ensureReady, androidAvdSelection } = params;
   const session = sessionStore.get(sessionName);
   const flags = req.flags ?? {};
   const response = requireSessionOrExplicitSelector(req.command, session, flags);
@@ -269,7 +268,7 @@ async function resolveInventoryCommandDevice(params: {
       session,
       flags,
       ensureReady,
-      allowStoppedAndroidAvdPlaceholders,
+      androidAvdSelection,
     }),
   };
 }

@@ -21,6 +21,7 @@ import {
 import {
   unavailableBindDevice,
   unavailableBindExactDevice,
+  unavailableInspectFacts,
 } from './test-device-runtime-gateway.ts';
 import { createScreenRecordingAdmissionLedger } from '../screen-recording-admission-ledger.ts';
 
@@ -47,6 +48,7 @@ function makeChainParams(req: DaemonRequest) {
     invoke: async (): Promise<DaemonResponse> => ({ ok: true, data: {} }),
     providerScope: {},
     bindDevice: unavailableBindDevice,
+    inspectFacts: unavailableInspectFacts,
     bindExactDevice: unavailableBindExactDevice,
     reconcileOrphanedDeviceClaim: async () => ({
       status: 'retained' as const,

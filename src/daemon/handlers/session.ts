@@ -46,7 +46,11 @@ import { LeaseRegistry } from '../lease-registry.ts';
 import { PREPARE_REQUEST_TIMEOUT_MS } from '../../core/command-descriptor/timeout-policy.ts';
 import { Deadline } from '../../utils/retry.ts';
 import type { LeaseLifecycleProvider } from '@agent-device/contracts/device';
-import type { BindDeviceRuntime, BindExactDeviceRuntime } from '../request-runtime-binding.ts';
+import type {
+  BindDeviceRuntime,
+  BindExactDeviceRuntime,
+  InspectDeviceRuntimeFacts,
+} from '../request-runtime-binding.ts';
 import type { DeviceClaimReconciler } from '../device-claims.ts';
 import type { AppLogAdmissionLedger } from '../app-log-admission-ledger.ts';
 import type { ScreenRecordingAdmissionLedger } from '../screen-recording-admission-ledger.ts';
@@ -282,6 +286,7 @@ export type SessionCommandInput = {
   invokeReplayAction?: DaemonInvokeFn;
   androidAdbExecutor?: AndroidAdbExecutor;
   bindDevice?: BindDeviceRuntime;
+  inspectFacts?: InspectDeviceRuntimeFacts;
   bindExactDevice?: BindExactDeviceRuntime;
   appLogAdmissionLedger?: AppLogAdmissionLedger;
   screenRecordingAdmissionLedger?: ScreenRecordingAdmissionLedger;
@@ -307,9 +312,17 @@ const handleSessionInventoryCommandGroup: SessionCommandHandler = async ({
 const handleSessionStateCommandGroup: SessionCommandHandler = async ({
   req,
   sessionName,
-  logPath,
   sessionStore,
-}) => await handleSessionStateCommands({ req, sessionName, logPath, sessionStore });
+  inspectFacts,
+  bindDevice,
+}) =>
+  await handleSessionStateCommands({
+    req,
+    sessionName,
+    sessionStore,
+    inspectFacts,
+    bindDevice,
+  });
 
 const handleSessionObservabilityCommandGroup: SessionCommandHandler = async ({
   req,
@@ -539,6 +552,7 @@ export async function handleSessionCommands(
     invoke,
     invokeReplayAction,
     androidAdbExecutor,
+    inspectFacts,
     bindDevice,
     bindExactDevice,
     appLogAdmissionLedger,
@@ -563,6 +577,7 @@ export async function handleSessionCommands(
     invoke,
     invokeReplayAction,
     androidAdbExecutor,
+    inspectFacts,
     bindDevice,
     bindExactDevice,
     appLogAdmissionLedger,

@@ -4,6 +4,7 @@ import type {
   PlatformRuntimeHost,
   PlatformRuntimeOperations,
   PlatformRuntimeOwner,
+  EnsureReadyInput,
 } from '@agent-device/contracts/platform';
 import { localRuntimeOwner } from '@agent-device/contracts/platform';
 import { createAndroidAppLogRuntime } from './logs/runtime.ts';
@@ -12,14 +13,36 @@ import { bindAndroidScreenRecordingRuntime } from './recording/runtime.ts';
 
 const owner = localRuntimeOwner('android');
 const available = Object.freeze({ available: true } as const);
+const headlessUnavailable = Object.freeze({
+  available: false,
+  reason: 'unsupported-device-kind',
+  hint: 'Headless boot is supported only for Android emulators.',
+} as const);
 
 export function createAndroidPlatformRuntime(host: PlatformRuntimeHost): PlatformRuntimeOwner {
   const appLogs = createAndroidAppLogRuntime(host);
+  const inspectFacts = async (device: Parameters<typeof appLogs.inspectFacts>[0]) => {
+    const logs = await appLogs.inspectFacts(device);
+    return Object.freeze({
+      device: logs.device,
+      operations: {
+        ...logs.operations,
+        networkDump: available,
+        screenRecordingStart: available,
+        screenRecordingReattach: available,
+        screenRecordingCleanup: available,
+        ensureReady: available,
+        ensureReadyHeadless: device.kind === 'emulator' ? available : headlessUnavailable,
+      },
+    });
+  };
   return Object.freeze({
     owner,
     ownsDevice: (device) => device.platform === 'android',
+    inspectFacts,
     bind: async (request) => {
       const logs = await appLogs.bind(request);
+      const facts = await inspectFacts(request.device);
       const recording = await bindAndroidScreenRecordingRuntime({
         host,
         device: request.device,
@@ -29,21 +52,28 @@ export function createAndroidPlatformRuntime(host: PlatformRuntimeHost): Platfor
       return Object.freeze({
         device: logs.device,
         owner,
-        facts: Object.freeze({
-          device: logs.facts.device,
-          operations: {
-            ...logs.facts.operations,
-            networkDump: available,
-            screenRecordingStart: available,
-            screenRecordingReattach: available,
-            screenRecordingCleanup: available,
-          },
-        }),
+        facts,
         operations: Object.freeze({
           ...logs.operations,
           networkDump: async (input: NetworkDumpInput) =>
             await dumpAndroidNetworkTraffic(host, request.device, input, request.scope.signal),
           ...recording,
+          ensureReady: async (input: EnsureReadyInput) =>
+            await host.deviceReadiness.android.ensureReady(
+              request.device,
+              { ...input, headless: false },
+              request.scope.signal,
+            ),
+          ...(facts.operations.ensureReadyHeadless.available
+            ? {
+                ensureReadyHeadless: async (input: EnsureReadyInput) =>
+                  await host.deviceReadiness.android.ensureReady(
+                    request.device,
+                    { ...input, headless: true },
+                    request.scope.signal,
+                  ),
+              }
+            : {}),
         }),
         [Symbol.asyncDispose]: async () => await logs[Symbol.asyncDispose](),
       }) satisfies DeviceBinding<PlatformRuntimeOperations>;

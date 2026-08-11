@@ -22,4 +22,6 @@ test('classifies the Linux runtime denominator as unavailable', async () => {
     available: false,
     reason: 'unsupported-platform-leaf',
   });
+  expect(binding.facts.operations.ensureReady).toMatchObject({ available: false });
+  expect(binding.facts.operations.ensureReadyHeadless).toMatchObject({ available: false });
 });

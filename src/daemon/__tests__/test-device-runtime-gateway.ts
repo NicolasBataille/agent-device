@@ -9,9 +9,11 @@ import {
   type RequestRouterDeps,
 } from '../request-router.ts';
 import type { BindDeviceRuntime, BindExactDeviceRuntime } from '../request-runtime-binding.ts';
+import type { DeviceInfo } from '@agent-device/kernel/device';
 
 export const unavailableDeviceRuntimeGateway: DeviceRuntimeGateway<PlatformRuntimeOperations> =
   Object.freeze({
+    inspectFacts: async (device) => (await unavailableBinding(device)).facts,
     bind: async ({ device }) => ({
       device,
       owner: localRuntimeOwner(device.platform),
@@ -36,6 +38,8 @@ export const unavailableDeviceRuntimeGateway: DeviceRuntimeGateway<PlatformRunti
           screenRecordingStart: unavailable,
           screenRecordingReattach: unavailable,
           screenRecordingCleanup: unavailable,
+          ensureReady: unavailable,
+          ensureReadyHeadless: unavailable,
         },
       },
       operations: {},
@@ -44,24 +48,27 @@ export const unavailableDeviceRuntimeGateway: DeviceRuntimeGateway<PlatformRunti
     shutdown: async () => {},
   });
 
+async function unavailableBinding(device: DeviceInfo) {
+  return await unavailableDeviceRuntimeGateway.bind({
+    device,
+    intent: { kind: 'ordinary' },
+    scope: {
+      signal: new AbortController().signal,
+      diagnostics: { emit: () => {} },
+      progress: { report: () => {} },
+    },
+  });
+}
+
 const unavailable = Object.freeze({
   available: false as const,
   reason: 'owner-capability-missing' as const,
 });
 
 export const unavailableBindDevice: BindDeviceRuntime = async (device, use) =>
-  narrowDeviceBinding(
-    await unavailableDeviceRuntimeGateway.bind({
-      device,
-      intent: { kind: 'ordinary' },
-      scope: {
-        signal: new AbortController().signal,
-        diagnostics: { emit: () => {} },
-        progress: { report: () => {} },
-      },
-    }),
-    use,
-  );
+  narrowDeviceBinding(await unavailableBinding(device), use);
+
+export const unavailableInspectFacts = unavailableDeviceRuntimeGateway.inspectFacts;
 
 export const unavailableBindExactDevice: BindExactDeviceRuntime = async (
   device,

@@ -43,13 +43,13 @@ export async function resolveCommandDevice(params: {
   session: SessionState | undefined;
   flags: DaemonRequest['flags'] | undefined;
   ensureReady?: boolean;
-  allowStoppedAndroidAvdPlaceholders?: boolean;
+  androidAvdSelection?: 'running-only' | 'include-stopped';
 }): Promise<DeviceInfo> {
   const shouldUseExplicitSelector = hasExplicitDeviceSelector(params.flags);
   const device =
     shouldUseExplicitSelector || !params.session
       ? await resolveTargetDevice(params.flags ?? {}, {
-          allowStoppedAndroidAvdPlaceholders: params.allowStoppedAndroidAvdPlaceholders,
+          androidAvdSelection: params.androidAvdSelection,
         })
       : await refreshSessionDeviceIfNeeded(params.session.device);
   if (params.ensureReady !== false) {
@@ -95,22 +95,6 @@ export async function refreshSessionDeviceIfNeeded(device: DeviceInfo): Promise<
     device: device.name,
     ...(device.simulatorSetPath ? { iosSimulatorDeviceSet: device.simulatorSetPath } : {}),
   });
-}
-
-export function resolveAndroidEmulatorAvdName(params: {
-  flags: DaemonRequest['flags'] | undefined;
-  sessionDevice?: DeviceInfo;
-  resolvedDevice?: DeviceInfo;
-}): string | undefined {
-  const explicit = params.flags?.device?.trim();
-  if (explicit) return explicit;
-  if (params.resolvedDevice?.platform === 'android' && params.resolvedDevice.kind === 'emulator') {
-    return params.resolvedDevice.name;
-  }
-  if (params.sessionDevice?.platform === 'android' && params.sessionDevice.kind === 'emulator') {
-    return params.sessionDevice.name;
-  }
-  return undefined;
 }
 
 export function selectorTargetsSessionDevice(

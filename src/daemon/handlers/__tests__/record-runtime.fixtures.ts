@@ -193,6 +193,8 @@ function makeRuntime(session: SessionState, options: RuntimeOptions = {}) {
         screenRecordingStart: options.screenRecordingStartFact ?? { available: true },
         screenRecordingReattach: { available: true },
         screenRecordingCleanup: { available: true },
+        ensureReady: unavailable,
+        ensureReadyHeadless: unavailable,
       },
     },
     operations,

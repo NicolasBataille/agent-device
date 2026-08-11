@@ -19,25 +19,34 @@ const unavailable = Object.freeze({
 
 export function createHarmonyPlatformRuntime(host: PlatformRuntimeHost): PlatformRuntimeOwner {
   const appLogs = createHarmonyAppLogRuntime(host);
+  const inspectFacts = async (device: Parameters<typeof appLogs.inspectFacts>[0]) => {
+    const logs = await appLogs.inspectFacts(device);
+    const recordingFacts = harmonyScreenRecordingFacts(device);
+    return Object.freeze({
+      device: logs.device,
+      operations: {
+        ...logs.operations,
+        networkDump: unavailable,
+        screenRecordingStart: recordingFacts,
+        screenRecordingReattach: recordingFacts,
+        screenRecordingCleanup: recordingFacts,
+        ensureReady: unavailable,
+        ensureReadyHeadless: unavailable,
+      },
+    });
+  };
   return Object.freeze({
     owner,
     ownsDevice: (device) => device.platform === 'harmonyos',
+    inspectFacts,
     bind: async (request) => {
       const logs = await appLogs.bind(request);
-      const recordingFacts = harmonyScreenRecordingFacts(request.device);
+      const facts = await inspectFacts(request.device);
+      const recordingFacts = facts.operations.screenRecordingStart;
       return Object.freeze({
         device: logs.device,
         owner,
-        facts: Object.freeze({
-          device: logs.facts.device,
-          operations: {
-            ...logs.facts.operations,
-            networkDump: unavailable,
-            screenRecordingStart: recordingFacts,
-            screenRecordingReattach: recordingFacts,
-            screenRecordingCleanup: recordingFacts,
-          },
-        }),
+        facts,
         operations: Object.freeze({
           ...logs.operations,
           ...(recordingFacts.available

@@ -7,7 +7,7 @@ import type {
   RuntimeOwnerRef,
 } from '@agent-device/contracts/platform';
 import {
-  createUnavailablePlatformRuntimeBinding,
+  createUnavailablePlatformRuntimeFacts,
   readRecentNetworkTrafficFromText,
 } from '@agent-device/capture-kit';
 import { sameRuntimeOwner } from '@agent-device/contracts/platform';
@@ -24,6 +24,11 @@ const recordingUnavailable = Object.freeze({
   reason: 'unsupported-provider-mode',
   hint: 'WebDriver provider runtimes do not expose screen recording.',
 } as const);
+const headlessUnavailable = Object.freeze({
+  available: false,
+  reason: 'unsupported-provider-mode',
+  hint: 'Headless boot is unavailable for provider-owned devices.',
+} as const);
 
 export function createWebDriverPlatformRuntimeOwner(
   options: Readonly<{
@@ -35,6 +40,7 @@ export function createWebDriverPlatformRuntimeOwner(
   return Object.freeze({
     owner: options.owner,
     ownsDevice: options.ownsDevice,
+    inspectFacts: async (device) => webDriverFacts(options.owner, device),
     bind: async (request) => {
       if (
         request.intent.kind === 'exact-owner' &&
@@ -60,26 +66,9 @@ function bindWebDriverPlatformRuntime(
   device: DeviceInfo,
 ): DeviceBinding<PlatformRuntimeOperations> {
   const backend = device.platform === 'apple' ? 'ios-device' : 'android';
-  const unavailable = createUnavailablePlatformRuntimeBinding(device, owner, {
-    appLog: appLogUnavailable,
-    network: appLogUnavailable,
-    screenRecording: recordingUnavailable,
-  });
-  const facts: RuntimeFacts<PlatformRuntimeOperations> = Object.freeze({
-    device: unavailable.facts.device,
-    operations: {
-      appLogInspect: appLogUnavailable,
-      appLogDoctor: appLogUnavailable,
-      appLogStart: appLogUnavailable,
-      appLogReattach: appLogUnavailable,
-      appLogCleanup: appLogUnavailable,
-      networkDump: available,
-      screenRecordingStart: recordingUnavailable,
-      screenRecordingReattach: recordingUnavailable,
-      screenRecordingCleanup: recordingUnavailable,
-    },
-  });
+  const facts = webDriverFacts(owner, device);
   const operations: DeviceBinding<PlatformRuntimeOperations>['operations'] = Object.freeze({
+    ensureReady: async () => ({ ...device, booted: true }),
     networkDump: async (input) => {
       const recent = await host.appLogs.readRecent(input.sessionId, input.maxScanLines);
       const dump = readRecentNetworkTrafficFromText(recent.text, {
@@ -107,5 +96,32 @@ function bindWebDriverPlatformRuntime(
     facts,
     operations,
     [Symbol.asyncDispose]: async () => undefined,
+  });
+}
+
+function webDriverFacts(
+  owner: Extract<RuntimeOwnerRef, { kind: 'provider-runtime' }>,
+  device: DeviceInfo,
+): RuntimeFacts<PlatformRuntimeOperations> {
+  const unavailable = createUnavailablePlatformRuntimeFacts(device, owner, {
+    appLog: appLogUnavailable,
+    network: appLogUnavailable,
+    screenRecording: recordingUnavailable,
+  });
+  return Object.freeze({
+    device: unavailable.device,
+    operations: {
+      appLogInspect: appLogUnavailable,
+      appLogDoctor: appLogUnavailable,
+      appLogStart: appLogUnavailable,
+      appLogReattach: appLogUnavailable,
+      appLogCleanup: appLogUnavailable,
+      networkDump: available,
+      screenRecordingStart: recordingUnavailable,
+      screenRecordingReattach: recordingUnavailable,
+      screenRecordingCleanup: recordingUnavailable,
+      ensureReady: available,
+      ensureReadyHeadless: headlessUnavailable,
+    },
   });
 }

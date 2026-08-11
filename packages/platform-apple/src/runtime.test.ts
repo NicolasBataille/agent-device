@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { AppleOS, DeviceInfo } from '@agent-device/kernel/device';
 import { createApplePlatformRuntime } from './runtime.ts';
 import { platformRuntimeHostFixture } from './runtime.fixtures.ts';
@@ -79,4 +79,40 @@ test.each([
       hint: 'watchOS recording is not supported.',
     });
   }
+  expect(facts.operations.ensureReady.available).toBe(
+    device.appleOs !== 'macos' && device.appleOs !== 'watchos',
+  );
+  expect(facts.operations.ensureReadyHeadless.available).toBe(false);
+});
+
+test('readiness keeps the Apple automation helper warm inside the platform runtime', async () => {
+  const host = platformRuntimeHostFixture();
+  const keepAutomationReady = vi.fn();
+  const ensureReady = vi.fn(async (_device, options: { onColdBootStart?: () => void }) => {
+    options.onColdBootStart?.();
+  });
+  const runtime = createApplePlatformRuntime({
+    ...host,
+    deviceReadiness: {
+      ...host.deviceReadiness,
+      apple: { ensureReady, keepAutomationReady },
+    },
+  });
+  const device = appleDevice({ booted: false });
+  const binding = await runtime.bind({
+    device,
+    intent: { kind: 'ordinary' },
+    scope: {
+      signal: new AbortController().signal,
+      diagnostics: { emit: () => {} },
+      progress: { report: () => {} },
+    },
+  });
+
+  await binding.operations.ensureReady?.({});
+
+  expect(ensureReady).toHaveBeenCalledOnce();
+  expect(keepAutomationReady).toHaveBeenCalledTimes(2);
+  expect(keepAutomationReady).toHaveBeenNthCalledWith(1, device);
+  expect(keepAutomationReady).toHaveBeenNthCalledWith(2, device);
 });

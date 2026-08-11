@@ -11,16 +11,18 @@ import {
   type RuntimeOwnerRef,
 } from '@agent-device/contracts/platform';
 
-type UnavailablePlatformRuntimeFacts = Readonly<{
+export type UnavailablePlatformRuntimeFacts = Readonly<{
   appLog: RuntimeOperationUnavailability;
   network: RuntimeOperationUnavailability;
   screenRecording?: RuntimeOperationUnavailability;
+  readiness?: RuntimeOperationUnavailability;
 }>;
 
 type FrozenUnavailablePlatformRuntimeFacts = Readonly<{
   appLog: RuntimeOperationUnavailability;
   network: RuntimeOperationUnavailability;
   screenRecording: RuntimeOperationUnavailability;
+  readiness: RuntimeOperationUnavailability;
 }>;
 
 /** Builds one honest combined owner for a family with no app-log or network mechanics. */
@@ -33,6 +35,7 @@ export function createUnavailablePlatformRuntimeOwner(
   return Object.freeze({
     owner,
     ownsDevice: (device) => device.platform === family,
+    inspectFacts: async (device) => createUnavailablePlatformRuntimeFacts(device, owner, facts),
     bind: async (request) => {
       if (request.intent.kind === 'exact-owner' && !sameRuntimeOwner(request.intent.owner, owner)) {
         throw new AppError(
@@ -57,8 +60,23 @@ export function createUnavailablePlatformRuntimeBinding(
   owner: RuntimeOwnerRef,
   unavailable: UnavailablePlatformRuntimeFacts,
 ): DeviceBinding<PlatformRuntimeOperations> {
-  const { appLog, network, screenRecording } = freezeUnavailableFacts(unavailable);
-  const facts: RuntimeFacts<PlatformRuntimeOperations> = Object.freeze({
+  const facts = createUnavailablePlatformRuntimeFacts(device, owner, unavailable);
+  return Object.freeze({
+    device,
+    owner,
+    facts,
+    operations: Object.freeze({}),
+    [Symbol.asyncDispose]: async () => undefined,
+  });
+}
+
+export function createUnavailablePlatformRuntimeFacts(
+  device: DeviceInfo,
+  owner: RuntimeOwnerRef,
+  unavailable: UnavailablePlatformRuntimeFacts,
+): RuntimeFacts<PlatformRuntimeOperations> {
+  const { appLog, network, screenRecording, readiness } = freezeUnavailableFacts(unavailable);
+  return Object.freeze({
     device: {
       ...deviceShape(device),
       providerMode: owner.kind === 'local-family' ? 'local' : 'provider-runtime',
@@ -73,14 +91,9 @@ export function createUnavailablePlatformRuntimeBinding(
       screenRecordingStart: screenRecording,
       screenRecordingReattach: screenRecording,
       screenRecordingCleanup: screenRecording,
+      ensureReady: readiness,
+      ensureReadyHeadless: readiness,
     },
-  });
-  return Object.freeze({
-    device,
-    owner,
-    facts,
-    operations: Object.freeze({}),
-    [Symbol.asyncDispose]: async () => undefined,
   });
 }
 
@@ -93,5 +106,6 @@ function freezeUnavailableFacts(
     screenRecording: Object.freeze({
       ...(unavailable.screenRecording ?? unavailable.network),
     }),
+    readiness: Object.freeze({ ...(unavailable.readiness ?? unavailable.network) }),
   });
 }

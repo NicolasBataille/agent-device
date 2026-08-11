@@ -10,6 +10,7 @@ import {
   type ResourceOwnershipFence,
   type RuntimeOperationKey,
   type RuntimeOwnerRef,
+  type RuntimeFacts,
   type RuntimeUse,
 } from '@agent-device/contracts/platform';
 
@@ -38,8 +39,13 @@ export type BindExactDeviceRuntime = <
   scope: PlatformRequestScope,
 ) => Promise<BoundDeviceRuntime<RuntimeUse<PlatformRuntimeOperations, Required, Preferred>>>;
 
+export type InspectDeviceRuntimeFacts = (
+  device: DeviceInfo,
+) => Promise<RuntimeFacts<PlatformRuntimeOperations>>;
+
 export type RequestRuntimeBindings = AsyncDisposable &
   Readonly<{
+    inspectFacts: InspectDeviceRuntimeFacts;
     bindDevice: BindDeviceRuntime;
     bindExactDevice: BindExactDeviceRuntime;
   }>;
@@ -83,6 +89,7 @@ export function createRequestRuntimeBindings(params: {
   };
 
   return {
+    inspectFacts: async (device) => await params.gateway.inspectFacts(device),
     bindDevice,
     bindExactDevice,
     [Symbol.asyncDispose]: async () => await cleanups[Symbol.asyncDispose](),

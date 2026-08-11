@@ -33,6 +33,8 @@ test('preserves a narrow web provider dump including empty successful entries', 
   });
   expect(binding.facts.device.providerMode).toBe('transport-composed');
   expect(binding.facts.operations.networkDump).toEqual({ available: true });
+  expect(binding.facts.operations.ensureReady).toMatchObject({ available: false });
+  expect(binding.facts.operations.ensureReadyHeadless).toMatchObject({ available: false });
 });
 
 test('keeps a web transport without dumpNetwork unavailable instead of throwing a stub', async () => {
@@ -159,6 +161,10 @@ function host(
       readProcessMarker: async () => ({ status: 'missing' }),
     },
     networkTransports: { resolve: async () => transport },
+    deviceReadiness: {
+      apple: { ensureReady: async () => {}, keepAutomationReady: () => {} },
+      android: { ensureReady: async (device) => ({ ...device, booted: true }) },
+    },
     screenRecording: {
       outputs: { prepare: async () => {} },
       apple: {

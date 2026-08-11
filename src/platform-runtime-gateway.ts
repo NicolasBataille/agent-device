@@ -10,7 +10,10 @@ import type {
   PlatformRuntimeProviderModule,
   RuntimeOwnerRef,
 } from '@agent-device/contracts/platform';
-import { createUnavailablePlatformRuntimeBinding } from '@agent-device/capture-kit';
+import {
+  createUnavailablePlatformRuntimeBinding,
+  createUnavailablePlatformRuntimeFacts,
+} from '@agent-device/capture-kit';
 import {
   providerRuntimeOwner,
   runtimeOwnerKey,
@@ -125,6 +128,16 @@ export function createComposedPlatformRuntimeGateway(options: {
   };
 
   return Object.freeze({
+    inspectFacts: async (device) => {
+      const provider = selectOrdinaryProvider(options.providerRuntimes, device);
+      if (provider) {
+        const module = modulesByRuntime.get(provider);
+        if (!module) return unavailableProviderFacts(provider, device);
+        const owner = await loadProvider(module);
+        return await inspectAndValidate(owner, device);
+      }
+      return await inspectAndValidate(await loadLocal(device.platform), device);
+    },
     bind: async (request) => {
       if (request.intent.kind === 'exact-owner') {
         const selected = await selectExactOwner(
@@ -135,13 +148,7 @@ export function createComposedPlatformRuntimeGateway(options: {
         );
         return await bindAndValidate(selected, request);
       }
-      const matchingProviders = (options.providerRuntimes ?? []).filter((runtime) =>
-        runtime.ownsDevice(request.device),
-      );
-      if (matchingProviders.length > 1) {
-        throw runtimeContractError('Multiple provider runtimes claim the selected device');
-      }
-      const provider = matchingProviders[0];
+      const provider = selectOrdinaryProvider(options.providerRuntimes, request.device);
       if (provider) {
         const module = modulesByRuntime.get(provider);
         if (!module) {
@@ -160,6 +167,25 @@ export function createComposedPlatformRuntimeGateway(options: {
       providerLoads.clear();
     },
   });
+}
+
+function selectOrdinaryProvider(
+  runtimes: readonly ProviderDeviceRuntime[] | undefined,
+  device: DeviceInfo,
+): ProviderDeviceRuntime | undefined {
+  const matching = (runtimes ?? []).filter((runtime) => runtime.ownsDevice(device));
+  if (matching.length > 1) {
+    throw runtimeContractError('Multiple provider runtimes claim the selected device');
+  }
+  return matching[0];
+}
+
+async function inspectAndValidate(owner: PlatformRuntimeOwner, device: DeviceInfo) {
+  const facts = await owner.inspectFacts(device);
+  if (!factsMatchDeviceOwner(device, owner.owner, facts)) {
+    throw runtimeContractError('Platform runtime facts do not match the selected device and owner');
+  }
+  return facts;
 }
 
 async function bindAndValidate(
@@ -203,7 +229,14 @@ function matchesRequestedOwner(owner: RuntimeOwnerRef, request: DeviceBindingReq
 }
 
 function factsMatchBindingIdentity(binding: DeviceBinding<PlatformRuntimeOperations>): boolean {
-  const { device, owner, facts } = binding;
+  return factsMatchDeviceOwner(binding.device, binding.owner, binding.facts);
+}
+
+function factsMatchDeviceOwner(
+  device: DeviceInfo,
+  owner: RuntimeOwnerRef,
+  facts: DeviceBinding<PlatformRuntimeOperations>['facts'],
+): boolean {
   return (
     sameDeviceShape(facts.device, deviceShape(device)) &&
     providerModeMatchesOwner(facts.device.providerMode, owner)
@@ -248,6 +281,18 @@ function unavailableProviderBinding(
     appLog: unavailable,
     network: unavailable,
   });
+}
+
+function unavailableProviderFacts(runtime: ProviderDeviceRuntime, device: DeviceInfo) {
+  const unavailable = Object.freeze({
+    available: false,
+    reason: 'unsupported-provider-mode',
+  } as const);
+  return createUnavailablePlatformRuntimeFacts(
+    device,
+    providerRuntimeOwner(runtime.provider, 'default'),
+    { appLog: unavailable, network: unavailable, readiness: unavailable },
+  );
 }
 
 function ownerUnavailable(owner: RuntimeOwnerRef): AppError {

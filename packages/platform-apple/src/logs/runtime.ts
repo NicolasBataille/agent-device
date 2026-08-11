@@ -28,6 +28,7 @@ export function createAppleAppLogRuntime(
   return Object.freeze({
     owner,
     ownsDevice: (device) => device.platform === 'apple',
+    inspectFacts: async (device) => appleAppLogFacts(device),
     bind: async (request) => {
       if (request.intent.kind === 'exact-owner' && !sameRuntimeOwner(request.intent.owner, owner)) {
         throw new AppError('UNSUPPORTED_OPERATION', 'Apple app-log owner identity does not match');

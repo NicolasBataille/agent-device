@@ -52,7 +52,7 @@ type AppleDeviceSelector = {
 };
 
 export type ResolveTargetDeviceOptions = {
-  allowStoppedAndroidAvdPlaceholders?: boolean;
+  androidAvdSelection?: 'running-only' | 'include-stopped';
   appleSimulatorAppTarget?: string;
 };
 
@@ -203,12 +203,14 @@ export async function resolveTargetDevice(
   flags: ResolveDeviceFlags,
   options: ResolveTargetDeviceOptions = {},
 ): Promise<DeviceInfo> {
-  const inventoryRequest = buildDeviceInventoryRequestFromFlags(flags);
+  const inventoryRequest = {
+    ...buildDeviceInventoryRequestFromFlags(flags),
+    androidAvdSelection: options.androidAvdSelection ?? 'running-only',
+  };
   const { iosSimulatorSetPath, ...selector } = inventoryRequest;
   const cacheKey = buildResolveTargetDeviceCacheKey(inventoryRequest, options);
   const selectionContext = {
     simulatorSetPath: iosSimulatorSetPath,
-    allowStoppedAndroidAvdPlaceholders: options.allowStoppedAndroidAvdPlaceholders,
   };
   const diagnosticData = {
     platform: inventoryRequest.platform,

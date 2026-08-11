@@ -212,7 +212,7 @@ test('resolveDevice does not apply scoped set guidance for non-iOS platform with
   assert.equal(err.details?.simulatorSetPath, undefined);
 });
 
-test('resolveDevice ignores stopped Android AVD placeholders for adb-backed selection', async () => {
+test('resolveDevice treats Android AVD placeholders returned by inventory as selectable devices', async () => {
   const stoppedAvd: DeviceInfo = {
     platform: 'android',
     id: 'Pixel_9_Pro_XL',
@@ -221,32 +221,11 @@ test('resolveDevice ignores stopped Android AVD placeholders for adb-backed sele
     target: 'mobile',
     booted: false,
   };
-  const bootingEmulator: DeviceInfo = {
-    platform: 'android',
-    id: 'emulator-5554',
-    name: 'Pixel_8',
-    kind: 'emulator',
-    target: 'mobile',
-    booted: false,
-  };
-
-  const implicit = await resolveDevice([stoppedAvd, bootingEmulator], { platform: 'android' });
-  assert.equal(implicit.id, 'emulator-5554');
-
   const explicit = await resolveDevice([stoppedAvd], {
     platform: 'android',
     deviceName: 'Pixel_9_Pro_XL',
-  }).catch((e) => e);
-  assert.ok(explicit instanceof AppError);
-  assert.equal(explicit.code, 'DEVICE_NOT_FOUND');
-  assert.equal(explicit.message, 'No device named Pixel_9_Pro_XL');
-
-  const bootSelection = await resolveDevice(
-    [stoppedAvd],
-    { platform: 'android', deviceName: 'Pixel_9_Pro_XL' },
-    { allowStoppedAndroidAvdPlaceholders: true },
-  );
-  assert.equal(bootSelection.id, 'Pixel_9_Pro_XL');
+  });
+  assert.equal(explicit.id, 'Pixel_9_Pro_XL');
 });
 
 test('resolveDevice applies scoped set guidance when no platform selector specified and simulatorSetPath is set', async () => {

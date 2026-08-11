@@ -31,6 +31,8 @@ export type DeviceInventoryRequest = {
   /** Internal local-inventory projection filters; not public command grammar. */
   kind?: DeviceKind;
   booted?: boolean;
+  /** Internal target-resolution policy; ordinary inventory leaves this absent and lists all AVDs. */
+  androidAvdSelection?: 'running-only' | 'include-stopped';
 };
 
 export type ProviderDeviceInventoryRequest = Omit<DeviceInventoryRequest, 'booted' | 'kind'>;

@@ -199,6 +199,9 @@ function createRecordingPlatformRuntimeGateway(params: {
 }): DeviceRuntimeGateway<PlatformRuntimeOperations> {
   const owner = providerRuntimeOwner('provider-scenario', 'ios-settings');
   return {
+    inspectFacts: async () => {
+      throw new Error('unused');
+    },
     bind: async ({ device }) => {
       if (device.platform !== 'apple' || !device.appleOs) {
         throw new TypeError('The iOS provider scenario requires an explicit Apple leaf');
@@ -228,6 +231,8 @@ function createRecordingPlatformRuntimeGateway(params: {
             screenRecordingStart: unavailableRecording,
             screenRecordingReattach: unavailableRecording,
             screenRecordingCleanup: unavailableRecording,
+            ensureReady: { available: true },
+            ensureReadyHeadless: unavailableRecording,
           },
         },
         operations: {

@@ -93,7 +93,11 @@ test.each([
       sessionStore,
       leaseRegistry: new LeaseRegistry(),
       deviceInventoryGateways: createTestDeviceInventoryGateways(),
-      deviceRuntimeGateway: { bind, shutdown: gateway.shutdown },
+      deviceRuntimeGateway: {
+        inspectFacts: gateway.inspectFacts,
+        bind,
+        shutdown: gateway.shutdown,
+      },
       trackDownloadableArtifact: () => 'artifact',
     });
 
@@ -162,6 +166,8 @@ function makeRecordingGateway(firstStartBlocked: Promise<void>) {
           screenRecordingStart: { available: true },
           screenRecordingReattach: { available: true },
           screenRecordingCleanup: { available: true },
+          ensureReady: unavailable,
+          ensureReadyHeadless: unavailable,
         },
       },
       operations: {
@@ -173,6 +179,9 @@ function makeRecordingGateway(firstStartBlocked: Promise<void>) {
     }),
   );
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => {
+      throw new Error('unused');
+    },
     bind,
     shutdown: async () => {},
   };

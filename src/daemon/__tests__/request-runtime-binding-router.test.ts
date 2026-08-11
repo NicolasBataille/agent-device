@@ -146,12 +146,17 @@ function makeGateway(disposeError?: Error) {
         screenRecordingStart: unavailableRecording,
         screenRecordingReattach: unavailableRecording,
         screenRecordingCleanup: unavailableRecording,
+        ensureReady: { available: true as const },
+        ensureReadyHeadless: unavailableRecording,
       },
     },
     operations,
     [Symbol.asyncDispose]: bindingDispose,
   }));
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => {
+      throw new Error('unused');
+    },
     bind,
     shutdown: async () => {},
   };

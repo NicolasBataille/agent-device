@@ -70,7 +70,6 @@ export type DeviceSelector = {
 
 type DeviceSelectionContext = {
   simulatorSetPath?: string;
-  allowStoppedAndroidAvdPlaceholders?: boolean;
 };
 
 export function isApplePlatform(
@@ -268,10 +267,6 @@ export async function resolveDevice(
   const explicitlySelected = resolveExplicitDevice(candidates, selector);
   if (explicitlySelected) return explicitlySelected;
 
-  if (context.allowStoppedAndroidAvdPlaceholders !== true) {
-    candidates = candidates.filter((device) => !isStoppedAndroidAvdPlaceholder(device));
-  }
-
   const namedDevice = resolveDeviceByName(candidates, selector.deviceName);
   if (namedDevice) return namedDevice;
 
@@ -342,15 +337,6 @@ function selectPreferredDevice(candidates: DeviceInfo[]): DeviceInfo | undefined
   const onlyBooted = booted[0];
   if (onlyBooted && booted.length === 1) return onlyBooted;
   return booted[0] ?? selectable[0];
-}
-
-function isStoppedAndroidAvdPlaceholder(device: DeviceInfo): boolean {
-  return (
-    device.platform === 'android' &&
-    device.kind === 'emulator' &&
-    device.booted === false &&
-    !/^emulator-\d+$/.test(device.id)
-  );
 }
 
 export function matchesDeviceSelector(

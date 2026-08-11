@@ -12,6 +12,7 @@ import { openAppLogOutput, readAppLogOutputTail } from './platform-runtime-app-l
 import { createManagedAppLogProcesses } from './platform-runtime-app-log-process.ts';
 import { createNetworkRuntimeHost } from './platform-runtime-network-host.ts';
 import { createScreenRecordingRuntimeHost } from './platform-runtime-screen-recording-host.ts';
+import { createDeviceReadinessRuntimeHost } from './platform-runtime-device-readiness-host.ts';
 
 export function createPlatformRuntimeHost(options: {
   sessionsDir: string;
@@ -66,6 +67,7 @@ export function createPlatformRuntimeHost(options: {
       },
     }),
     ...network,
+    deviceReadiness: createDeviceReadinessRuntimeHost(),
     screenRecording: createScreenRecordingRuntimeHost(),
     clock: Object.freeze({
       now: () => Date.now(),

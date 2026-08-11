@@ -410,6 +410,8 @@ function createRuntimeHarness(options: { inspectAvailable?: boolean } = {}) {
           screenRecordingStart: unavailableRecording,
           screenRecordingReattach: unavailableRecording,
           screenRecordingCleanup: unavailableRecording,
+          ensureReady: { available: true as const },
+          ensureReadyHeadless: unavailableRecording,
         },
       },
       operations,

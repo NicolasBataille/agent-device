@@ -71,7 +71,12 @@ async function discoverAndroidDevices(
     3,
     async (entry) => await probeRunningDevice(context, entry),
   );
-  return [...running, ...(await listStoppedAvds(context, running))];
+  return [
+    ...running,
+    ...(request.androidAvdSelection === 'running-only'
+      ? []
+      : await listStoppedAvds(context, running)),
+  ];
 }
 
 function resolveSerialAllowlist(

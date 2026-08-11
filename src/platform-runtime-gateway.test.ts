@@ -31,6 +31,39 @@ const scope: PlatformRequestScope = {
 };
 
 describe('composed platform runtime gateway', () => {
+  test('inspects only the selected lazy owner and does not bind it', async () => {
+    const selectedRef = providerRuntimeOwner('limrun', 'selected');
+    const selectedOwner = runtimeOwner({ ref: selectedRef });
+    const inspectFacts = vi.spyOn(selectedOwner, 'inspectFacts');
+    const bind = vi.spyOn(selectedOwner, 'bind');
+    const unrelatedLoad = vi.fn(async () => {
+      throw new Error('must stay lazy');
+    });
+    const runtimeGateway = gateway([
+      providerRuntime({
+        ref: providerRuntimeOwner('limrun', 'unrelated'),
+        ownsDevice: () => false,
+        load: unrelatedLoad,
+      }),
+      providerRuntime({ ref: selectedRef, load: async () => selectedOwner }),
+    ]);
+
+    await expect(runtimeGateway.inspectFacts(device)).resolves.toMatchObject({
+      operations: { ensureReady: { available: false } },
+    });
+
+    expect(inspectFacts).toHaveBeenCalledOnce();
+    expect(bind).not.toHaveBeenCalled();
+    expect(unrelatedLoad).not.toHaveBeenCalled();
+  });
+
+  test('rejects inspected facts with a provider-mode mismatch', async () => {
+    const ref = providerRuntimeOwner('limrun', 'stable');
+    await expect(
+      gateway([providerRuntime({ ref, mismatch: 'facts' })]).inspectFacts(device),
+    ).rejects.toMatchObject({ details: { reason: 'runtime-contract-invalid' } });
+  });
+
   test('selects an exact provider owner without ordinary ownsDevice arbitration', async () => {
     const ownsDevice = vi.fn(() => false);
     const ref = providerRuntimeOwner('limrun', 'stable');
@@ -222,6 +255,7 @@ function runtimeOwner(options: {
   return {
     owner: options.ref,
     ownsDevice: () => true,
+    inspectFacts: async () => binding(options).facts,
     bind: async () => binding(options),
     shutdown: async () => {},
   };
@@ -269,5 +303,7 @@ function unavailableFacts() {
     screenRecordingStart: unavailable,
     screenRecordingReattach: unavailable,
     screenRecordingCleanup: unavailable,
+    ensureReady: unavailable,
+    ensureReadyHeadless: unavailable,
   };
 }

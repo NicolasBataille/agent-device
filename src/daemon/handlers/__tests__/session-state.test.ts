@@ -3,20 +3,40 @@ import { test, expect } from 'vitest';
 import { handleSessionStateCommands } from '../session-state.ts';
 import { makeSessionStore } from '../../../__tests__/test-utils/store-factory.ts';
 import { withTestDeviceInventory } from '../../../__tests__/test-utils/device-inventory-gateways.ts';
+import { createUnavailablePlatformRuntimeFacts } from '@agent-device/capture-kit';
+import { localRuntimeOwner } from '@agent-device/contracts/platform';
 
 test('boot rejects --headless outside Android directly', async () => {
-  const response = await handleSessionStateCommands({
-    req: {
-      token: 't',
-      session: 'default',
-      command: 'boot',
-      positionals: [],
-      flags: { platform: 'ios', headless: true },
-    },
-    sessionName: 'default',
-    logPath: '/tmp/daemon.log',
-    sessionStore: makeSessionStore('agent-device-session-state-'),
-  });
+  const device = {
+    platform: 'apple' as const,
+    appleOs: 'ios' as const,
+    id: 'sim-1',
+    name: 'iPhone',
+    kind: 'simulator' as const,
+    target: 'mobile' as const,
+    booted: false,
+  };
+  const response = await withTestDeviceInventory(
+    { local: async () => [device] },
+    async () =>
+      await handleSessionStateCommands({
+        req: {
+          token: 't',
+          session: 'default',
+          command: 'boot',
+          positionals: [],
+          flags: { platform: 'ios', headless: true },
+        },
+        sessionName: 'default',
+        sessionStore: makeSessionStore('agent-device-session-state-'),
+        inspectFacts: async () =>
+          createUnavailablePlatformRuntimeFacts(device, localRuntimeOwner('apple'), {
+            appLog: { available: false, reason: 'owner-capability-missing' },
+            network: { available: false, reason: 'owner-capability-missing' },
+            readiness: { available: false, reason: 'unsupported-device-kind' },
+          }),
+      }),
+  );
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(false);
@@ -36,7 +56,6 @@ test('appstate returns missing-session error for explicit session flag', async (
       flags: { platform: 'ios', session: 'named' },
     },
     sessionName: 'named',
-    logPath: '/tmp/daemon.log',
     sessionStore: makeSessionStore('agent-device-session-state-'),
   });
 
@@ -72,7 +91,6 @@ test('appstate rejects web before Android app-state backend dispatch', async () 
           flags: { platform: 'web' },
         },
         sessionName: 'default',
-        logPath: '/tmp/daemon.log',
         sessionStore: makeSessionStore('agent-device-session-state-'),
       }),
   );

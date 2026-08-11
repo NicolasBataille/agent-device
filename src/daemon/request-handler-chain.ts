@@ -8,7 +8,11 @@ import type { LeaseLifecycleProvider } from '@agent-device/contracts/device';
 import type { LeaseRegistry } from './lease-registry.ts';
 import type { SessionStore } from './session-store.ts';
 import type { DaemonInvokeFn, DaemonRequest, DaemonResponse } from './types.ts';
-import type { BindDeviceRuntime, BindExactDeviceRuntime } from './request-runtime-binding.ts';
+import type {
+  BindDeviceRuntime,
+  BindExactDeviceRuntime,
+  InspectDeviceRuntimeFacts,
+} from './request-runtime-binding.ts';
 import type { DeviceClaimReconciler } from './device-claims.ts';
 import type { AppLogAdmissionLedger } from './app-log-admission-ledger.ts';
 import type { ScreenRecordingAdmissionLedger } from './screen-recording-admission-ledger.ts';
@@ -35,6 +39,7 @@ type RequestHandlerChainParams = {
    */
   providerScope: RequestPlatformProviderScope;
   bindDevice: BindDeviceRuntime;
+  inspectFacts: InspectDeviceRuntimeFacts;
   bindExactDevice: BindExactDeviceRuntime;
   reconcileOrphanedDeviceClaim: DeviceClaimReconciler;
   appLogAdmissionLedger?: AppLogAdmissionLedger;
@@ -137,6 +142,7 @@ async function runSessionHandler(
       invokeReplayAction: params.invokeReplayAction,
       androidAdbExecutor: params.providerScope.androidAdbExecutor,
       bindDevice: params.bindDevice,
+      inspectFacts: params.inspectFacts,
       bindExactDevice: params.bindExactDevice,
       reconcileOrphanedDeviceClaim: params.reconcileOrphanedDeviceClaim,
       appLogAdmissionLedger: params.appLogAdmissionLedger,

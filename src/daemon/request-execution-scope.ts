@@ -49,6 +49,7 @@ import {
   createRequestRuntimeBindings,
   type BindDeviceRuntime,
   type BindExactDeviceRuntime,
+  type InspectDeviceRuntimeFacts,
 } from './request-runtime-binding.ts';
 
 // Production daemon wiring owns one LeaseRegistry per process; scoping locks by registry keeps
@@ -70,6 +71,7 @@ export type RequestExecutionScope = AsyncDisposable & {
   runLocked<T>(task: () => Promise<T>): Promise<T>;
   retainDeviceExecutionLock(deviceId: string): Promise<void>;
   bindDevice: BindDeviceRuntime;
+  inspectFacts: InspectDeviceRuntimeFacts;
   bindExactDevice: BindExactDeviceRuntime;
   throwIfCanceled(): void;
 };
@@ -81,6 +83,7 @@ export type LockedRequestScope = {
   existingSession: SessionState | undefined;
   retainDeviceExecutionLock(deviceId: string): Promise<void>;
   bindDevice: BindDeviceRuntime;
+  inspectFacts: InspectDeviceRuntimeFacts;
   bindExactDevice: BindExactDeviceRuntime;
   throwIfCanceled(): void;
   contextFromFlags(
@@ -174,6 +177,15 @@ export async function createRequestExecutionScope(params: {
         await requestExecutionLocks.retainDevice(deviceId),
       bindDevice:
         runtimeBindings?.bindDevice ??
+        (async () => {
+          throw new AppError(
+            'COMMAND_FAILED',
+            'Device runtime gateway is not configured for this request scope',
+            { reason: 'runtime-gateway-missing' },
+          );
+        }),
+      inspectFacts:
+        runtimeBindings?.inspectFacts ??
         (async () => {
           throw new AppError(
             'COMMAND_FAILED',
@@ -348,6 +360,7 @@ export function prepareLockedRequestScope(params: {
       existingSession,
       retainDeviceExecutionLock: scope.retainDeviceExecutionLock,
       bindDevice: scope.bindDevice,
+      inspectFacts: scope.inspectFacts,
       bindExactDevice: scope.bindExactDevice,
       throwIfCanceled: scope.throwIfCanceled,
       contextFromFlags,

@@ -249,6 +249,8 @@ function createAdmissionBinding(
         screenRecordingStart: unavailable,
         screenRecordingReattach: unavailable,
         screenRecordingCleanup: unavailable,
+        ensureReady: unavailable,
+        ensureReadyHeadless: unavailable,
       },
     },
     operations: {

@@ -47,6 +47,20 @@ test('request runtime binding caches one broad owner and projects each declared 
   expect(runtime.disposals).toEqual(['one']);
 });
 
+test('facts inspection answers admission without creating a request binding', async () => {
+  const runtime = makeGateway();
+  const bindings = createRequestRuntimeBindings({ gateway: runtime.gateway, scope });
+
+  await expect(bindings.inspectFacts(device('one'))).resolves.toMatchObject({
+    operations: { ensureReady: { available: true } },
+  });
+
+  expect(runtime.inspectFacts).toHaveBeenCalledOnce();
+  expect(runtime.bind).not.toHaveBeenCalled();
+  await bindings[Symbol.asyncDispose]();
+  expect(runtime.disposals).toEqual([]);
+});
+
 test('request binding disposes multiple owners in reverse adoption order', async () => {
   const runtime = makeGateway();
   const bindings = createRequestRuntimeBindings({ gateway: runtime.gateway, scope });
@@ -130,6 +144,7 @@ test('late exact-owner binding is rolled back when request cleanup already began
   const lateBinding = { ...published, [Symbol.asyncDispose]: disposePublished };
   let publish: (binding: DeviceBinding<PlatformRuntimeOperations>) => void = () => {};
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => runtime.gateway.inspectFacts(selected),
     bind: vi.fn(
       async () =>
         await new Promise<DeviceBinding<PlatformRuntimeOperations>>((resolve) => {
@@ -171,6 +186,7 @@ test('late exact-owner rollback failure is secondary diagnostic evidence', async
   };
   let publish: (binding: DeviceBinding<PlatformRuntimeOperations>) => void = () => {};
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => runtime.gateway.inspectFacts(selected),
     bind: vi.fn(
       async () =>
         await new Promise<DeviceBinding<PlatformRuntimeOperations>>((resolve) => {
@@ -231,6 +247,7 @@ test('request cancellation aborts deferred exact recovery and late publication i
   let publish: (binding: DeviceBinding<PlatformRuntimeOperations>) => void = () => {};
   let observedScope: typeof scope | undefined;
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => runtime.gateway.inspectFacts(selected),
     bind: vi.fn(
       async (request) =>
         await new Promise<DeviceBinding<PlatformRuntimeOperations>>((resolve) => {
@@ -309,28 +326,37 @@ function makeGateway(options: { inspectAvailable?: boolean } = {}) {
     }),
     screenRecordingReattach: vi.fn(async () => ({ status: 'missing' as const })),
     screenRecordingCleanup: vi.fn(async () => ({ status: 'already-missing' as const })),
+    ensureReady: vi.fn(async () => device('ready')),
+    ensureReadyHeadless: vi.fn(async () => device('ready-headless')),
+  };
+  const facts = {
+    device: {
+      family: 'android' as const,
+      kind: 'emulator' as const,
+      providerMode: 'local' as const,
+    },
+    operations: {
+      appLogInspect:
+        options.inspectAvailable === false
+          ? ({ available: false, reason: 'owner-capability-missing' } as const)
+          : ({ available: true } as const),
+      appLogDoctor: { available: true } as const,
+      appLogStart: { available: true } as const,
+      appLogReattach: { available: true } as const,
+      appLogCleanup: { available: true } as const,
+      networkDump: { available: true } as const,
+      screenRecordingStart: { available: true } as const,
+      screenRecordingReattach: { available: true } as const,
+      screenRecordingCleanup: { available: true } as const,
+      ensureReady: { available: true } as const,
+      ensureReadyHeadless: { available: true } as const,
+    },
   };
   const bind = vi.fn(
     async ({ device: selected }): Promise<DeviceBinding<PlatformRuntimeOperations>> => ({
       device: selected,
       owner: localRuntimeOwner('android'),
-      facts: {
-        device: { family: 'android', kind: 'emulator', providerMode: 'local' },
-        operations: {
-          appLogInspect:
-            options.inspectAvailable === false
-              ? { available: false, reason: 'owner-capability-missing' }
-              : { available: true },
-          appLogDoctor: { available: true },
-          appLogStart: { available: true },
-          appLogReattach: { available: true },
-          appLogCleanup: { available: true },
-          networkDump: { available: true },
-          screenRecordingStart: { available: true },
-          screenRecordingReattach: { available: true },
-          screenRecordingCleanup: { available: true },
-        },
-      },
+      facts,
       operations:
         options.inspectAvailable === false
           ? {
@@ -342,6 +368,8 @@ function makeGateway(options: { inspectAvailable?: boolean } = {}) {
               screenRecordingStart: operations.screenRecordingStart,
               screenRecordingReattach: operations.screenRecordingReattach,
               screenRecordingCleanup: operations.screenRecordingCleanup,
+              ensureReady: operations.ensureReady,
+              ensureReadyHeadless: operations.ensureReadyHeadless,
             }
           : operations,
       [Symbol.asyncDispose]: async () => {
@@ -349,11 +377,13 @@ function makeGateway(options: { inspectAvailable?: boolean } = {}) {
       },
     }),
   );
+  const inspectFacts = vi.fn(async () => facts);
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts,
     bind,
     shutdown: async () => {},
   };
-  return { gateway, bind, operations, disposals };
+  return { gateway, bind, inspectFacts, operations, disposals };
 }
 
 function device(id: string): DeviceInfo {

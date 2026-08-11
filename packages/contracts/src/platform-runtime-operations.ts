@@ -2,6 +2,10 @@ import type { AppLogRuntimeHost, AppLogRuntimeOperations } from './app-log-runti
 import type { NetworkRuntimeHost, NetworkRuntimeOperations } from './network-runtime.ts';
 import type { ScreenRecordingRuntimeHost } from './screen-recording-runtime-host.ts';
 import type { ScreenRecordingRuntimeOperations } from './screen-recording-runtime.ts';
+import type {
+  DeviceReadinessRuntimeHost,
+  DeviceReadinessRuntimeOperations,
+} from './device-readiness-runtime.ts';
 import {
   runtimeUse,
   type DeviceRuntimeOwner,
@@ -11,7 +15,8 @@ import {
 
 export type PlatformRuntimeOperations = AppLogRuntimeOperations &
   NetworkRuntimeOperations &
-  ScreenRecordingRuntimeOperations;
+  ScreenRecordingRuntimeOperations &
+  DeviceReadinessRuntimeOperations;
 
 /**
  * The one neutral runtime-use declaration every command domain shares (ADR 0019 §9): no
@@ -21,9 +26,19 @@ export type PlatformRuntimeOperations = AppLogRuntimeOperations &
  */
 export const defineUse = runtimeUse<PlatformRuntimeOperations>();
 
+export const ensureReadyUse = defineUse({ required: ['ensureReady'] });
+export const ensureReadyHeadlessUse = defineUse({ required: ['ensureReadyHeadless'] });
+export const deviceReadinessRuntimeUses = Object.freeze([
+  ensureReadyUse,
+  ensureReadyHeadlessUse,
+] as const);
+
 export type PlatformRuntimeHost = AppLogRuntimeHost &
   NetworkRuntimeHost &
-  Readonly<{ screenRecording: ScreenRecordingRuntimeHost }>;
+  Readonly<{
+    screenRecording: ScreenRecordingRuntimeHost;
+    deviceReadiness: DeviceReadinessRuntimeHost;
+  }>;
 
 export type PlatformRuntimeOwner = DeviceRuntimeOwner<PlatformRuntimeOperations>;
 

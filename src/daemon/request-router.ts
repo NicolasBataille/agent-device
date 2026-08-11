@@ -277,6 +277,7 @@ export function createRequestHandler(deps: RequestRouterDeps): DaemonInvokeFn {
         : undefined,
       providerScope,
       bindDevice: lockedScope.bindDevice,
+      inspectFacts: lockedScope.inspectFacts,
       bindExactDevice: lockedScope.bindExactDevice,
       reconcileOrphanedDeviceClaim: createDeviceClaimReconciler({
         gateway: deviceRuntimeGateway,

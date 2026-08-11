@@ -302,16 +302,7 @@ test('macOS supports the Apple runner interaction core but excludes mobile-only 
     [{ device: macOsDevice, expected: true, label: 'on macOS' }],
   );
   assertCommandSupport(
-    [
-      'app-switcher',
-      'boot',
-      'home',
-      'install',
-      'install-from-source',
-      'push',
-      'reinstall',
-      'orientation',
-    ],
+    ['app-switcher', 'home', 'install', 'install-from-source', 'push', 'reinstall', 'orientation'],
     [{ device: macOsDevice, expected: false, label: 'on macOS' }],
   );
 });
@@ -396,7 +387,6 @@ test('Linux supports desktop interaction commands and blocks mobile/unsupported 
       'alert',
       'app-switcher',
       'apps',
-      'boot',
       'install',
       'install-from-source',
       'keyboard',
@@ -440,7 +430,6 @@ test('web supports only the initial browser interaction slice', () => {
       'app-switcher',
       'apps',
       'back',
-      'boot',
       'clipboard',
       'diff',
       'gesture',

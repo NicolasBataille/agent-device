@@ -61,6 +61,8 @@ test('reconciles the dead owner session resources through their exact runtime ow
         screenRecordingStart: unavailable,
         screenRecordingReattach: unavailable,
         screenRecordingCleanup: unavailable,
+        ensureReady: unavailable,
+        ensureReadyHeadless: unavailable,
       },
     },
     operations: {
@@ -70,6 +72,9 @@ test('reconciles the dead owner session resources through their exact runtime ow
     [Symbol.asyncDispose]: async () => {},
   }));
   const gateway: DeviceRuntimeGateway<PlatformRuntimeOperations> = {
+    inspectFacts: async () => {
+      throw new Error('unused');
+    },
     bind,
     shutdown: async () => {},
   };

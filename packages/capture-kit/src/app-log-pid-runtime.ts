@@ -106,6 +106,10 @@ export function createPidScopedAppLogRuntimeOwner<
   return Object.freeze({
     owner,
     ownsDevice: (device) => device.platform === options.family,
+    inspectFacts: async (device) => {
+      const transport = await host.processTransports.resolve(device);
+      return createFacts(device, transport, options);
+    },
     bind: async (request) => {
       if (request.intent.kind === 'exact-owner' && !sameRuntimeOwner(request.intent.owner, owner)) {
         throw new AppError(

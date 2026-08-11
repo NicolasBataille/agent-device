@@ -50,6 +50,8 @@ export function createNetworkRuntime(
             screenRecordingStart: unavailable,
             screenRecordingReattach: unavailable,
             screenRecordingCleanup: unavailable,
+            ensureReady: unavailable,
+            ensureReadyHeadless: unavailable,
           },
         },
         operations: networkFact.available ? { networkDump } : {},

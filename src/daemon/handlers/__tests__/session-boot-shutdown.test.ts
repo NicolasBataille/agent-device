@@ -5,16 +5,20 @@ import { AppError } from '@agent-device/kernel/errors';
 import {
   mockResolveTargetDevice,
   mockEnsureDeviceReady,
-  mockPrewarmAppleRunnerCache,
   mockRunCmd,
   mockShutdownSimulator,
-  mockEnsureAndroidEmulatorBooted,
   makeSessionStore,
   makeSession,
   noopInvoke,
 } from './session-test-harness.ts';
 import type { SessionState } from '../../types.ts';
-import { handleSessionCommands } from './session-command-harness.ts';
+import {
+  handleSessionCommands,
+  mockBindDeviceRuntime,
+  mockEnsureReadyHeadlessRuntime,
+  mockEnsureReadyRuntime,
+  mockInspectDeviceRuntimeFacts,
+} from './session-command-harness.ts';
 
 test('boot requires session or explicit selector', async () => {
   const sessionStore = makeSessionStore();
@@ -76,39 +80,33 @@ test('boot prefers explicit device selector over active session device', async (
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(true);
-  expect(mockEnsureDeviceReady).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'sim-2' }),
-    expect.any(Object),
-  );
-  const onColdBootStart = mockEnsureDeviceReady.mock.calls[0]?.[1]?.onIosSimulatorColdBootStart;
-  expect(onColdBootStart).toBeTypeOf('function');
-  onColdBootStart?.(selectedDevice);
-  expect(mockPrewarmAppleRunnerCache).toHaveBeenCalledWith(
-    selectedDevice,
-    expect.objectContaining({
-      logPath: expect.stringMatching(/daemon\.log$/),
-    }),
-  );
+  expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledOnce();
+  expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledWith(selectedDevice);
+  expect(mockBindDeviceRuntime).toHaveBeenCalledOnce();
+  expect(mockEnsureReadyRuntime).toHaveBeenCalledOnce();
+  expect(mockEnsureReadyHeadlessRuntime).not.toHaveBeenCalled();
+  expect(mockEnsureDeviceReady).not.toHaveBeenCalled();
   if (response && response.ok) {
     expect(response.data?.platform).toBe('ios');
     expect(response.data?.id).toBe('sim-2');
   }
 });
 
-test('boot --headless launches Android emulator when no running device matches', async () => {
+test('boot --headless admits a stopped Android emulator through facts and binds once', async () => {
   const sessionStore = makeSessionStore();
-  mockResolveTargetDevice.mockRejectedValue(new AppError('DEVICE_NOT_FOUND', 'No device found'));
-  const launchCalls: Array<{ avdName: string; serial?: string; headless?: boolean }> = [];
-  mockEnsureAndroidEmulatorBooted.mockImplementation(async ({ avdName, serial, headless }) => {
-    launchCalls.push({ avdName, serial, headless });
-    return {
-      platform: 'android',
-      id: 'emulator-5554',
-      name: 'Pixel_9_Pro_XL',
-      kind: 'emulator',
-      target: 'mobile',
-      booted: true,
-    };
+  const placeholder: SessionState['device'] = {
+    platform: 'android',
+    id: 'Pixel_9_Pro_XL',
+    name: 'Pixel_9_Pro_XL',
+    kind: 'emulator',
+    target: 'mobile',
+    booted: false,
+  };
+  mockResolveTargetDevice.mockResolvedValue(placeholder);
+  mockEnsureReadyHeadlessRuntime.mockResolvedValue({
+    ...placeholder,
+    id: 'emulator-5554',
+    booted: true,
   });
   const response = await handleSessionCommands({
     req: {
@@ -126,10 +124,10 @@ test('boot --headless launches Android emulator when no running device matches',
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(true);
-  expect(launchCalls).toEqual([{ avdName: 'Pixel_9_Pro_XL', serial: undefined, headless: true }]);
-  expect(mockEnsureDeviceReady).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'emulator-5554' }),
-  );
+  expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledWith(placeholder);
+  expect(mockBindDeviceRuntime).toHaveBeenCalledOnce();
+  expect(mockEnsureReadyHeadlessRuntime).toHaveBeenCalledOnce();
+  expect(mockEnsureReadyRuntime).not.toHaveBeenCalled();
   if (response && response.ok) {
     expect(response.data?.platform).toBe('android');
     expect(response.data?.id).toBe('emulator-5554');
@@ -137,20 +135,21 @@ test('boot --headless launches Android emulator when no running device matches',
   }
 });
 
-test('boot launches Android emulator with GUI when no running device matches', async () => {
+test('boot admits a stopped Android emulator through normal readiness', async () => {
   const sessionStore = makeSessionStore();
-  mockResolveTargetDevice.mockRejectedValue(new AppError('DEVICE_NOT_FOUND', 'No device found'));
-  const launchCalls: Array<{ avdName: string; serial?: string; headless?: boolean }> = [];
-  mockEnsureAndroidEmulatorBooted.mockImplementation(async ({ avdName, serial, headless }) => {
-    launchCalls.push({ avdName, serial, headless });
-    return {
-      platform: 'android',
-      id: 'emulator-5554',
-      name: 'Pixel_9_Pro_XL',
-      kind: 'emulator',
-      target: 'mobile',
-      booted: true,
-    };
+  const placeholder: SessionState['device'] = {
+    platform: 'android',
+    id: 'Pixel_9_Pro_XL',
+    name: 'Pixel_9_Pro_XL',
+    kind: 'emulator',
+    target: 'mobile',
+    booted: false,
+  };
+  mockResolveTargetDevice.mockResolvedValue(placeholder);
+  mockEnsureReadyRuntime.mockResolvedValue({
+    ...placeholder,
+    id: 'emulator-5554',
+    booted: true,
   });
   const response = await handleSessionCommands({
     req: {
@@ -168,7 +167,9 @@ test('boot launches Android emulator with GUI when no running device matches', a
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(true);
-  expect(launchCalls).toEqual([{ avdName: 'Pixel_9_Pro_XL', serial: undefined, headless: false }]);
+  expect(mockInspectDeviceRuntimeFacts).toHaveBeenCalledWith(placeholder);
+  expect(mockBindDeviceRuntime).toHaveBeenCalledOnce();
+  expect(mockEnsureReadyRuntime).toHaveBeenCalledOnce();
   if (response && response.ok) {
     expect(response.data?.platform).toBe('android');
     expect(response.data?.id).toBe('emulator-5554');
@@ -176,7 +177,7 @@ test('boot launches Android emulator with GUI when no running device matches', a
   }
 });
 
-test('boot launches stopped Android emulator selected from inventory', async () => {
+test('boot forwards Android serial admission policy to readiness', async () => {
   const sessionStore = makeSessionStore();
   mockResolveTargetDevice.mockResolvedValue({
     platform: 'android',
@@ -186,18 +187,6 @@ test('boot launches stopped Android emulator selected from inventory', async () 
     target: 'mobile',
     booted: false,
   });
-  const launchCalls: Array<{ avdName: string; serial?: string; headless?: boolean }> = [];
-  mockEnsureAndroidEmulatorBooted.mockImplementation(async ({ avdName, serial, headless }) => {
-    launchCalls.push({ avdName, serial, headless });
-    return {
-      platform: 'android',
-      id: 'emulator-5554',
-      name: 'Pixel_9_Pro_XL',
-      kind: 'emulator',
-      target: 'mobile',
-      booted: true,
-    };
-  });
 
   const response = await handleSessionCommands({
     req: {
@@ -205,7 +194,11 @@ test('boot launches stopped Android emulator selected from inventory', async () 
       session: 'default',
       command: 'boot',
       positionals: [],
-      flags: { platform: 'android' },
+      flags: {
+        platform: 'android',
+        serial: 'emulator-5554',
+        androidDeviceAllowlist: 'emulator-5554',
+      },
     },
     sessionName: 'default',
     logPath: path.join(os.tmpdir(), 'daemon.log'),
@@ -215,10 +208,10 @@ test('boot launches stopped Android emulator selected from inventory', async () 
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(true);
-  expect(launchCalls).toEqual([{ avdName: 'Pixel_9_Pro_XL', serial: undefined, headless: false }]);
-  expect(mockEnsureDeviceReady).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'emulator-5554', booted: true }),
-  );
+  expect(mockEnsureReadyRuntime).toHaveBeenCalledWith({
+    serial: 'emulator-5554',
+    androidSerialAllowlist: ['emulator-5554'],
+  });
   if (response && response.ok) {
     expect(response.data?.platform).toBe('android');
     expect(response.data?.id).toBe('emulator-5554');
@@ -229,7 +222,6 @@ test('boot launches stopped Android emulator selected from inventory', async () 
 test('boot --headless requires avd selector when device cannot be resolved', async () => {
   const sessionStore = makeSessionStore();
   mockResolveTargetDevice.mockRejectedValue(new AppError('DEVICE_NOT_FOUND', 'No device found'));
-  mockEnsureAndroidEmulatorBooted.mockRejectedValue(new Error('unexpected'));
   const response = await handleSessionCommands({
     req: {
       token: 't',
@@ -246,7 +238,8 @@ test('boot --headless requires avd selector when device cannot be resolved', asy
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(false);
-  expect(mockEnsureAndroidEmulatorBooted).not.toHaveBeenCalled();
+  expect(mockInspectDeviceRuntimeFacts).not.toHaveBeenCalled();
+  expect(mockBindDeviceRuntime).not.toHaveBeenCalled();
   if (response && !response.ok) {
     expect(response.error.code).toBe('INVALID_ARGS');
     expect(response.error.message).toMatch(/boot --headless requires --device <avd-name>/);
@@ -255,6 +248,15 @@ test('boot --headless requires avd selector when device cannot be resolved', asy
 
 test('boot --headless rejects non-Android selectors', async () => {
   const sessionStore = makeSessionStore();
+  mockResolveTargetDevice.mockResolvedValue({
+    platform: 'apple',
+    appleOs: 'ios',
+    id: 'sim-2',
+    name: 'iPhone 17 Pro',
+    kind: 'simulator',
+    target: 'mobile',
+    booted: false,
+  });
   const response = await handleSessionCommands({
     req: {
       token: 't',
@@ -271,27 +273,22 @@ test('boot --headless rejects non-Android selectors', async () => {
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(false);
-  expect(mockEnsureAndroidEmulatorBooted).not.toHaveBeenCalled();
+  expect(mockBindDeviceRuntime).not.toHaveBeenCalled();
   if (response && !response.ok) {
     expect(response.error.code).toBe('INVALID_ARGS');
     expect(response.error.message).toMatch(/headless is supported only for Android emulators/i);
   }
 });
 
-test('boot keeps --target validation when emulator is fallback-launched', async () => {
+test('boot keeps --target validation before facts inspection', async () => {
   const sessionStore = makeSessionStore();
-  mockResolveTargetDevice.mockRejectedValue(new AppError('DEVICE_NOT_FOUND', 'No device found'));
-  const launchCalls: Array<{ avdName: string; serial?: string; headless?: boolean }> = [];
-  mockEnsureAndroidEmulatorBooted.mockImplementation(async ({ avdName, serial, headless }) => {
-    launchCalls.push({ avdName, serial, headless });
-    return {
-      platform: 'android',
-      id: 'emulator-5554',
-      name: 'Pixel_9_Pro_XL',
-      kind: 'emulator',
-      target: 'mobile',
-      booted: true,
-    };
+  mockResolveTargetDevice.mockResolvedValue({
+    platform: 'android',
+    id: 'Pixel_9_Pro_XL',
+    name: 'Pixel_9_Pro_XL',
+    kind: 'emulator',
+    target: 'mobile',
+    booted: false,
   });
   const response = await handleSessionCommands({
     req: {
@@ -309,8 +306,8 @@ test('boot keeps --target validation when emulator is fallback-launched', async 
 
   expect(response).toBeTruthy();
   expect(response?.ok).toBe(false);
-  expect(mockEnsureDeviceReady).not.toHaveBeenCalled();
-  expect(launchCalls).toEqual([{ avdName: 'Pixel_9_Pro_XL', serial: undefined, headless: false }]);
+  expect(mockInspectDeviceRuntimeFacts).not.toHaveBeenCalled();
+  expect(mockBindDeviceRuntime).not.toHaveBeenCalled();
   if (response && !response.ok) {
     expect(response.error.code).toBe('DEVICE_NOT_FOUND');
     expect(response.error.message).toMatch(/matching --target tv/i);

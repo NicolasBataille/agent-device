@@ -15,6 +15,7 @@ import type { PostActionObservationSupport } from './post-action-observation.ts'
 import {
   appLogRuntimePlanUses,
   assertRecordRuntimeExecution,
+  deviceReadinessRuntimeUses,
   inventoryUse,
   networkDumpUse,
   screenRecordingRuntimePlanUses,
@@ -509,11 +510,7 @@ export const RAW_COMMAND_DESCRIPTORS = [
     catalog: { group: 'public' },
     recordsSessionAction: false,
     daemon: { route: 'session', refFrameEffect: 'may-invalidate', sessionKind: 'state' },
-    capability: {
-      apple: APPLE_SIM_AND_DEVICE,
-      android: ANDROID_ALL,
-      linux: LINUX_NONE,
-    },
+    platformExecution: { kind: 'device-runtime', uses: deviceReadinessRuntimeUses },
     timeoutPolicy: DEFAULT_TIMEOUT_POLICY,
     batchable: true,
     platformExecution: LEGACY_PLATFORM_EXECUTION,

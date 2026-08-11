@@ -14,40 +14,46 @@ const scope: PlatformRequestScope = {
   progress: { report: () => undefined },
 };
 
-test('Android inventory invokes bounded host commands and filters serials', async () => {
-  const calls: HostCommandRequest[] = [];
-  const host = createHost(async (request) => {
-    calls.push(request);
-    const key = request.args.join('\0');
-    if (request.executable === 'emulator') return result('Pixel_9_Pro_XL\nLiving_Room_TV\n');
-    if (key === 'devices\0-l') {
-      return result(
-        'List of devices attached\nemulator-5554 device model:Pixel_9_Pro_XL\nphysical-1 device model:Phone\n',
-      );
-    }
-    if (key.includes('ro.boot.qemu.avd_name')) return result('Pixel_9_Pro_XL\n');
-    if (key.includes('sys.boot_completed')) return result('1\n');
-    if (key.includes('ro.build.characteristics')) return result('phone\n');
-    if (key.includes('has-feature')) return result('false\n');
-    if (key.includes('pm\0list\0features')) return result('');
-    throw new Error(`Unexpected command: ${request.executable} ${request.args.join(' ')}`);
-  });
+test.each([
+  ['include-stopped', true],
+  ['running-only', false],
+] as const)(
+  'Android inventory %s policy owns stopped-AVD placeholder resolution',
+  async (androidAvdSelection, includesStoppedAvd) => {
+    const calls: HostCommandRequest[] = [];
+    const host = createHost(async (request) => {
+      calls.push(request);
+      const key = request.args.join('\0');
+      if (request.executable === 'emulator') return result('Pixel_9_Pro_XL\nLiving_Room_TV\n');
+      if (key === 'devices\0-l') {
+        return result(
+          'List of devices attached\nemulator-5554 device model:Pixel_9_Pro_XL\nphysical-1 device model:Phone\n',
+        );
+      }
+      if (key.includes('ro.boot.qemu.avd_name')) return result('Pixel_9_Pro_XL\n');
+      if (key.includes('sys.boot_completed')) return result('1\n');
+      if (key.includes('ro.build.characteristics')) return result('phone\n');
+      if (key.includes('has-feature')) return result('false\n');
+      if (key.includes('pm\0list\0features')) return result('');
+      throw new Error(`Unexpected command: ${request.executable} ${request.args.join(' ')}`);
+    });
 
-  const devices = await createAndroidInventory(host).discover(
-    { androidSerialAllowlist: ['emulator-5554'] },
-    scope,
-  );
+    const devices = await createAndroidInventory(host).discover(
+      { androidSerialAllowlist: ['emulator-5554'], androidAvdSelection },
+      scope,
+    );
 
-  assert.deepEqual(
-    devices.map((device) => [device.id, device.name, device.booted]),
-    [
-      ['emulator-5554', 'Pixel 9 Pro XL', true],
-      ['Living_Room_TV', 'Living_Room_TV', false],
-    ],
-  );
-  assert.ok(calls.every((call) => call.timeoutMs === 10_000));
-  assert.ok(calls.every((call) => call.allowFailure === true));
-});
+    assert.deepEqual(
+      devices.map((candidate) => [candidate.id, candidate.name, candidate.booted]),
+      [
+        ['emulator-5554', 'Pixel 9 Pro XL', true],
+        ...(includesStoppedAvd ? [['Living_Room_TV', 'Living_Room_TV', false] as const] : []),
+      ],
+    );
+    assert.ok(calls.every((call) => call.timeoutMs === 10_000));
+    assert.ok(calls.every((call) => call.allowFailure === true));
+  },
+);
 
 test('Android inventory fails closed when adb is unavailable', async () => {
   const host = createHost(async () => result(''), { adb: undefined });

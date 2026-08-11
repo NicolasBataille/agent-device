@@ -14,6 +14,7 @@ import { runRequestHandlerChain } from '../request-handler-chain.ts';
 import {
   unavailableBindDevice,
   unavailableBindExactDevice,
+  unavailableInspectFacts,
 } from './test-device-runtime-gateway.ts';
 import type { DaemonRequest, DaemonResponse } from '../types.ts';
 import { mkdtempForTestSync } from '../../__tests__/test-utils/tmp-dir.ts';
@@ -262,6 +263,7 @@ async function runCatalogCommandThroughHandlerChain(
             androidAdbExecutor: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
           },
           bindDevice: unavailableBindDevice,
+          inspectFacts: unavailableInspectFacts,
           bindExactDevice: unavailableBindExactDevice,
           reconcileOrphanedDeviceClaim: async () => ({
             status: 'retained' as const,

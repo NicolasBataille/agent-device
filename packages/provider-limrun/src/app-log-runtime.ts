@@ -45,6 +45,11 @@ const recordingUnavailable = Object.freeze({
   reason: 'unsupported-provider-mode',
   hint: 'Limrun does not expose an exact-owner screen-recording runtime.',
 } as const);
+const headlessUnavailable = Object.freeze({
+  available: false,
+  reason: 'unsupported-provider-mode',
+  hint: 'Headless boot is unavailable for provider-owned devices.',
+} as const);
 
 export function createLimrunPlatformRuntimeOwner(
   options: LimrunPlatformRuntimeOwnerOptions,
@@ -53,6 +58,7 @@ export function createLimrunPlatformRuntimeOwner(
   return Object.freeze({
     owner,
     ownsDevice: (device) => isSupportedLimrunAppLogDevice(device) && options.ownsDevice(device),
+    inspectFacts: async (device) => facts(device),
     bind: async (request) => {
       if (request.intent.kind === 'exact-owner' && !sameRuntimeOwner(request.intent.owner, owner)) {
         throw new AppError('UNSUPPORTED_OPERATION', 'Limrun app-log owner identity does not match');
@@ -175,6 +181,7 @@ function bindLimrunAppLogs(
           : [];
       return Object.freeze({ source: 'app-log' as const, backend, dump, notes });
     },
+    ensureReady: async () => ({ ...device, booted: true }),
   } satisfies DeviceBinding<PlatformRuntimeOperations>['operations'];
   return Object.freeze({
     device,
@@ -223,6 +230,8 @@ function facts(device: DeviceInfo): RuntimeFacts<PlatformRuntimeOperations> {
       screenRecordingStart: recordingUnavailable,
       screenRecordingReattach: recordingUnavailable,
       screenRecordingCleanup: recordingUnavailable,
+      ensureReady: available,
+      ensureReadyHeadless: headlessUnavailable,
     },
   });
 }

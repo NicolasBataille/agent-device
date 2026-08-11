@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { PlatformRuntimeHost } from '@agent-device/contracts/platform';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { createAndroidPlatformRuntime } from './runtime.ts';
@@ -16,8 +16,16 @@ test.each([
   ['emulator', device],
   ['device', { ...device, kind: 'device' as const }],
 ])('classifies the Android %s runtime denominator', async (_name, runtimeDevice) => {
+  const ensureReady = vi.fn(async (readyDevice: DeviceInfo) => ({
+    ...readyDevice,
+    id: 'refreshed-device',
+    booted: true,
+  }));
   const host = {
     processTransports: { resolve: async () => ({ mode: 'local' as const }) },
+    deviceReadiness: {
+      android: { ensureReady },
+    },
     screenRecording: {
       android: {
         resolve: async () => ({
@@ -52,4 +60,30 @@ test.each([
   expect(facts.operations.screenRecordingStart).toEqual({ available: true });
   expect(facts.operations.screenRecordingReattach).toEqual({ available: true });
   expect(facts.operations.screenRecordingCleanup).toEqual({ available: true });
+  expect(facts.operations.ensureReady).toEqual({ available: true });
+  expect(facts.operations.ensureReadyHeadless.available).toBe(runtimeDevice.kind === 'emulator');
+
+  await expect(binding.operations.ensureReady?.({})).resolves.toMatchObject({
+    id: 'refreshed-device',
+    booted: true,
+  });
+  expect(ensureReady).toHaveBeenLastCalledWith(
+    runtimeDevice,
+    { headless: false },
+    expect.any(AbortSignal),
+  );
+
+  if (runtimeDevice.kind === 'emulator') {
+    await expect(binding.operations.ensureReadyHeadless?.({})).resolves.toMatchObject({
+      id: 'refreshed-device',
+      booted: true,
+    });
+    expect(ensureReady).toHaveBeenLastCalledWith(
+      runtimeDevice,
+      { headless: true },
+      expect.any(AbortSignal),
+    );
+  } else {
+    expect(binding.operations.ensureReadyHeadless).toBeUndefined();
+  }
 });

@@ -180,6 +180,7 @@ export type DeviceBindingRequest = Readonly<{
 
 /** Provider-first request gateway. Ordinary and exact-owner selection stay inside this module. */
 export type DeviceRuntimeGateway<Operations extends object> = Readonly<{
+  inspectFacts(device: DeviceInfo): Promise<RuntimeFacts<Operations>>;
   bind(request: DeviceBindingRequest): Promise<DeviceBinding<Operations>>;
   shutdown(): Promise<void>;
 }>;
