@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { createAgentDeviceClient } from '../../../src/agent-device-client.ts';
 import type { AgentDeviceDaemonTransport } from '@agent-device/contracts/client';
 import type { AgentDeviceClient } from '../../../src/client/client-types.ts';
@@ -130,7 +131,7 @@ export async function createProviderScenarioHarness(
     setSession: (name, session) => sessionStore.set(name, session),
     close: async () => {
       await deviceRuntimeGateway.shutdown();
-      removeProviderScenarioTempDir(sessionDir);
+      await removeProviderScenarioTempDir(sessionDir);
     },
   };
 }
@@ -164,12 +165,21 @@ export async function withProviderScenarioTempDir<TResult>(
   try {
     return await run(dir);
   } finally {
-    removeProviderScenarioTempDir(dir);
+    await removeProviderScenarioTempDir(dir);
   }
 }
 
-function removeProviderScenarioTempDir(dir: string): void {
-  fs.rmSync(dir, PROVIDER_SCENARIO_TEMP_REMOVE_OPTIONS);
+async function removeProviderScenarioTempDir(dir: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.rmSync(dir, PROVIDER_SCENARIO_TEMP_REMOVE_OPTIONS);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 5 || !['EBUSY', 'ENOTEMPTY', 'EPERM'].includes(code ?? '')) throw error;
+      await sleep(50 * (attempt + 1));
+    }
+  }
 }
 
 export function restoreEnv(key: string, previous: string | undefined): void {
