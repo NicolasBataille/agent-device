@@ -268,8 +268,8 @@ test('network cutover scan catches planted legacy execution and dual admission',
           await readSessionNetworkCapture(input);
           await provider.dumpNetwork({ include: 'all' });
           requireCommandSupported('network', device);
+          function handleNetworkCommand() { runtime.operations.networkDump(input); }
           handleNetworkCommand(request);
-          runtime.operations.networkDump(input);
         `,
       ],
       [
@@ -297,7 +297,10 @@ test('network cutover scan rejects a retired implementation by committed path', 
   assert.deepEqual(
     summariesFor('R15 network-runtime-cutover', [
       ['src/daemon/network-log.ts', `export const parser = () => [];`],
-      ['src/daemon/handlers/ok.ts', 'handleNetworkCommand(r); runtime.operations.networkDump(i);'],
+      [
+        'src/daemon/handlers/ok.ts',
+        'function handleNetworkCommand() { runtime.operations.networkDump(i); } handleNetworkCommand(r);',
+      ],
     ]),
     ['src/daemon/network-log.ts: retired network module remains'],
   );
@@ -311,8 +314,8 @@ test('network cutover scan ignores retired names in comments and string data', (
         `
           // readSessionNetworkCapture and requireCommandSupported('network') were removed.
           const note = 'provider.dumpNetwork and PUBLIC_COMMANDS.network';
+          function handleNetworkCommand() { runtime.operations.networkDump(input); }
           handleNetworkCommand(request);
-          runtime.operations.networkDump(input);
         `,
       ],
     ]),
@@ -347,10 +350,12 @@ test('network route scan rejects planted neither and duplicate routes', () => {
       [
         'src/daemon/planted.ts',
         `
+          function handleNetworkCommand() {
+            runtime.operations.networkDump(input);
+            fallback.operations.networkDump(input);
+          }
           handleNetworkCommand(first);
           handleNetworkCommand(second);
-          runtime.operations.networkDump(input);
-          fallback.operations.networkDump(input);
         `,
       ],
     ]),
@@ -376,10 +381,12 @@ test('R16 catches a planted legacy recording backend, admission, and plugin face
           requireCommandSupported(PUBLIC_COMMANDS.record, device);
           const backend = RECORDING_BACKENDS_BY_TAG.android;
           type LegacyTag = RecordingBackendTag;
+          function startRecording() { runtime.operations.screenRecordingStart(input); }
+          function createScreenRecordingRecoveryControl() {
+            runtime.operations.screenRecordingReattach(input);
+            runtime.operations.screenRecordingCleanup(input);
+          }
           handleRecordTraceCommands(input);
-          runtime.operations.screenRecordingStart(input);
-          runtime.operations.screenRecordingReattach(input);
-          runtime.operations.screenRecordingCleanup(input);
         `,
       ],
       [
@@ -411,10 +418,12 @@ test('R16 excludes trace-only mechanics from the record cutover scan', () => {
         `
           const traceRecording = { startTrace() {}, stopTrace() {} };
           traceRecording.startTrace();
+          function startRecording() { runtime.operations.screenRecordingStart(input); }
+          function createScreenRecordingRecoveryControl() {
+            runtime.operations.screenRecordingReattach(input);
+            runtime.operations.screenRecordingCleanup(input);
+          }
           handleRecordTraceCommands(input);
-          runtime.operations.screenRecordingStart(input);
-          runtime.operations.screenRecordingReattach(input);
-          runtime.operations.screenRecordingCleanup(input);
         `,
       ],
     ]),

@@ -107,7 +107,11 @@ export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
     },
     runtimeTypeNames: ['NetworkRuntimeOperations'],
     operations: { names: ['networkDump'] },
-    singularExecution: { routes: ['handleNetworkCommand'], operations: ['networkDump'] },
+    singularExecution: {
+      routes: ['handleNetworkCommand'],
+      operations: ['networkDump'],
+      operationOwners: { networkDump: ['handleNetworkCommand'] },
+    },
   },
   {
     rule: 'R16 record-runtime-cutover',
@@ -143,6 +147,11 @@ export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
     singularExecution: {
       routes: ['handleRecordTraceCommands'],
       operations: ['screenRecordingStart', 'screenRecordingReattach', 'screenRecordingCleanup'],
+      operationOwners: {
+        screenRecordingStart: ['startRecording'],
+        screenRecordingReattach: ['createScreenRecordingRecoveryControl'],
+        screenRecordingCleanup: ['createScreenRecordingRecoveryControl'],
+      },
     },
     lifecycleProof: recordDaemonMechanicsProof,
   },

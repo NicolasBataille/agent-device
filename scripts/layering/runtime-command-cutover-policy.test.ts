@@ -22,7 +22,7 @@ test('the parametrized gate goes red on a planted row across every generalized c
             "import { resolvePlantedBackend } from './planted-legacy.ts';",
             "requireCommandSupported('planted', device);",
             'const widened = runtime as PlantedRuntimeOperations;',
-            "widened.operations['plantedDump']({});",
+            "function handlePlantedCommand() { widened.operations['plantedDump']({}); }",
           ].join('\n'),
         ],
         [
@@ -66,8 +66,10 @@ test('the planted row is green once the command has exactly one execution path',
           `
           // resolvePlantedBackend and requireCommandSupported('planted') were removed.
           const note = 'planted-legacy.ts';
+          function handlePlantedCommand() {
+            runtime.operations.plantedDump(input);
+          }
           handlePlantedCommand(request);
-          runtime.operations.plantedDump(input);
         `,
         ],
       ],
@@ -164,7 +166,14 @@ test('planted red: a named-operation row that enforces only some operations is r
     cutoverRowDefects({
       ...PLANTED_ROW,
       operations: { names: ['plantedDump', 'plantedReattach'] },
-      singularExecution: { routes: ['handlePlantedCommand'], operations: ['plantedDump'] },
+      singularExecution: {
+        routes: ['handlePlantedCommand'],
+        operations: ['plantedDump'],
+        operationOwners: {
+          plantedDump: ['handlePlantedCommand'],
+          plantedReattach: ['handlePlantedCommand'],
+        },
+      },
     }),
     ['names operations it does not enforce exactly once: plantedReattach'],
   );
@@ -178,6 +187,7 @@ test('planted red: a row that enforces an operation it does not name is rejected
       singularExecution: {
         routes: ['handlePlantedCommand'],
         operations: ['plantedDump', 'somebodyElsesOperation'],
+        operationOwners: { plantedDump: ['handlePlantedCommand'] },
       },
     }),
     ['enforces operations it does not name: somebodyElsesOperation'],
@@ -192,10 +202,59 @@ test('planted red: duplicate operations on either side are rejected', () => {
       singularExecution: {
         routes: ['handlePlantedCommand'],
         operations: ['plantedDump', 'plantedDump'],
+        operationOwners: { plantedDump: ['handlePlantedCommand'] },
       },
     }),
     ['names duplicate operations: plantedDump', 'enforces duplicate operations: plantedDump'],
   );
+});
+
+test('planted red: every named operation declares its lexical owner', () => {
+  assert.deepEqual(
+    cutoverRowDefects({
+      ...PLANTED_ROW,
+      singularExecution: {
+        routes: ['handlePlantedCommand'],
+        operations: ['plantedDump'],
+        operationOwners: {},
+      },
+    }),
+    ['names operations without lexical owners: plantedDump'],
+  );
+});
+
+test('unrelated daemon calls neither satisfy nor duplicate an owner-scoped operation', () => {
+  const missing = summariesFor(
+    PLANTED_RULE,
+    [
+      [
+        'src/daemon/planted-handler.ts',
+        `
+          function handlePlantedCommand() {}
+          function handleUnrelatedCommand() { runtime.operations.plantedDump(input); }
+          handlePlantedCommand(request);
+        `,
+      ],
+    ],
+    [PLANTED_ROW],
+  );
+  assert.deepEqual(missing, ['(planted runtime): expected one narrowed plantedDump call, found 0']);
+
+  const present = summariesFor(
+    PLANTED_RULE,
+    [
+      [
+        'src/daemon/planted-handler.ts',
+        `
+          function handlePlantedCommand() { runtime.operations.plantedDump(input); }
+          function handleUnrelatedCommand() { runtime.operations.plantedDump(input); }
+          handlePlantedCommand(request);
+        `,
+      ],
+    ],
+    [PLANTED_ROW],
+  );
+  assert.deepEqual(present, []);
 });
 
 test('a pattern-only row may prove singularity through its route alone', () => {

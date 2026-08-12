@@ -425,26 +425,42 @@ function exactCallViolations(
   if (row.execution !== 'device-runtime') return [];
   const routes: readonly string[] = row.singularExecution.routes;
   const operations: readonly string[] = row.singularExecution.operations ?? [];
-  const counts = new Map<string, number>([...routes, ...operations].map((name) => [name, 0]));
+  const routeCounts = new Map<string, number>(routes.map((name) => [name, 0]));
+  const ownerNodes = new Map<string, AstNode[]>();
   for (const file of files.filter(({ path }) => path.startsWith('src/daemon/'))) {
     const program = programs.get(file.path);
     if (!program) continue;
     visitAst(program, (node) => {
+      const owner = lexicalFunctionOwnerName(node);
+      if (owner !== undefined) {
+        const nodes = ownerNodes.get(owner) ?? [];
+        nodes.push(node);
+        ownerNodes.set(owner, nodes);
+      }
       if (node['type'] !== 'CallExpression') return;
       const callee = node['callee'] as AstNode | undefined;
-      if (callee?.['type'] === 'Identifier' && counts.has(String(callee['name']))) {
-        bump(counts, String(callee['name']));
-      }
-      if (callee?.['type'] === 'MemberExpression' && isRuntimeOperationCall(callee)) {
-        const name = memberName(callee);
-        if (name !== undefined && operations.includes(name)) bump(counts, name);
+      if (callee?.['type'] === 'Identifier' && routeCounts.has(String(callee['name']))) {
+        bump(routeCounts, String(callee['name']));
       }
     });
   }
+  const operationCounts = new Map(
+    operations.map((operation) => [
+      operation,
+      countOwnedOperationCalls(
+        operation,
+        row.singularExecution.operationOwners[operation] ?? [],
+        ownerNodes,
+      ),
+    ]),
+  );
   const pseudoFile = `(${row.command} runtime)`;
   return [
-    ...routes.map((name) => ({ found: counts.get(name) ?? 0, what: `${name} route` })),
-    ...operations.map((name) => ({ found: counts.get(name) ?? 0, what: `narrowed ${name} call` })),
+    ...routes.map((name) => ({ found: routeCounts.get(name) ?? 0, what: `${name} route` })),
+    ...operations.map((name) => ({
+      found: operationCounts.get(name) ?? 0,
+      what: `narrowed ${name} call`,
+    })),
   ]
     .filter(({ found }) => found !== 1)
     .map(({ what, found }) => ({
@@ -452,6 +468,45 @@ function exactCallViolations(
       line: 1,
       message: `expected one ${what}, found ${found}`,
     }));
+}
+
+function lexicalFunctionOwnerName(node: AstNode): string | undefined {
+  if (node['type'] === 'FunctionDeclaration') {
+    const id = node['id'] as AstNode | null | undefined;
+    return id?.['type'] === 'Identifier' ? String(id['name']) : undefined;
+  }
+  if (node['type'] !== 'VariableDeclarator') return undefined;
+  const id = node['id'] as AstNode | undefined;
+  const init = node['init'] as AstNode | null | undefined;
+  if (id?.['type'] !== 'Identifier') return undefined;
+  if (init?.['type'] !== 'ArrowFunctionExpression' && init?.['type'] !== 'FunctionExpression') {
+    return undefined;
+  }
+  return String(id['name']);
+}
+
+function countOwnedOperationCalls(
+  operation: string,
+  owners: readonly string[],
+  ownerNodes: ReadonlyMap<string, readonly AstNode[]>,
+): number {
+  let count = 0;
+  for (const owner of owners) {
+    for (const node of ownerNodes.get(owner) ?? []) {
+      visitAst(node, (candidate) => {
+        if (candidate['type'] !== 'CallExpression') return;
+        const callee = candidate['callee'] as AstNode | undefined;
+        if (
+          callee?.['type'] === 'MemberExpression' &&
+          isRuntimeOperationCall(callee) &&
+          memberName(callee) === operation
+        ) {
+          count += 1;
+        }
+      });
+    }
+  }
+  return count;
 }
 
 function isRuntimeOperationCall(callee: AstNode): boolean {

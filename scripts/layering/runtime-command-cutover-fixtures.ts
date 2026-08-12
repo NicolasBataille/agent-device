@@ -47,5 +47,9 @@ export const PLANTED_ROW: MigratedCommandCutover = {
   },
   runtimeTypeNames: ['PlantedRuntimeOperations'],
   operations: { names: ['plantedDump'] },
-  singularExecution: { routes: ['handlePlantedCommand'], operations: ['plantedDump'] },
+  singularExecution: {
+    routes: ['handlePlantedCommand'],
+    operations: ['plantedDump'],
+    operationOwners: { plantedDump: ['handlePlantedCommand'] },
+  },
 };

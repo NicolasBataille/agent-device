@@ -101,6 +101,11 @@ type NamedOperationCutover = DeviceRuntimeBase &
       routes: NonEmpty<string>;
       /** Narrowed operations that must be called exactly once — the named set. */
       operations: NonEmpty<string>;
+      /**
+       * Lexical function owner for each narrowed operation call. An unrelated daemon
+       * caller must neither satisfy a missing command call nor create a false duplicate.
+       */
+      operationOwners: Readonly<Record<string, NonEmpty<string>>>;
     }>;
   }>;
 
@@ -215,19 +220,42 @@ function namedOperationDefects(row: DeviceRuntimeCutover): string[] {
   if (unnamed.length > 0) {
     defects.push(`enforces operations it does not name: ${sortedUnique(unnamed).join(', ')}`);
   }
+  const owners = row.singularExecution?.operationOwners ?? {};
+  const owned = Object.keys(owners);
+  const ownerless = named.filter((name) => (owners[name]?.length ?? 0) === 0);
+  const unclaimedOwners = owned.filter((name) => !namedSet.has(name));
+  if (ownerless.length > 0) {
+    defects.push(`names operations without lexical owners: ${sortedUnique(ownerless).join(', ')}`);
+  }
+  if (unclaimedOwners.length > 0) {
+    defects.push(
+      `declares lexical owners for unnamed operations: ${sortedUnique(unclaimedOwners).join(', ')}`,
+    );
+  }
+  for (const [operation, lexicalOwners] of Object.entries(owners)) {
+    const duplicates = duplicateValues(lexicalOwners);
+    if (duplicates.length > 0) {
+      defects.push(
+        `declares duplicate lexical owners for ${operation}: ${duplicates.join(', ')}`,
+      );
+    }
+  }
   return defects;
 }
 
 function duplicateDefects(verb: 'names' | 'enforces', values: readonly string[]): string[] {
+  const duplicates = duplicateValues(values);
+  return duplicates.length === 0 ? [] : [`${verb} duplicate operations: ${duplicates.join(', ')}`];
+}
+
+function duplicateValues(values: readonly string[]): string[] {
   const seen = new Set<string>();
   const duplicates = values.filter((value) => {
     if (seen.has(value)) return true;
     seen.add(value);
     return false;
   });
-  return duplicates.length === 0
-    ? []
-    : [`${verb} duplicate operations: ${sortedUnique(duplicates).join(', ')}`];
+  return sortedUnique(duplicates);
 }
 
 function sortedUnique(values: readonly string[]): string[] {
