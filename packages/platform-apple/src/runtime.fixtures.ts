@@ -15,11 +15,13 @@ export function platformRuntimeHostFixture(): PlatformRuntimeHost {
     },
     networkTransports: { resolve: async () => ({ mode: 'local' }) },
     deviceReadiness: {
-      apple: {
-        ensureReady: async () => {},
-        keepAutomationReady: () => {},
+      applePhysical: { ensureConnected: async () => {} },
+      appleAutomation: { keepHot: () => {} },
+      androidEmulator: {
+        discover: async () => [],
+        launch: () => 1,
+        terminate: async () => {},
       },
-      android: { ensureReady: async (device) => ({ ...device, booted: true }) },
     },
     screenRecording: {
       apple: {

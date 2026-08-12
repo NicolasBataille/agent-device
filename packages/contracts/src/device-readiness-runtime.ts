@@ -1,4 +1,5 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
+import type { DeviceInventoryRequest } from './device-inventory.ts';
 
 export type EnsureReadyInput = Readonly<{
   serial?: string;
@@ -12,19 +13,15 @@ export type DeviceReadinessRuntimeOperations = Readonly<{
 }>;
 
 export type DeviceReadinessRuntimeHost = Readonly<{
-  apple: Readonly<{
-    ensureReady(
-      device: DeviceInfo,
-      options: Readonly<{ onColdBootStart?: () => void }>,
-      signal: AbortSignal,
-    ): Promise<void>;
-    keepAutomationReady(device: DeviceInfo): void;
+  applePhysical: Readonly<{
+    ensureConnected(device: DeviceInfo, signal: AbortSignal): Promise<void>;
   }>;
-  android: Readonly<{
-    ensureReady(
-      device: DeviceInfo,
-      input: EnsureReadyInput & Readonly<{ headless: boolean }>,
-      signal: AbortSignal,
-    ): Promise<DeviceInfo>;
+  appleAutomation: Readonly<{
+    keepHot(device: DeviceInfo): void;
+  }>;
+  androidEmulator: Readonly<{
+    discover(request: DeviceInventoryRequest, signal: AbortSignal): Promise<readonly DeviceInfo[]>;
+    launch(avdName: string, headless: boolean): number;
+    terminate(pid: number): Promise<void>;
   }>;
 }>;

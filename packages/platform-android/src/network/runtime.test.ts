@@ -191,8 +191,9 @@ function unusedAppLogHost(): Omit<
     processTransports: { resolve: async () => ({ mode: 'local' }) },
     clock: { now: () => 1, sleep: async () => {} },
     deviceReadiness: {
-      apple: { ensureReady: async () => {}, keepAutomationReady: () => {} },
-      android: { ensureReady: async (device) => ({ ...device, booted: true }) },
+      applePhysical: { ensureConnected: async () => {} },
+      appleAutomation: { keepHot: () => {} },
+      androidEmulator: { discover: async () => [], launch: () => 1, terminate: async () => {} },
     },
     screenRecording: {
       outputs: { prepare: async () => {} },

@@ -33,12 +33,16 @@ export async function launchCoreDeviceApp(
   await runIosDevicectl(args, { action: 'launch iOS app', deviceId: device.id });
 }
 
-export async function ensureCoreDeviceReady(device: DeviceInfo): Promise<void> {
+export async function ensureCoreDeviceReady(
+  device: DeviceInfo,
+  signal?: AbortSignal,
+): Promise<void> {
   try {
     const probe = await runCoreDeviceDetails(
       device.id,
       IOS_DEVICE_READY_TIMEOUT_MS,
       IOS_DEVICE_READY_COMMAND_TIMEOUT_BUFFER_MS,
+      signal,
     );
     const { result, parsed } = probe;
     if (result.exitCode === 0) {
@@ -146,6 +150,7 @@ async function runCoreDeviceDetails(
   deviceId: string,
   timeoutMs: number,
   commandTimeoutBufferMs = 0,
+  signal?: AbortSignal,
 ): Promise<{
   result: Awaited<ReturnType<typeof runXcrun>>;
   parsed: { parsed: boolean; outcome?: string; tunnelState?: string; tunnelIp?: string };
@@ -171,6 +176,7 @@ async function runCoreDeviceDetails(
       ],
       {
         allowFailure: true,
+        signal,
         timeoutMs: timeoutMs + commandTimeoutBufferMs,
       },
     );

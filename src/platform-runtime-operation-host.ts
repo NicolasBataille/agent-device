@@ -12,7 +12,9 @@ import { openAppLogOutput, readAppLogOutputTail } from './platform-runtime-app-l
 import { createManagedAppLogProcesses } from './platform-runtime-app-log-process.ts';
 import { createNetworkRuntimeHost } from './platform-runtime-network-host.ts';
 import { createScreenRecordingRuntimeHost } from './platform-runtime-screen-recording-host.ts';
-import { createDeviceReadinessRuntimeHost } from './platform-runtime-device-readiness-host.ts';
+import { createApplePhysicalReadinessHost } from './platform-runtime-apple-physical-readiness.ts';
+import { createAppleAutomationKeepHotHost } from './platform-runtime-apple-automation-keep-hot.ts';
+import { createAndroidEmulatorHost } from './platform-runtime-android-emulator-host.ts';
 
 export function createPlatformRuntimeHost(options: {
   sessionsDir: string;
@@ -67,7 +69,11 @@ export function createPlatformRuntimeHost(options: {
       },
     }),
     ...network,
-    deviceReadiness: createDeviceReadinessRuntimeHost(),
+    deviceReadiness: Object.freeze({
+      applePhysical: createApplePhysicalReadinessHost(),
+      appleAutomation: createAppleAutomationKeepHotHost(),
+      androidEmulator: createAndroidEmulatorHost(),
+    }),
     screenRecording: createScreenRecordingRuntimeHost(),
     clock: Object.freeze({
       now: () => Date.now(),

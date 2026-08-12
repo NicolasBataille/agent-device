@@ -49,7 +49,7 @@ type IosPhysicalDeviceLaunchOptions = {
 export type IosPhysicalDeviceControl = {
   readonly backend: IosPhysicalDeviceBackend;
   assertAppInstallationSupported(device: DeviceInfo): void;
-  ensureReady(device: DeviceInfo): Promise<void>;
+  ensureReady(device: DeviceInfo, signal?: AbortSignal): Promise<void>;
   listApps(device: DeviceInfo, filter: AppsFilter): Promise<IosAppInfo[]>;
   installApp(device: DeviceInfo, installablePath: string): Promise<void>;
   uninstallApp(device: DeviceInfo, bundleId: string): Promise<void>;
@@ -181,11 +181,12 @@ async function rejectXctestRunnerFileCopy(device: DeviceInfo): Promise<never> {
   );
 }
 
-async function ensureXctestDeviceReady(device: DeviceInfo): Promise<void> {
+async function ensureXctestDeviceReady(device: DeviceInfo, signal?: AbortSignal): Promise<void> {
   const timeoutSeconds = Math.max(1, Math.ceil(IOS_DEVICE_READY_TIMEOUT_MS / 1000));
   const args = ['xcdevice', 'wait', '--both', `--timeout=${timeoutSeconds}`, device.id];
   const result = await runXcrun(args, {
     allowFailure: true,
+    signal,
     timeoutMs: IOS_DEVICE_READY_TIMEOUT_MS + IOS_DEVICE_READY_COMMAND_TIMEOUT_BUFFER_MS,
   });
   if (result.exitCode === 0) return;

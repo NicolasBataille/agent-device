@@ -88,15 +88,27 @@ test.each([
 
 test('readiness and boot keep the Apple automation helper warm inside the platform runtime', async () => {
   const host = platformRuntimeHostFixture();
-  const keepAutomationReady = vi.fn();
-  const ensureReady = vi.fn(async (_device, options: { onColdBootStart?: () => void }) => {
-    options.onColdBootStart?.();
-  });
+  const keepHot = vi.fn();
+  let state = 'Shutdown';
   const runtime = createApplePlatformRuntime({
     ...host,
+    appleTools: {
+      ...host.appleTools,
+      run: vi.fn(async (request) => {
+        if (request.args.includes('list')) {
+          return {
+            stdout: JSON.stringify({ devices: { ios: [{ udid: 'apple-fact', state }] } }),
+            stderr: '',
+            exitCode: 0,
+          };
+        }
+        if (request.args.includes('boot')) state = 'Booted';
+        return { stdout: '', stderr: '', exitCode: 0 };
+      }),
+    },
     deviceReadiness: {
       ...host.deviceReadiness,
-      apple: { ensureReady, keepAutomationReady },
+      appleAutomation: { keepHot },
     },
   });
   const device = appleDevice({ booted: false });
@@ -113,22 +125,20 @@ test('readiness and boot keep the Apple automation helper warm inside the platfo
   await binding.operations.ensureReady?.({});
   await binding.operations.bootTarget?.({});
 
-  expect(ensureReady).toHaveBeenCalledTimes(2);
-  expect(keepAutomationReady).toHaveBeenCalledTimes(4);
-  expect(keepAutomationReady).toHaveBeenNthCalledWith(1, device);
-  expect(keepAutomationReady).toHaveBeenNthCalledWith(2, device);
-  expect(keepAutomationReady).toHaveBeenNthCalledWith(3, device);
-  expect(keepAutomationReady).toHaveBeenNthCalledWith(4, device);
+  expect(keepHot).toHaveBeenCalledTimes(3);
+  expect(keepHot).toHaveBeenNthCalledWith(1, device);
+  expect(keepHot).toHaveBeenNthCalledWith(2, device);
+  expect(keepHot).toHaveBeenNthCalledWith(3, device);
 });
 
 test('macOS readiness is a no-op while boot remains unavailable', async () => {
   const host = platformRuntimeHostFixture();
-  const ensureReady = vi.fn(host.deviceReadiness.apple.ensureReady);
+  const ensureConnected = vi.fn(host.deviceReadiness.applePhysical.ensureConnected);
   const binding = await createApplePlatformRuntime({
     ...host,
     deviceReadiness: {
       ...host.deviceReadiness,
-      apple: { ...host.deviceReadiness.apple, ensureReady },
+      applePhysical: { ensureConnected },
     },
   }).bind({
     device: leaves.macos,
@@ -141,6 +151,6 @@ test('macOS readiness is a no-op while boot remains unavailable', async () => {
   });
 
   await expect(binding.operations.ensureReady?.({})).resolves.toMatchObject({ booted: true });
-  expect(ensureReady).not.toHaveBeenCalled();
+  expect(ensureConnected).not.toHaveBeenCalled();
   expect(binding.operations.bootTarget).toBeUndefined();
 });

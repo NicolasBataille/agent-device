@@ -13,6 +13,7 @@ import {
   appleScreenRecordingFacts,
   createAppleScreenRecordingOperations,
 } from './recording/runtime.ts';
+import { ensureAppleReady } from './readiness/runtime.ts';
 
 const owner = localRuntimeOwner('apple');
 const available = Object.freeze({ available: true } as const);
@@ -100,20 +101,4 @@ export function createApplePlatformRuntime(host: PlatformRuntimeHost): PlatformR
     },
     shutdown: async () => await appLogs.shutdown(),
   });
-}
-
-async function ensureAppleReady(
-  host: PlatformRuntimeHost,
-  device: DeviceInfo,
-  signal: AbortSignal,
-) {
-  if (!isMacOs(device)) {
-    await host.deviceReadiness.apple.ensureReady(
-      device,
-      { onColdBootStart: () => host.deviceReadiness.apple.keepAutomationReady(device) },
-      signal,
-    );
-    host.deviceReadiness.apple.keepAutomationReady(device);
-  }
-  return { ...device, booted: true };
 }

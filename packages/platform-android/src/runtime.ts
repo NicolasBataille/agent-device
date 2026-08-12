@@ -10,6 +10,7 @@ import { localRuntimeOwner } from '@agent-device/contracts/platform';
 import { createAndroidAppLogRuntime } from './logs/runtime.ts';
 import { dumpAndroidNetworkTraffic } from './network/runtime.ts';
 import { bindAndroidScreenRecordingRuntime } from './recording/runtime.ts';
+import { ensureAndroidReady } from './readiness/runtime.ts';
 
 const owner = localRuntimeOwner('android');
 const available = Object.freeze({ available: true } as const);
@@ -60,13 +61,15 @@ export function createAndroidPlatformRuntime(host: PlatformRuntimeHost): Platfor
             await dumpAndroidNetworkTraffic(host, request.device, input, request.scope.signal),
           ...recording,
           ensureReady: async (input: EnsureReadyInput) =>
-            await host.deviceReadiness.android.ensureReady(
+            await ensureAndroidReady(
+              host,
               request.device,
               { ...input, headless: false },
               request.scope.signal,
             ),
           bootTarget: async (input: EnsureReadyInput) =>
-            await host.deviceReadiness.android.ensureReady(
+            await ensureAndroidReady(
+              host,
               request.device,
               { ...input, headless: false },
               request.scope.signal,
@@ -74,7 +77,8 @@ export function createAndroidPlatformRuntime(host: PlatformRuntimeHost): Platfor
           ...(facts.operations.bootTargetHeadless.available
             ? {
                 bootTargetHeadless: async (input: EnsureReadyInput) =>
-                  await host.deviceReadiness.android.ensureReady(
+                  await ensureAndroidReady(
+                    host,
                     request.device,
                     { ...input, headless: true },
                     request.scope.signal,

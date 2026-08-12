@@ -3,7 +3,45 @@ import { test } from 'node:test';
 import { checkRuntimeCommandCutover } from './runtime-command-cutover-policy.ts';
 import { rowFor, sources, summariesFor } from './runtime-command-cutover-fixtures.ts';
 
-// Per-row acceptance for the four migrated commands. Every case here was carried over
+test('R20 boot rejects the superseded root readiness adapter', () => {
+  assert.deepEqual(
+    summariesFor('R20 boot-runtime-cutover', [
+      ['src/platform-runtime-device-readiness-host.ts', 'export const adapter = {};'],
+      [
+        'src/daemon/handlers/session-state.ts',
+        `
+          function handleSessionStateCommands() {
+            runtime.operations.bootTarget(input);
+            runtime.operations.bootTargetHeadless(input);
+          }
+          handleSessionStateCommands(request);
+        `,
+      ],
+    ]),
+    ['src/platform-runtime-device-readiness-host.ts: retired device readiness module remains'],
+  );
+});
+
+test('R20 boot operation singularity is scoped to the session-state handler', () => {
+  assert.deepEqual(
+    summariesFor('R20 boot-runtime-cutover', [
+      [
+        'src/daemon/handlers/session-state.ts',
+        `
+          function handleSessionStateCommands() {
+            runtime.operations.bootTarget(input);
+            runtime.operations.bootTargetHeadless(input);
+          }
+          function unrelatedShutdownHelper() { runtime.operations.bootTarget(input); }
+          handleSessionStateCommands(request);
+        `,
+      ],
+    ]),
+    [],
+  );
+});
+
+// Per-row acceptance for the five migrated commands. Every older-row case here was carried over
 // from the per-command policy tests these rows replaced; the mechanism itself is proven
 // in runtime-command-cutover-policy.test.ts.
 

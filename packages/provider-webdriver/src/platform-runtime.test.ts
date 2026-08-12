@@ -103,8 +103,9 @@ test.each([
 function host(run: PlatformRuntimeHost['commands']['run']): PlatformRuntimeHost {
   return {
     deviceReadiness: {
-      apple: { ensureReady: async () => {}, keepAutomationReady: () => {} },
-      android: { ensureReady: async (device) => ({ ...device, booted: true }) },
+      applePhysical: { ensureConnected: async () => {} },
+      appleAutomation: { keepHot: () => {} },
+      androidEmulator: { discover: async () => [], launch: () => 1, terminate: async () => {} },
     },
     appleTools: {
       isXcrunAvailable: async () => false,

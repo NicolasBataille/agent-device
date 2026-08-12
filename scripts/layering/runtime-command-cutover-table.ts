@@ -11,17 +11,18 @@ import { recordRuntimeDaemonMechanicsViolations } from './record-runtime-mechani
  * mechanism in `runtime-command-cutover-policy.ts` carries one planted-red proof for
  * every row, and `cutoverRowDefects` rejects a row that leaves its claims unstated.
  *
- * Rule ids are per row: the layering report groups violations under R18 boot,
+ * Rule ids are per row: the layering report groups violations under R20 boot,
  * R17 devices, R14 logs, R15 network, R16 record.
  */
 export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
   {
-    rule: 'R18 boot-runtime-cutover',
+    rule: 'R20 boot-runtime-cutover',
     command: 'boot',
     subject: 'device readiness',
     tier: 'request-scoped',
     execution: 'device-runtime',
     legacyRetirement: {
+      modulePaths: ['src/platform-runtime-device-readiness-host.ts'],
       routeNames: ['ensureAndroidEmulatorBoot', 'resolveAndroidEmulatorAvdName'],
     },
     admissionMember: {
@@ -34,6 +35,10 @@ export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
     singularExecution: {
       routes: ['handleSessionStateCommands'],
       operations: ['bootTarget', 'bootTargetHeadless'],
+      operationOwners: {
+        bootTarget: ['handleSessionStateCommands'],
+        bootTargetHeadless: ['handleSessionStateCommands'],
+      },
     },
   },
   {
