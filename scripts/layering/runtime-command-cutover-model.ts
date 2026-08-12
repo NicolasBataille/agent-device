@@ -235,9 +235,7 @@ function namedOperationDefects(row: DeviceRuntimeCutover): string[] {
   for (const [operation, lexicalOwners] of Object.entries(owners)) {
     const duplicates = duplicateValues(lexicalOwners);
     if (duplicates.length > 0) {
-      defects.push(
-        `declares duplicate lexical owners for ${operation}: ${duplicates.join(', ')}`,
-      );
+      defects.push(`declares duplicate lexical owners for ${operation}: ${duplicates.join(', ')}`);
     }
   }
   return defects;
