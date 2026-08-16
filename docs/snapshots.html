@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/static/js/index.c07b0efe0e.js"></script>
+<script defer src="/agent-device/static/js/index.b3c0ae5f79.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -141,6 +141,12 @@ spent, the best payload captured so far is returned.</li>
 <strong>sparse</strong> capture reports that no backend could read the screen and points you at <code>screenshot</code>
 as visual truth plus coordinate taps. Use <code>--json</code> and read <code>snapshotQuality</code> when you need the
 state, backend, and reason behind <strong>degraded</strong> output.</li>
+<li>A <strong>sparse</strong> <code>snapshot</code> takes that screenshot for you and returns its path as
+<code>fallbackScreenshotPath</code>, so the visual fallback costs no extra command. Remote clients download
+the image through the normal artifact channel before exposing that path. When the screen was
+reachable but published no accessibility content at all, the warning also names it as a likely app
+accessibility bug — assistive technologies get the same empty tree. Reasons that describe a limit
+of this tool instead (a refused or budget-exhausted capture) are not attributed to the app.</li>
 <li><code>--raw</code> uses the <strong>raw diagnostic strategy</strong>: it stays tree-first and preserves strict capture
 failures, so a real XCTest accessibility serialization error surfaces as an error rather than as
 an empty tree.</li>
