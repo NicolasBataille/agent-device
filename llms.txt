@@ -1,6 +1,6 @@
 # agent-device
 
-> Agent-native CLI for AI mobile testing, React Native QA, Expo app verification, simulator and emulator automation, app observability, and replayable device workflows.
+> Mobile app automation and verification for AI coding agents through a CLI, MCP server, and typed Node.js API.
 
 ## Docs
 
