@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1786/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1786/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1786/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1786/static/js/index.2978f29cb1.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1786/static/js/index.aa7ceae064.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -139,7 +139,7 @@ non-simulator targets.</li>
 <li>The managed install respects <code>--state-dir</code> and <code>AGENT_DEVICE_STATE_DIR</code>.</li>
 <li>Web automation requires Node 24+.</li>
 <li>Supported through <code>agent-device</code>: URL open, snapshot refs, <code>get text/attrs</code>, <code>is visible/exists/text</code>, <code>find text/selector</code>, click/press, hover, fill/type, wait, <code>network dump</code>, <code>audio probe</code>, screenshot, close, and replay scripts composed from those commands.</li>
-<li><code>hover &lt;@ref|selector|x y&gt;</code> moves the pointer without pressing so hover-gated UI (row toolbars, menus) appears. Add <code>--settle</code> to read what it revealed instead of taking another snapshot.</li>
+<li><code>hover &lt;@ref|selector|x y&gt;</code> moves the pointer without pressing so hover-gated UI (row toolbars, menus) appears. Add <code>--settle</code> to read what it revealed instead of taking another snapshot. <code>hover @ref</code> hovers the browser&#x27;s own element handle; like <code>click @ref --settle</code>, the <code>--settle</code> diff needs a selector or coordinate target on web because web refs carry no geometry.</li>
 <li><code>audio probe start [durationSeconds] [bucketMs]</code> samples HTML media elements into compact RMS/peak dBFS buckets while the page keeps running. The first timing positional is seconds; the second is milliseconds.</li>
 <li>URL-backed web media may be routed through the probe <code>AudioContext</code> while observed. Use <code>audio probe status</code> to poll partial buckets and <code>audio probe stop</code> to end the probe early.</li>
 <li>Out of scope for <code>agent-device</code> web support: tab/window/devtools control, network routing/interception/HAR, cookies/storage, downloads/uploads, arbitrary page scripting, multi-page orchestration, and raw browser diagnostics. Use <code>agent-browser</code> directly for those browser-specific workflows.</li>
