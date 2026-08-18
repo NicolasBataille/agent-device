@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/static/js/index.b967683966.js"></script>
+<script defer src="/agent-device/static/js/index.88f80f3ceb.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -97,6 +97,11 @@ for remote connections. For example, a user-owned config may contain:</p>
 protected, operator-controlled configuration. Do not put either value in <code>./agent-device.json</code>.
 For non-loopback remote daemon URLs, the client still requires authentication. Saved <code>connect</code> profiles
 and explicit <code>--remote-config</code> workflows remain supported; generated profiles do not persist tokens.</p>
+<p>When a command fails against a remote daemon, the <code>Diagnostics Log:</code> path is always on the calling
+machine: the failing request&#x27;s record is fetched over the same base URL and token into
+<code>&lt;state-dir&gt;/remote-diagnostics/&lt;session&gt;/&lt;request-id&gt;.ndjson</code>, so a CI job can keep it as a build
+artifact. If the record cannot be fetched the line reads <code>unavailable</code> with the remote daemon, the
+request id, and the reason — never a path on the daemon host.</p>
 <p>Project-safe keys include command defaults such as <code>platform</code>, <code>target</code>, <code>device</code>, <code>session</code>,
 <code>snapshotDepth</code>, recording/capture options, and action timing. Connection and provider keys below are
 user- or explicit-config only:</p>
