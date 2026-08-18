@@ -1,6 +1,6 @@
 import type { RawSnapshotNode, Rect } from '@agent-device/kernel/snapshot';
 import { isRectVisibleInViewport, rectContains } from '@agent-device/kernel/rect';
-import { normalizeType } from '@agent-device/contracts/snapshot';
+import { extractNodeText, normalizeType } from '@agent-device/contracts/snapshot';
 import {
   areRectsApproximatelyEqual,
   collectChildrenByParent,
@@ -66,27 +66,38 @@ function resolveReplacedActionShelf(
   shelf: RawSnapshotNode,
   context: SnapshotTreeRuleContext,
 ): { shelfRect: Rect; intermediateSiblings: RawSnapshotNode[] } | undefined {
-  if (!isHorizontalActionShelf(shelf, childrenByParent.get(shelf.index) ?? [])) return undefined;
-  const parent = findParent(shelf, context.sourceNodesByIndex);
-  if (!parent?.rect) return undefined;
-
-  const siblings = childrenByParent.get(parent.index) ?? [];
-  const shelfPosition = siblings.findIndex((node) => node.index === shelf.index);
-  if (shelfPosition < 1 || !hasIndependentLeadingAction(siblings, shelfPosition, shelf)) {
-    return undefined;
-  }
+  const hiddenShelf = resolveHiddenActionShelf(shelf, childrenByParent, context.sourceNodesByIndex);
+  if (!hiddenShelf) return undefined;
   const replacementPosition = findActionShelfReplacementPosition(
     nodes,
     positions,
-    siblings,
-    shelfPosition,
-    parent,
+    hiddenShelf.siblings,
+    hiddenShelf.position,
+    hiddenShelf.parent,
   );
   if (replacementPosition < 0) return undefined;
   return {
-    shelfRect: shelf.rect,
-    intermediateSiblings: siblings.slice(shelfPosition + 1, replacementPosition),
+    shelfRect: hiddenShelf.rect,
+    intermediateSiblings: hiddenShelf.siblings.slice(hiddenShelf.position + 1, replacementPosition),
   };
+}
+
+function resolveHiddenActionShelf(
+  shelf: RawSnapshotNode,
+  childrenByParent: ReadonlyMap<number, RawSnapshotNode[]>,
+  nodesByIndex: ReadonlyMap<number, RawSnapshotNode>,
+):
+  | { rect: Rect; parent: RawSnapshotNode; siblings: RawSnapshotNode[]; position: number }
+  | undefined {
+  const presentation = resolveHorizontalActionShelf(shelf, childrenByParent.get(shelf.index) ?? []);
+  if (presentation?.childActionsPresented !== false) return undefined;
+  const parent = findParent(shelf, nodesByIndex);
+  if (!parent?.rect) return undefined;
+  const siblings = childrenByParent.get(parent.index) ?? [];
+  const position = siblings.findIndex((node) => node.index === shelf.index);
+  return position >= 1 && hasIndependentLeadingAction(siblings, position, shelf)
+    ? { rect: presentation.rect, parent, siblings, position }
+    : undefined;
 }
 
 function findParent(
@@ -110,20 +121,27 @@ function findActionShelfReplacementPosition(
   );
 }
 
-function isHorizontalActionShelf(
+function resolveHorizontalActionShelf(
   shelf: RawSnapshotNode,
   children: RawSnapshotNode[],
-): shelf is RawSnapshotNode & { rect: Rect } {
-  if (!isScrollableSnapshotType(shelf.type) || !shelf.rect) return false;
+): { rect: Rect; childActionsPresented: boolean } | undefined {
+  if (!isScrollableSnapshotType(shelf.type) || !shelf.rect) return undefined;
+  const shelfRect = shelf.rect;
   const buttons = children.filter(
     (node) => normalizeType(node.type ?? '') === 'button' && node.rect,
   );
-  if (buttons.length < ACTION_SHELF_MINIMUM_BUTTONS) return false;
+  if (buttons.length === 0 && shelf.hiddenContentBelow === true) {
+    return { rect: shelfRect, childActionsPresented: false };
+  }
+  if (buttons.length < ACTION_SHELF_MINIMUM_BUTTONS) return undefined;
   const centers = buttons.map((button) => button.rect!.x + button.rect!.width / 2);
-  return (
-    centers.every((center, index) => index === 0 || center > centers[index - 1]!) &&
-    buttons.every((button) => isRectVisibleInViewport(button.rect!, shelf.rect!))
-  );
+  if (!centers.every((center, index) => index === 0 || center > centers[index - 1]!)) {
+    return undefined;
+  }
+  return {
+    rect: shelfRect,
+    childActionsPresented: buttons.some((button) => rectContains(shelfRect, button.rect!)),
+  };
 }
 
 function hasIndependentLeadingAction(
@@ -191,9 +209,10 @@ function collectNavigationTitleAffordances(
       resolveNavigationTitleAffordance(field, children, bar.rect!),
     );
     if (candidates.length !== 1) continue;
-    const { field, title, image } = candidates[0]!;
+    const { field, title, image, label } = candidates[0]!;
     mergeReplacement(context.replacements, field, {
       type: 'Button',
+      label,
       enabled: true,
       rect: unionRects([image.rect!, field.rect!, title.rect!]),
     });
@@ -207,22 +226,24 @@ function resolveNavigationTitleAffordance(
   field: RawSnapshotNode,
   siblings: RawSnapshotNode[],
   barRect: Rect,
-): Array<{ field: RawSnapshotNode; title: RawSnapshotNode; image: RawSnapshotNode }> {
-  const label = field.label?.trim();
+): Array<{
+  field: RawSnapshotNode;
+  title: RawSnapshotNode;
+  image: RawSnapshotNode;
+  label: string;
+}> {
+  const label = extractNodeText(field);
   if (!isDisabledNavigationTitleField(field, label)) return [];
   const title = uniqueSibling(siblings, (node) => isMatchingTitle(node, label));
   const image = uniqueSibling(siblings, isNamedImage);
   return title?.rect &&
     image?.rect &&
     formsNavigationTitleAffordance(image.rect, field.rect!, title.rect, barRect)
-    ? [{ field, title, image }]
+    ? [{ field, title, image, label }]
     : [];
 }
 
-function isDisabledNavigationTitleField(
-  field: RawSnapshotNode,
-  label: string | undefined,
-): label is string {
+function isDisabledNavigationTitleField(field: RawSnapshotNode, label: string): boolean {
   return (
     normalizeType(field.type ?? '') === 'textfield' &&
     field.enabled === false &&
