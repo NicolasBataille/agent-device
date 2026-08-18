@@ -4,7 +4,6 @@ import type {
   SnapshotResult,
 } from '@agent-device/contracts/interaction';
 import type { DeviceInfo } from '@agent-device/kernel/device';
-import { getInteractor } from '../../core/interactors.ts';
 
 /**
  * Legacy snapshot consumers that have not moved to a device-runtime operation
@@ -16,6 +15,7 @@ export async function captureSnapshotWithInteractor(params: {
   runnerContext: RunnerContext;
   options: SnapshotOptions;
 }): Promise<SnapshotResult> {
+  const { getInteractor } = await import('../../core/interactors.ts');
   const interactor = await getInteractor(params.device, params.runnerContext);
   return await interactor.snapshot(params.options);
 }
