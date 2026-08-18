@@ -1,4 +1,4 @@
-import type { SnapshotQualityVerdict } from '@agent-device/kernel/snapshot';
+import type { SnapshotNode, SnapshotQualityVerdict } from '@agent-device/kernel/snapshot';
 import type { AgentDeviceRuntime, CommandContext } from '../../../runtime-contract.ts';
 import { now, sleep } from '../../runtime-common.ts';
 import {
@@ -65,7 +65,8 @@ export async function runStableCaptureLoop(
     quietMs: number;
     timeoutMs: number;
     resetBudgetOnPrivateAxRecovery?: boolean;
-    confirmBroadTransition?: boolean;
+    /** Immutable pre-action projection; the stored session may advance before settle begins. */
+    broadTransitionBaselineNodes?: SnapshotNode[];
   },
 ): Promise<StableCaptureLoopResult> {
   const { quietMs, timeoutMs } = params;
@@ -74,7 +75,7 @@ export async function runStableCaptureLoop(
   let privateAxRecoveryBudgetReset = false;
   const session = await runtime.sessions.get(options.session ?? 'default');
   const transitionBaseline = stableCaptureTransitionBaseline(
-    params.confirmBroadTransition,
+    params.broadTransitionBaselineNodes,
     session?.snapshot,
   );
   let preferredBackend = preferredSnapshotBackendForVerdict(session?.snapshot?.snapshotQuality);
@@ -176,11 +177,11 @@ export async function runStableCaptureLoop(
 }
 
 function stableCaptureTransitionBaseline(
-  enabled: boolean | undefined,
+  baselineNodes: SnapshotNode[] | undefined,
   snapshot: Parameters<typeof stableCaptureSignal>[0] | undefined,
 ): StableCaptureSignal | undefined {
-  return enabled === true && snapshot?.backend === 'xctest'
-    ? stableCaptureSignal(snapshot)
+  return baselineNodes && snapshot?.backend === 'xctest'
+    ? stableCaptureSignal({ ...snapshot, nodes: baselineNodes })
     : undefined;
 }
 

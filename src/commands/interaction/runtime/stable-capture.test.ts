@@ -16,6 +16,12 @@ import {
   elementTransientRoomSnapshot,
 } from './stable-capture.fixtures.ts';
 
+const BROAD_TRANSITION_PARAMS = {
+  quietMs: 500,
+  timeoutMs: 5_000,
+  broadTransitionBaselineNodes: elementThreadsNoticeSnapshot.nodes,
+};
+
 test('regular captures settle from visible semantics while offscreen rows churn', async () => {
   let elapsedMs = 0;
   const clock = {
@@ -57,7 +63,7 @@ test('settle confirms a broad screen replacement beyond a self-consistent transi
   const outcome = await runStableCaptureLoop(
     runtime,
     { session: 'default' },
-    { quietMs: 500, timeoutMs: 5_000, confirmBroadTransition: true },
+    BROAD_TRANSITION_PARAMS,
   );
 
   assert.equal(outcome.settled, true);
@@ -74,7 +80,7 @@ test('settle confirms a broad screen replacement when capture recovers to privat
   const outcome = await runStableCaptureLoop(
     runtime,
     { session: 'default' },
-    { quietMs: 500, timeoutMs: 5_000, confirmBroadTransition: true },
+    BROAD_TRANSITION_PARAMS,
   );
 
   assert.equal(outcome.settled, true);
@@ -95,7 +101,7 @@ test('settle confirms a broad replacement that begins after the first post-actio
   const outcome = await runStableCaptureLoop(
     runtime,
     { session: 'default' },
-    { quietMs: 500, timeoutMs: 5_000, confirmBroadTransition: true },
+    BROAD_TRANSITION_PARAMS,
   );
 
   assert.equal(outcome.settled, true);
@@ -106,13 +112,36 @@ test('settle confirms a broad replacement that begins after the first post-actio
   assert.ok(outcome.waitedMs >= 1_500, `settled delayed transition after ${outcome.waitedMs}ms`);
 });
 
+test('settle confirms against the pre-action tree when the stored snapshot already advanced', async () => {
+  const { runtime } = transitionRuntime({
+    sessionSnapshot: elementTransientRoomSnapshot,
+    settledAtMs: 1_200,
+  });
+
+  const outcome = await runStableCaptureLoop(
+    runtime,
+    { session: 'default' },
+    BROAD_TRANSITION_PARAMS,
+  );
+
+  assert.equal(outcome.settled, true);
+  assert.equal(
+    outcome.lastCapture?.snapshot.nodes.some((node) => node.label === 'action file'),
+    false,
+  );
+  assert.ok(
+    outcome.waitedMs >= 1_500,
+    `settled advanced-session transition after ${outcome.waitedMs}ms`,
+  );
+});
+
 test('settle honors an explicitly shorter quiet window across a broad replacement', async () => {
   const { runtime } = transitionRuntime();
 
   const outcome = await runStableCaptureLoop(
     runtime,
     { session: 'default' },
-    { quietMs: 25, timeoutMs: 5_000, confirmBroadTransition: true },
+    { ...BROAD_TRANSITION_PARAMS, quietMs: 25 },
   );
 
   assert.equal(outcome.settled, true);
@@ -120,11 +149,56 @@ test('settle honors an explicitly shorter quiet window across a broad replacemen
   assert.ok(outcome.waitedMs < 800, `short quiet window settled after ${outcome.waitedMs}ms`);
 });
 
+test('settle keeps the default quiet window for an overlapping local mutation', async () => {
+  const localMutation = {
+    ...elementSettledRoomSnapshot,
+    nodes: elementSettledRoomSnapshot.nodes.map((node) =>
+      node.label === 'Upload' ? { ...node, label: 'Add attachment' } : node,
+    ),
+  };
+  const { runtime } = staticSnapshotRuntime(localMutation);
+
+  const outcome = await runStableCaptureLoop(
+    runtime,
+    { session: 'default' },
+    {
+      quietMs: 500,
+      timeoutMs: 5_000,
+      broadTransitionBaselineNodes: elementSettledRoomSnapshot.nodes,
+    },
+  );
+
+  assert.equal(outcome.settled, true);
+  assert.ok(outcome.waitedMs >= 500, `settled before the requested quiet window`);
+  assert.ok(outcome.waitedMs < 800, `local mutation settled after ${outcome.waitedMs}ms`);
+});
+
+function staticSnapshotRuntime(snapshot: SnapshotState) {
+  let elapsedMs = 0;
+  const runtime = createAgentDevice({
+    backend: {
+      platform: 'ios',
+      captureSnapshot: async () => ({ snapshot }),
+    } satisfies AgentDeviceBackend,
+    artifacts: createLocalArtifactAdapter(),
+    sessions: createMemorySessionStore([{ name: 'default', snapshot }]),
+    policy: localCommandPolicy(),
+    clock: {
+      now: () => elapsedMs,
+      sleep: async (ms: number) => {
+        elapsedMs += ms;
+      },
+    },
+  });
+  return { runtime };
+}
+
 function transitionRuntime(
   options: {
     captureBackend?: 'tree' | 'private-ax';
     firstCaptureKeepsBaseline?: boolean;
     settledAtMs?: number;
+    sessionSnapshot?: SnapshotState;
   } = {},
 ) {
   const captureBackend = options.captureBackend ?? 'tree';
@@ -155,7 +229,7 @@ function transitionRuntime(
     } satisfies AgentDeviceBackend,
     artifacts: createLocalArtifactAdapter(),
     sessions: createMemorySessionStore([
-      { name: 'default', snapshot: elementThreadsNoticeSnapshot },
+      { name: 'default', snapshot: options.sessionSnapshot ?? elementThreadsNoticeSnapshot },
     ]),
     policy: localCommandPolicy(),
     clock,
