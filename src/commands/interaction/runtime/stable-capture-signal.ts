@@ -70,13 +70,10 @@ export function stableCaptureSignalsHaveBroadReplacement(
   left: StableCaptureSignal | undefined,
   right: StableCaptureSignal,
 ): boolean {
-  if (
-    !left ||
-    left.captureBackend !== right.captureBackend ||
-    left.nodes.length === 0 ||
-    right.nodes.length === 0
-  )
-    return false;
+  // A backend transition must reset the ordinary quiet window, but it must not conceal a broad
+  // semantic replacement. Both signals already carry the same visible XCTest projection, and the
+  // transition baseline is only armed for XCTest sessions.
+  if (!left || left.nodes.length === 0 || right.nodes.length === 0) return false;
   const remainingIdentities = new Map<string, number>();
   for (const node of left.nodes) {
     remainingIdentities.set(node.identity, (remainingIdentities.get(node.identity) ?? 0) + 1);

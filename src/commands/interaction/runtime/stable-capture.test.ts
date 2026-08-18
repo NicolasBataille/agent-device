@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
+import type { SnapshotState } from '@agent-device/kernel/snapshot';
 import type { AgentDeviceBackend } from '../../../backend.ts';
 import { createLocalArtifactAdapter } from '../../../io.ts';
 import {
@@ -67,6 +68,23 @@ test('settle confirms a broad screen replacement beyond a self-consistent transi
   assert.ok(outcome.waitedMs >= 1_500, `settled transitional tree after ${outcome.waitedMs}ms`);
 });
 
+test('settle confirms a broad screen replacement when capture recovers to private AX', async () => {
+  const { runtime } = transitionRuntime('private-ax');
+
+  const outcome = await runStableCaptureLoop(
+    runtime,
+    { session: 'default' },
+    { quietMs: 500, timeoutMs: 5_000, confirmBroadTransition: true },
+  );
+
+  assert.equal(outcome.settled, true);
+  assert.equal(
+    outcome.lastCapture?.snapshot.nodes.some((node) => node.label === 'action file'),
+    false,
+  );
+  assert.ok(outcome.waitedMs >= 1_500, `settled transitional tree after ${outcome.waitedMs}ms`);
+});
+
 test('settle honors an explicitly shorter quiet window across a broad replacement', async () => {
   const { runtime } = transitionRuntime();
 
@@ -81,7 +99,7 @@ test('settle honors an explicitly shorter quiet window across a broad replacemen
   assert.ok(outcome.waitedMs < 800, `short quiet window settled after ${outcome.waitedMs}ms`);
 });
 
-function transitionRuntime() {
+function transitionRuntime(captureBackend: 'tree' | 'private-ax' = 'tree') {
   let elapsedMs = 0;
   const clock = {
     now: () => elapsedMs,
@@ -93,7 +111,10 @@ function transitionRuntime() {
     backend: {
       platform: 'ios',
       captureSnapshot: async () => ({
-        snapshot: elapsedMs < 800 ? elementTransientRoomSnapshot : elementSettledRoomSnapshot,
+        snapshot: withCaptureBackend(
+          elapsedMs < 800 ? elementTransientRoomSnapshot : elementSettledRoomSnapshot,
+          captureBackend,
+        ),
       }),
     } satisfies AgentDeviceBackend,
     artifacts: createLocalArtifactAdapter(),
@@ -104,4 +125,17 @@ function transitionRuntime() {
     clock,
   });
   return { runtime };
+}
+
+function withCaptureBackend(
+  snapshot: SnapshotState,
+  backend: 'tree' | 'private-ax',
+): SnapshotState {
+  return {
+    ...snapshot,
+    snapshotQuality:
+      backend === 'tree'
+        ? snapshot.snapshotQuality
+        : ({ state: 'recovered', backend: 'private-ax' } as const),
+  };
 }
