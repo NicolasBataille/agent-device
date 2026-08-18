@@ -69,7 +69,7 @@ test('settle confirms a broad screen replacement beyond a self-consistent transi
 });
 
 test('settle confirms a broad screen replacement when capture recovers to private AX', async () => {
-  const { runtime } = transitionRuntime('private-ax');
+  const { runtime } = transitionRuntime({ captureBackend: 'private-ax' });
 
   const outcome = await runStableCaptureLoop(
     runtime,
@@ -83,6 +83,27 @@ test('settle confirms a broad screen replacement when capture recovers to privat
     false,
   );
   assert.ok(outcome.waitedMs >= 1_500, `settled transitional tree after ${outcome.waitedMs}ms`);
+});
+
+test('settle confirms a broad replacement that begins after the first post-action capture', async () => {
+  const { runtime } = transitionRuntime({
+    captureBackend: 'private-ax',
+    firstCaptureKeepsBaseline: true,
+    settledAtMs: 1_200,
+  });
+
+  const outcome = await runStableCaptureLoop(
+    runtime,
+    { session: 'default' },
+    { quietMs: 500, timeoutMs: 5_000, confirmBroadTransition: true },
+  );
+
+  assert.equal(outcome.settled, true);
+  assert.equal(
+    outcome.lastCapture?.snapshot.nodes.some((node) => node.label === 'action file'),
+    false,
+  );
+  assert.ok(outcome.waitedMs >= 1_500, `settled delayed transition after ${outcome.waitedMs}ms`);
 });
 
 test('settle honors an explicitly shorter quiet window across a broad replacement', async () => {
@@ -99,8 +120,17 @@ test('settle honors an explicitly shorter quiet window across a broad replacemen
   assert.ok(outcome.waitedMs < 800, `short quiet window settled after ${outcome.waitedMs}ms`);
 });
 
-function transitionRuntime(captureBackend: 'tree' | 'private-ax' = 'tree') {
+function transitionRuntime(
+  options: {
+    captureBackend?: 'tree' | 'private-ax';
+    firstCaptureKeepsBaseline?: boolean;
+    settledAtMs?: number;
+  } = {},
+) {
+  const captureBackend = options.captureBackend ?? 'tree';
+  const settledAtMs = options.settledAtMs ?? 800;
   let elapsedMs = 0;
+  let captures = 0;
   const clock = {
     now: () => elapsedMs,
     sleep: async (ms: number) => {
@@ -110,12 +140,18 @@ function transitionRuntime(captureBackend: 'tree' | 'private-ax' = 'tree') {
   const runtime = createAgentDevice({
     backend: {
       platform: 'ios',
-      captureSnapshot: async () => ({
-        snapshot: withCaptureBackend(
-          elapsedMs < 800 ? elementTransientRoomSnapshot : elementSettledRoomSnapshot,
-          captureBackend,
-        ),
-      }),
+      captureSnapshot: async () => {
+        const keepsBaseline = options.firstCaptureKeepsBaseline === true && captures === 0;
+        captures += 1;
+        return {
+          snapshot: keepsBaseline
+            ? elementThreadsNoticeSnapshot
+            : withCaptureBackend(
+                elapsedMs < settledAtMs ? elementTransientRoomSnapshot : elementSettledRoomSnapshot,
+                captureBackend,
+              ),
+        };
+      },
     } satisfies AgentDeviceBackend,
     artifacts: createLocalArtifactAdapter(),
     sessions: createMemorySessionStore([

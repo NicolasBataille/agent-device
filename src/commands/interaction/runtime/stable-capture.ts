@@ -109,7 +109,6 @@ export async function runStableCaptureLoop(
     lastCapture = capture;
     const signal = stableCaptureSignal(capture.snapshot);
     requiredQuietMs = stableCaptureTransitionQuietMs({
-      captureNumber: captures,
       baseline: transitionBaseline,
       signal,
       requestedQuietMs: quietMs,
@@ -186,7 +185,6 @@ function stableCaptureTransitionBaseline(
 }
 
 function stableCaptureTransitionQuietMs(params: {
-  captureNumber: number;
   baseline: StableCaptureSignal | undefined;
   signal: StableCaptureSignal;
   requestedQuietMs: number;
@@ -194,7 +192,6 @@ function stableCaptureTransitionQuietMs(params: {
 }): number {
   if (
     params.requestedQuietMs < DEFAULT_STABLE_QUIET_MS ||
-    params.captureNumber !== 1 ||
     !stableCaptureSignalsHaveBroadReplacement(params.baseline, params.signal)
   ) {
     return params.currentQuietMs;
