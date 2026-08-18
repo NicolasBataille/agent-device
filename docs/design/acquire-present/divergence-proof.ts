@@ -1,32 +1,39 @@
-// Proof harness v5 — folds in the external review's SECOND pass (R1-R4):
-//   R1: regular presentation emits the EFFECTIVE visible rect as `rect` (the
-//       durable wire carrier the daemon already centers); raw emits rawFrame.
-//       rawFrame stays internal for identity/dedup only.
-//   R2: hitTestEvidence is NOT an emitted field — internal to RawAXNode and
-//       diagnostics. P2b still proves it cannot influence membership or fields.
-//   R4: occlusion is removed from hittable (daemon annotation owns occlusion,
-//       single implementation); presentRegular is linear in node count.
-// Carries forward from the first pass:
-//   F1: membership is backend-neutral (type/content/geometric actionability only).
-//       sourceHittable no longer gates membership; native hit-test ships as
-//       separate evidence (hitTestEvidence: 'passed'|'failed'|undefined).
-//   F3: two projections behind one module — presentRegular (clip/membership/
-//       hints) and presentRaw (normalization only, NO visibility pruning).
-//       New property: interactive ⊆ raw.
-//   F4: internal rawFrame vs effectiveVisibleFrame; derived hit point uses the
-//       effective intersection (checked: hit point always inside clip).
-//   F6: invariant quantifier — every framed node emitted visible intersects its
-//       CUMULATIVE effective clip (was already what the code checked; prose fixed).
+// Divergence proof harness for the acquire/present snapshot design (#1797, #1832).
 //
-// New proof obligation (F1): FACT-AVAILABILITY NEUTRALITY — the same semantic
-// raw tree, with and without sourceHittable facts, yields IDENTICAL membership.
+// This is a MODEL of the design, not the production code path. It transcribes the two
+// `-i`/hittable interpretation policies shipped at HEAD (3020195) and the amended
+// single-presentation design, then checks the model obligations below. The final verdict is
+// deliberately labeled MODEL OBLIGATIONS PASS — not "proven" — because several contracts are
+// out of the model's reach (see the coverage table the script prints).
+//
+// Obligations:
+//  P1  — the shipped per-backend policies diverge on IDENTICAL raw input (interpretation-caused).
+//  P2  — the single regular projection cannot diverge on identical input; interactive ⊆ raw;
+//        the raw projection is unpruned; every daemon-centered hit point lands inside the
+//        emitted (effective) rect; the cumulative-clip invariant holds.
+//  P2b — fact-availability neutrality (C1): the same tree with and without native hit-test
+//        facts yields identical membership and derived fields; evidence is never serialized.
+//  P3  — with DELIBERATELY different raw trees, every presented delta is attributable to an
+//        owning raw-input delta; interpretation contributes zero unattributed differences.
+//
+// Membership policy modeled (decided under external review pass 3, finding 3): membership is
+// `interactive-type OR content`. Geometric actionability feeds ONLY the emitted `hittable`
+// field, never membership — a framed node with neither an interactive type nor content is not
+// agent-addressable and stays out of `-i` regular output (it remains in raw). This is an
+// intentional delta vs the shipped tree policy's "hittable-non-other" branch, reviewed as part
+// of migration step 3.
+//
+// Frame emptiness follows CGRect semantics: a rect with EITHER dimension zero is empty, and
+// empty-frame nodes take the frameless escape hatch (presentation-visible when they carry
+// content, never hittable, never clipping). The random generator emits both zero-frames and
+// one-axis-degenerate frames to exercise the hatch accurately.
 
 type Rect = { x: number; y: number; w: number; h: number };
 type RawNode = {
   type: string;
   label?: string;
   frame: Rect;
-  sourceHittable?: boolean; // acquired fact; NEVER gates membership (F1)
+  sourceHittable?: boolean; // acquired fact; never gates membership; never serialized
   children?: RawNode[];
 };
 
@@ -39,7 +46,8 @@ const intersect = (a: Rect, b: Rect): Rect => {
   return { x: x1, y: y1, w: Math.max(0, x2 - x1), h: Math.max(0, y2 - y1) };
 };
 const hasArea = (r: Rect) => r.w * r.h > 0;
-const hasFrame = (r: Rect) => r.w > 0 || r.h > 0;
+// CGRect-style emptiness: either zero dimension ⇒ empty ⇒ frameless hatch.
+const hasFrame = (r: Rect) => r.w > 0 && r.h > 0;
 const inside = (px: number, py: number, r: Rect) =>
   px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
 const key = (n: RawNode) => `${n.type}|${n.label ?? ''}|${n.frame.x},${n.frame.y},${n.frame.w},${n.frame.h}`;
@@ -60,11 +68,13 @@ function checkoutScreen(): RawNode {
       { type: 'scrollview', label: 'Order summary', frame: f(0, 120, 402, 560), children: [
         { type: 'other', label: 'Your items', frame: f(0, 120, 402, 48) },
         ...rows,
+        // RN/SwiftUI-style frameless semantic wrapper with real content.
         { type: 'other', label: 'a11y wrapper', frame: f(0, 0, 0, 0), children: [
           { type: 'button', label: 'Apply promo', frame: f(16, 620, 200, 40), sourceHittable: true },
         ]},
-        // Partially clipped row: bottom half outside the scroll frame (y=640..700,
-        // container ends 680) — exercises F4's effective hit point.
+        // One-axis-degenerate frame (h=0): CGRect-empty ⇒ frameless hatch.
+        { type: 'statictext', label: 'Free shipping over $50', frame: f(16, 615, 370, 0) },
+        // Partially clipped row: bottom half outside the scroll frame.
         { type: 'button', label: 'Gift wrap', frame: f(16, 640, 300, 60), sourceHittable: true },
         { type: 'statictext', label: 'Overflow: promo terms apply', frame: f(16, 690, 370, 40) },
       ]},
@@ -80,7 +90,7 @@ function checkoutScreen(): RawNode {
   };
 }
 
-// ---------- HEAD "before" models (unchanged from v2, for P1) ----------
+// ---------- HEAD "before" models (P1) ----------
 function visibleAtHead(n: RawNode, scroll: Rect | null): boolean {
   if (!hasFrame(n.frame)) return false;
   return hasArea(intersect(n.frame, viewport)) && (scroll === null || hasArea(intersect(n.frame, scroll)));
@@ -109,13 +119,13 @@ function headPrivateAxInteractive(root: RawNode): Set<string> {
   return out;
 }
 
-// ---------- AFTER v3: one module, two projections ----------
+// ---------- AFTER: one module, two projections ----------
 type Presented = {
   key: string;
-  hittable: boolean; // geometric actionability, linear, NO occlusion (R4)
-  rect: Rect; // EMITTED: effective visible rect (R1) — daemon centers this
-  rawFrame: Rect; // INTERNAL: identity/dedup only, never serialized
-  hitPoint: { x: number; y: number }; // = center of emitted rect (existing daemon behavior)
+  hittable: boolean; // geometric actionability, backend-neutral, feeds the FIELD only
+  rect: Rect; // EMITTED: effective visible rect (regular) — daemon centers this
+  rawFrame: Rect; // INTERNAL: identity/dedup only
+  hitPoint: { x: number; y: number };
 };
 
 function presentRegular(root: RawNode): { nodes: Presented[]; hints: string[]; invariantViolations: number } {
@@ -123,21 +133,20 @@ function presentRegular(root: RawNode): { nodes: Presented[]; hints: string[]; i
   const hints: string[] = [];
   let invariantViolations = 0;
   const walk = (n: RawNode, clip: Rect, anchor: { label: string; rect: Rect } | null) => {
-    const frameless = !hasFrame(n.frame);
+    const frameless = !hasFrame(n.frame); // covers zero AND one-axis-degenerate frames
     const eff = intersect(n.frame, clip);
-    const visible = frameless || (hasArea(n.frame) && hasArea(eff));
+    const visible = frameless || hasArea(eff);
     const interactive = INTERACTIVE.has(n.type);
-    // F1: membership is backend-neutral — geometric actionability only.
-    const geometricHittable = !frameless && hasArea(eff) && interactive;
     const hasContent = (n.label ?? '').length > 0 && n.type !== 'image' && n.type !== 'other';
-    const include = visible && (interactive || geometricHittable || hasContent);
+    // Membership: interactive-type OR content. Geometry feeds only the hittable field.
+    const include = visible && (interactive || hasContent);
+    const hittable = !frameless && hasArea(eff) && interactive;
     if (include) {
-      // F6: emitted-visible framed node must intersect its CUMULATIVE clip.
       if (!frameless && !hasArea(eff)) invariantViolations++;
-      const emittedRect = frameless ? n.frame : eff; // R1: effective rect IS the wire rect
+      const emittedRect = frameless ? n.frame : eff;
       nodes.push({
         key: key(n),
-        hittable: geometricHittable,
+        hittable,
         rect: emittedRect,
         rawFrame: n.frame,
         hitPoint: { x: emittedRect.x + emittedRect.w / 2, y: emittedRect.y + emittedRect.h / 2 },
@@ -154,8 +163,6 @@ function presentRegular(root: RawNode): { nodes: Presented[]; hints: string[]; i
   return { nodes, hints, invariantViolations };
 }
 
-// F3: raw projection — normalization only, NO visibility pruning. The clip
-// invariant does NOT apply here.
 function presentRaw(root: RawNode): Set<string> {
   const out = new Set<string>();
   const walk = (n: RawNode) => { out.add(key(n)); (n.children ?? []).forEach(walk); };
@@ -164,67 +171,139 @@ function presentRaw(root: RawNode): Set<string> {
 }
 
 const setOf = (r: { nodes: Presented[] }) => new Set(r.nodes.map((n) => n.key));
-const diff = (a: Set<string>, b: Set<string>) => [...a].filter((k) => !b.has(k)).concat([...b].filter((k) => !a.has(k)));
+const symDiff = (a: Set<string>, b: Set<string>) =>
+  [...a].filter((k) => !b.has(k)).concat([...b].filter((k) => !a.has(k)));
 const subset = (a: Set<string>, b: Set<string>) => [...a].every((k) => b.has(k));
+const rawKeys = (r: RawNode): Set<string> => {
+  const s = new Set<string>();
+  const w = (n: RawNode) => { s.add(key(n)); (n.children ?? []).forEach(w); };
+  w(r);
+  return s;
+};
 
-// ---------- P1 (unchanged): HEAD diverges on identical input ----------
+// ---------- P1 ----------
 const sample = checkoutScreen();
-const d1 = diff(headTreeInteractive(sample), headPrivateAxInteractive(sample));
-console.log(`P1 BEFORE (HEAD): tree ${headTreeInteractive(sample).size} vs privateAX ${headPrivateAxInteractive(sample).size} nodes, divergent: ${d1.length}`);
+const t = headTreeInteractive(sample);
+const x = headPrivateAxInteractive(sample);
+const p1Divergent = symDiff(t, x);
+console.log(`P1 BEFORE (HEAD): tree ${t.size} vs privateAX ${x.size} nodes, divergent: ${p1Divergent.length}`);
 
-// ---------- P2: single regular projection cannot diverge; raw ⊇ interactive ----------
+// ---------- P2 ----------
 const a1 = presentRegular(sample);
 const a2 = presentRegular(sample);
-console.log(`\nP2 AFTER: regular self-divergence ${diff(setOf(a1), setOf(a2)).length}, invariant violations ${a1.invariantViolations}`);
-console.log(`  interactive ⊆ raw: ${subset(setOf(a1), presentRaw(sample))}`);
-console.log(`  raw is unpruned: ${presentRaw(sample).size} nodes vs ${a1.nodes.length} regular (raw keeps overflow text: ${presentRaw(sample).has(key({ type: 'statictext', label: 'Overflow: promo terms apply', frame: f(16, 690, 370, 40) }))})`);
+const p2SelfDiv = symDiff(setOf(a1), setOf(a2)).length;
+const p2Subset = subset(setOf(a1), presentRaw(sample));
 const gift = a1.nodes.find((n) => n.key.includes('Gift wrap'))!;
-console.log(`  R1 partially clipped 'Gift wrap': rawFrame h=${gift.rawFrame.h}, emitted rect h=${gift.rect.h}, daemon-centered hitPoint y=${gift.hitPoint.y} (raw midpoint would be ${gift.rawFrame.y + gift.rawFrame.h / 2})`);
-const allHitPointsInClip = a1.nodes.every((n) => !hasFrame(n.rawFrame) || inside(n.hitPoint.x, n.hitPoint.y, n.rect));
-console.log(`  every daemon-centered hit point inside emitted rect: ${allHitPointsInClip} (no new wire field needed)`);
-const noEvidenceOnWire = a1.nodes.every((n) => !('hitTestEvidence' in n));
-console.log(`  R2 evidence never serialized: ${noEvidenceOnWire}`);
+const degenerate = a1.nodes.find((n) => n.key.includes('Free shipping'))!;
+const p2HitPoints = a1.nodes.every((n) => inside(n.hitPoint.x, n.hitPoint.y, n.rect));
+console.log(`\nP2 AFTER: self-divergence ${p2SelfDiv}, invariant violations ${a1.invariantViolations}`);
+console.log(`  interactive ⊆ raw: ${p2Subset}; raw unpruned: ${presentRaw(sample).size} raw vs ${a1.nodes.length} regular`);
+console.log(`  clipped 'Gift wrap': rawFrame h=${gift.rawFrame.h}, emitted rect h=${gift.rect.h}, centered hitPoint y=${gift.hitPoint.y} (raw midpoint ${gift.rawFrame.y + gift.rawFrame.h / 2})`);
+console.log(`  degenerate-frame (h=0) content node: visible=${degenerate !== undefined}, hittable=${degenerate?.hittable} (frameless hatch, CGRect emptiness)`);
+console.log(`  every centered hit point inside emitted rect: ${p2HitPoints}; evidence on wire: ${a1.nodes.some((n) => 'hitTestEvidence' in n) ? 'YES (BUG)' : 'none'}`);
 
-// ---------- P2b (F1): FACT-AVAILABILITY NEUTRALITY ----------
+// ---------- P2b: fact-availability neutrality (C1) ----------
 const stripped = structuredClone(sample);
 const strip = (n: RawNode) => { delete n.sourceHittable; (n.children ?? []).forEach(strip); };
 strip(stripped);
 const withFacts = presentRegular(sample);
 const withoutFacts = presentRegular(stripped);
-const membershipDelta = diff(setOf(withFacts), setOf(withoutFacts));
-const hittableDelta = withFacts.nodes.filter((n) => {
-  const m = withoutFacts.nodes.find((x) => x.key === n.key);
+const p2bMembership = symDiff(setOf(withFacts), setOf(withoutFacts)).length;
+const p2bFields = withFacts.nodes.filter((n) => {
+  const m = withoutFacts.nodes.find((q) => q.key === n.key);
   return m && m.hittable !== n.hittable;
 }).length;
-const evidenceOnlyDelta = 0; // R2: evidence lives in RawAXNode/diagnostics, not on presented nodes
-console.log(`\nP2b F1 fact-availability neutrality (same tree ± sourceHittable facts):`);
-console.log(`  membership delta: ${membershipDelta.length} (must be 0)`);
-console.log(`  hittable-field delta: ${hittableDelta} (must be 0 — field is geometric, backend-neutral)`);
-console.log(`  evidence on wire: ${evidenceOnlyDelta} (R2: internal to RawAXNode/diagnostics only)`);
+console.log(`\nP2b neutrality (± sourceHittable facts): membership delta ${p2bMembership}, field delta ${p2bFields}`);
+
+// ---------- P3: attribution of presented deltas to raw-input deltas ----------
+// Two DELIBERATELY different raw trees for the same screen:
+//  - axRaw additionally reports a merged-card leaf the tree source lacks;
+//  - treeRaw additionally reports the nav 'Back' button the AX source missed;
+//  - axRaw lacks every sourceHittable fact (availability asymmetry).
+const treeRaw = structuredClone(sample);
+const axRaw = structuredClone(sample);
+strip(axRaw);
+axRaw.children!.find((c) => c.type === 'scrollview')!.children!.push({
+  type: 'button', label: 'Merged card CTA', frame: f(16, 240, 370, 40),
+});
+const nav = axRaw.children!.find((c) => c.type === 'navigationbar')!;
+nav.children = nav.children!.filter((c) => c.label !== 'Back');
+
+const pTree = presentRegular(treeRaw);
+const pAx = presentRegular(axRaw);
+const rawDelta = new Set(symDiff(rawKeys(treeRaw), rawKeys(axRaw)));
+const presentedDelta = symDiff(setOf(pTree), setOf(pAx));
+const unattributed = presentedDelta.filter((k) => !rawDelta.has(k));
+const sharedFieldDeltas = pTree.nodes.filter((n) => {
+  const m = pAx.nodes.find((q) => q.key === n.key);
+  return m && (m.hittable !== n.hittable || JSON.stringify(m.rect) !== JSON.stringify(n.rect));
+}).length;
+console.log(`\nP3 attribution (deliberately different raw trees):`);
+console.log(`  raw deltas: ${rawDelta.size}, presented deltas: ${presentedDelta.length}, unattributed: ${unattributed.length}`);
+console.log(`  field deltas on shared nodes: ${sharedFieldDeltas} (must be 0 — availability cannot alter fields)`);
+console.log(`  => ${unattributed.length === 0 && sharedFieldDeltas === 0 ? 'every presented delta has an owning raw delta; interpretation contributes zero' : 'ATTRIBUTION FAILED'}`);
 
 // ---------- randomized ----------
 let seed = 7;
 const rnd = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+const randFrame = (): Rect => {
+  const roll = rnd();
+  if (roll < 0.05) return f(0, 0, 0, 0); // zero-frame
+  if (roll < 0.09) return f(rnd() * 400, rnd() * 800, rnd() * 300, 0); // h-degenerate
+  if (roll < 0.13) return f(rnd() * 400, rnd() * 800, 0, rnd() * 300); // w-degenerate
+  return f(rnd() * 500 - 50, rnd() * 900 - 50, rnd() * 400, rnd() * 400);
+};
 const randTree = (d: number): RawNode => ({
   type: rnd() < 0.2 ? 'scrollview' : rnd() < 0.45 ? 'button' : rnd() < 0.6 ? 'image' : 'statictext',
   label: rnd() < 0.85 ? `n${Math.floor(rnd() * 1e6)}` : undefined,
-  frame: rnd() < 0.08 ? f(0, 0, 0, 0) : f(rnd() * 500 - 50, rnd() * 900 - 50, rnd() * 400, rnd() * 400),
+  frame: randFrame(),
   sourceHittable: rnd() < 0.3 ? rnd() < 0.5 : undefined,
   children: d > 0 ? Array.from({ length: Math.floor(rnd() * 4) }, () => randTree(d - 1)) : [],
 });
-let selfDiv = 0, factDiv = 0, invTotal = 0, subsetFail = 0, hitPointFail = 0;
+let rSelf = 0, rFact = 0, rInv = 0, rSubset = 0, rHit = 0, rUnattr = 0;
 for (let i = 0; i < 1000; i++) {
   const tree: RawNode = { type: 'application', frame: viewport, children: [randTree(4)] };
   const s = structuredClone(tree); strip(s);
   const p = presentRegular(tree);
-  if (diff(setOf(p), setOf(presentRegular(tree))).length > 0) selfDiv++;
-  if (diff(setOf(p), setOf(presentRegular(s))).length > 0) factDiv++;
-  invTotal += p.invariantViolations;
-  if (!subset(setOf(p), presentRaw(tree))) subsetFail++;
-  if (!p.nodes.every((n) => !hasFrame(n.rawFrame) || inside(n.hitPoint.x, n.hitPoint.y, n.rect))) hitPointFail++;
+  if (symDiff(setOf(p), setOf(presentRegular(tree))).length > 0) rSelf++;
+  if (symDiff(setOf(p), setOf(presentRegular(s))).length > 0) rFact++;
+  rInv += p.invariantViolations;
+  if (!subset(setOf(p), presentRaw(tree))) rSubset++;
+  if (!p.nodes.every((n) => inside(n.hitPoint.x, n.hitPoint.y, n.rect))) rHit++;
+  // randomized P3: mutate a clone by adding + removing one labeled node, then attribute.
+  const m = structuredClone(tree);
+  const first = m.children![0];
+  if (first) {
+    (first.children ??= []).push({ type: 'button', label: `mut${i}`, frame: f(10, 10, 50, 50) });
+    if (first.children.length > 1) first.children.splice(0, 1);
+  }
+  const rd = new Set(symDiff(rawKeys(tree), rawKeys(m)));
+  const pd = symDiff(setOf(presentRegular(tree)), setOf(presentRegular(m)));
+  rUnattr += pd.filter((k) => !rd.has(k)).length;
 }
-console.log(`\nrandomized (1000 trees): self-divergence ${selfDiv}, fact-availability membership divergence ${factDiv}, invariant violations ${invTotal}, interactive⊆raw failures ${subsetFail}, hit-point-outside-clip ${hitPointFail}`);
+console.log(`\nrandomized (1000 trees incl. degenerate frames): self-div ${rSelf}, fact-availability div ${rFact}, invariant ${rInv}, interactive⊆raw fails ${rSubset}, hit-point fails ${rHit}, unattributed P3 deltas ${rUnattr}`);
 
-const pass = d1.length > 0 && selfDiv === 0 && factDiv === 0 && membershipDelta.length === 0 && hittableDelta === 0
-  && invTotal === 0 && subsetFail === 0 && hitPointFail === 0 && allHitPointsInClip;
-console.log(`\nVERDICT: ${pass ? 'PROVEN under v5 (second-pass amendments hold)' : 'NOT PROVEN'}`);
+// ---------- coverage table ----------
+console.log(`
+CONTRACT COVERAGE OF THIS MODEL
+  C1 fact-availability neutrality  exercised (P2b, randomized) — membership + fields
+  C3 two projections               exercised (interactive ⊆ raw; raw unpruned)
+  C4 geometry carrier              exercised, weakly — hit-point containment follows from
+                                   centering the emitted rect; the real check is the daemon
+                                   consuming it (migration step 3)
+  C6 clip invariant                exercised, weakly — checked by the same function that
+                                   established visibility; the real check is the independent
+                                   choke-point assert (migration step 4)
+  P3 attribution                   exercised (fixture pair + randomized single-node mutations)
+  C2 hint conservatism             NOT modeled (adapter completeness needs real adapters)
+  C5 deadline / whole-tier discard NOT modeled (needs the capture-plan loop)
+  self-divergence                  trivially true for a pure function; kept as a regression
+                                   tripwire for accidental statefulness, not as evidence`);
+
+const pass =
+  p1Divergent.length > 0 && p2SelfDiv === 0 && a1.invariantViolations === 0 && p2Subset && p2HitPoints &&
+  degenerate !== undefined && degenerate.hittable === false &&
+  p2bMembership === 0 && p2bFields === 0 &&
+  unattributed.length === 0 && sharedFieldDeltas === 0 &&
+  rSelf === 0 && rFact === 0 && rInv === 0 && rSubset === 0 && rHit === 0 && rUnattr === 0;
+console.log(`\nVERDICT: ${pass ? 'MODEL OBLIGATIONS PASS' : 'MODEL OBLIGATIONS FAIL'}`);
