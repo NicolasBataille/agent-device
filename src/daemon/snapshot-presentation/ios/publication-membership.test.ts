@@ -1,21 +1,28 @@
 import { expect, test } from 'vitest';
-import { attachRefs, type RawSnapshotNode } from '@agent-device/kernel/snapshot';
-import { presentIosInteractiveSnapshot } from './index.ts';
+import type { RawSnapshotNode } from '@agent-device/kernel/snapshot';
+import { buildSnapshotState } from '../../handlers/snapshot-capture.ts';
 
 // End-to-end publication-membership contract for the acquire/present design (#1797, external
-// review pass 4 finding 1). Runner presentation owns ELIGIBILITY (which nodes may appear at
-// all); this daemon compaction layer owns PUBLICATION membership (what agents actually see).
-// The four semantic-content cases pin the declared policy:
-//   - label content   -> published (any type: a labeled image is meaningful content)
-//   - value content   -> published
-//   - interactive     -> published
+// review pass 4 finding 1), exercised through the PRODUCTION interface: buildSnapshotState owns
+// the real ordering of normalization, group pruning, scope, iOS compaction, occlusion
+// annotation, and refs. Runner presentation owns ELIGIBILITY (which nodes may appear at all);
+// this pipeline owns PUBLICATION membership (what agents actually see).
+//
+// The semantic-content cases pin the declared policy:
+//   - label content        -> published (any type: a labeled image is meaningful content)
+//   - value content        -> published
+//   - interactive-only     -> published (a bare hittable Button with NO label/identifier/value,
+//                             so its survival proves the interactive branch, not content)
 //   - identifier-only STRUCTURAL `Other` (non-hittable, no label/value) -> ELIGIBLE but
 //     SUPPRESSED at publication, deliberately: this is the React Native testID-wrapper shape
-//     (see collectIosStructuralIdentifierSuppression in noise.ts), which would otherwise spam
-//     agent output with non-actionable wrappers. Identifier-only nodes of other shapes are NOT
-//     covered by that suppression and must survive.
+//     (collectIosStructuralIdentifierSuppression in noise.ts), which would otherwise spam agent
+//     output with non-actionable wrappers. Identifier-only nodes outside that shape survive.
+//
+// Non-vacuity (regression-test rule): with the collectIosStructuralIdentifierSuppression call
+// disabled in noise.ts, the suppression test below FAILS ('promo-banner' is published); it
+// passes only because the production suppression fires.
 function publish(nodes: RawSnapshotNode[]) {
-  return attachRefs(presentIosInteractiveSnapshot(nodes));
+  return buildSnapshotState({ nodes, backend: 'xctest' }, { snapshotInteractiveOnly: true }).nodes;
 }
 
 const screen: RawSnapshotNode[] = [
@@ -44,23 +51,26 @@ const screen: RawSnapshotNode[] = [
     identifier: 'promo-banner',
     rect: { x: 110, y: 130, width: 180, height: 44 },
   },
+  // Interactive-only: no label, no identifier, no value — survival proves the interactive branch.
   {
     index: 4,
     depth: 1,
     parentIndex: 0,
     type: 'Button',
-    label: 'Pay $42.00',
     hittable: true,
     rect: { x: 16, y: 696, width: 370, height: 56 },
   },
 ];
 
-test('publication keeps label content, value content, and interactive nodes', () => {
+test('publication keeps label content, value content, and bare interactive nodes', () => {
   const published = publish(screen);
-  const labels = published.map((node) => node.label ?? node.value ?? node.identifier);
-  expect(labels).toContain('Red sneakers product photo');
-  expect(labels).toContain('3 items');
-  expect(labels).toContain('Pay $42.00');
+  expect(published.some((node) => node.label === 'Red sneakers product photo')).toBe(true);
+  expect(published.some((node) => node.value === '3 items')).toBe(true);
+  expect(
+    published.some(
+      (node) => node.type === 'Button' && !node.label && !node.identifier && !node.value,
+    ),
+  ).toBe(true);
 });
 
 test('publication suppresses identifier-only structural Other wrappers, by declared policy', () => {
