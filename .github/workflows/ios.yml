@@ -105,6 +105,7 @@ jobs:
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testSynthesizedTextCommitProgressWalksExpectedPrefixOnly \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testTextEntryTapWitnessIsBoundToTargetIdentity \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testCoordinateTapTextInputProbeSkipsPenalizedXCTestChannel \
+            -only-testing:AgentDeviceRunnerUITests/RunnerTests/testCoordinateTextInputCandidateMustBeEnabledAndContainTheTouchPoint \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testQuerySelectorPrefersHittableMatchOverNonHittableDuplicate \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testActivateTargetSkipsForegroundAndActivatesNonForegroundApplication \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testMissingBundleCommandInvalidatesCompleteCachedTargetState \
