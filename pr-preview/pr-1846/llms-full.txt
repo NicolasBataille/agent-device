@@ -143,6 +143,8 @@ Use MCP tools or the CLI in the integrated terminal. If `agent-device` is not on
 
 For web automation, MCP tools can target `platform: "web"` after the managed backend is available, but `agent-device web setup` and `agent-device web doctor` are CLI-only. Run setup from a terminal in the same effective state directory before asking an MCP client to drive a browser session.
 
+The server also ships its own guidance, so MCP-only clients do not depend on a separately installed skill: the handshake (`initialize` and `server/discover`) returns compact `instructions` with the workflow card (start with `open`, act with `settle: true`, verify, `close`, ref fidelity, sparse-AX recovery), and an MCP-only `help` tool returns the same guides as `agent-device help <topic|command>` on demand. `help` is not a startup step; agents call it for specialized work (gestures, scripting, TV, macOS, web, remote, debugging) or an unclear command shape.
+
 Tool execution failures are returned as MCP tool results with `isError: true`; clients and agents should inspect the tool result, not only the successful JSON-RPC envelope.
 
 MCP clients must not use this server as a generic shell runner. If the CLI is missing, agents should ask a human before installing or updating packages, reconnect the server after setup, and retry the intended app-driving command without adding version/help probes.
@@ -1859,9 +1861,14 @@ agent-device get attrs @e1
   the capture. On API 23 the helper cannot report `drawing-order`, so covered same-window surfaces
   (for example a React Native screen left under the foreground one) are not pruned;
   `androidSnapshot.occlusionScanUnavailable: true` discloses that capture shape.
-- `--scope` resolves once, to the first node in document order whose label, value, or identifier
-  contains the scope text (case-insensitive), and returns that node's subtree; no match returns an
-  empty snapshot rather than the full tree.
+- `--scope <text|@ref>` returns the subtree of the first node in document order whose label, value,
+  or identifier contains the scope text (case-insensitive) and whose subtree still has content in
+  the requested projection, re-rooted at depth 0; no match returns an empty snapshot rather than the
+  full tree. Under `-i` that means scoping to a layout container returns the actionable elements
+  inside it, even when the container itself is filtered out. `--depth` then counts from the scope
+  root. `@ref` scopes by that element's label from the last snapshot. Android resolves scope inside
+  its projection; on iOS the runner first narrows capture by label/identifier and the daemon applies
+  the rule to the presented tree.
 - `--actions` names the custom accessibility affordances an element merged away (iOS
   `UIAccessibilityCustomAction`, React Native `accessibilityActions`), so a card whose reply/options
   controls are not separate elements still lists them. It is iOS-simulator-only and exists for
