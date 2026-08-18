@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1842/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1842/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1842/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1842/static/js/index.cb263cc88d.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1842/static/js/index.7c01650f18.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -47,6 +47,7 @@
 <h2 class="rp-toc-include" id="mcp-server"><a href="#mcp-server" class="rp-header-anchor rp-link" aria-hidden="true">#</a>MCP server</h2>
 <p><code>agent-device mcp</code> starts the official stdio MCP server. It exposes direct structured tools for installed CLI commands. Tools run through command contracts and <code>AgentDeviceClient</code>; local-only workflows stay CLI-only rather than subprocess fallbacks.</p>
 <p>For web automation, MCP tools can target <code>platform: &quot;web&quot;</code> after the managed backend is available, but <code>agent-device web setup</code> and <code>agent-device web doctor</code> are CLI-only. Run setup from a terminal in the same effective state directory before asking an MCP client to drive a browser session.</p>
+<p>The server also ships its own guidance, so MCP-only clients do not depend on a separately installed skill: the handshake (<code>initialize</code> and <code>server/discover</code>) returns compact <code>instructions</code> with the workflow card (start with <code>open</code>, act with <code>settle: true</code>, verify, <code>close</code>, ref fidelity, sparse-AX recovery), and an MCP-only <code>help</code> tool returns the same guides as <code>agent-device help &lt;topic|command&gt;</code> on demand. <code>help</code> is not a startup step; agents call it for specialized work (gestures, scripting, TV, macOS, web, remote, debugging) or an unclear command shape.</p>
 <p>Tool execution failures are returned as MCP tool results with <code>isError: true</code>; clients and agents should inspect the tool result, not only the successful JSON-RPC envelope.</p>
 <p>MCP clients must not use this server as a generic shell runner. If the CLI is missing, agents should ask a human before installing or updating packages, reconnect the server after setup, and retry the intended app-driving command without adding version/help probes.</p>
 <p>Global install configuration:</p>
