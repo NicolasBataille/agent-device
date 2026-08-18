@@ -7,8 +7,8 @@ import {
   MACOS_DEVICE,
 } from '../../../__tests__/test-utils/index.ts';
 
-const dispatchCommand = vi.hoisted(() => vi.fn());
-vi.mock('../../../core/dispatch.ts', () => ({ dispatchCommand }));
+const captureSnapshotWithInteractor = vi.hoisted(() => vi.fn());
+vi.mock('../snapshot-interactor-capture.ts', () => ({ captureSnapshotWithInteractor }));
 
 test('buildSnapshotState handles undefined nodes gracefully', () => {
   const state = buildSnapshotState({ nodes: undefined, truncated: undefined }, undefined);
@@ -105,8 +105,8 @@ test('buildSnapshotState applies iOS interactive presentation for xctest snapsho
 });
 
 test('iOS interactive capture does not send local presentation scope to XCTest', async () => {
-  dispatchCommand.mockClear();
-  dispatchCommand.mockResolvedValueOnce({ nodes: [], backend: 'xctest' });
+  captureSnapshotWithInteractor.mockClear();
+  captureSnapshotWithInteractor.mockResolvedValueOnce({ nodes: [], backend: 'xctest' });
 
   await captureSnapshotData({
     device: IOS_SIMULATOR,
@@ -116,14 +116,16 @@ test('iOS interactive capture does not send local presentation scope to XCTest',
     logPath: '/tmp/snapshot-capture-test.log',
   });
 
-  expect(dispatchCommand).toHaveBeenCalledOnce();
-  expect(dispatchCommand.mock.calls[0]?.[4]).toEqual(
-    expect.objectContaining({ snapshotInteractiveOnly: true, snapshotScope: undefined }),
+  expect(captureSnapshotWithInteractor).toHaveBeenCalledOnce();
+  expect(captureSnapshotWithInteractor).toHaveBeenCalledWith(
+    expect.objectContaining({
+      options: expect.objectContaining({ interactiveOnly: true, scope: undefined }),
+    }),
   );
 });
 
 test('snapshot capture preserves backend scope outside iOS interactive presentation', async () => {
-  dispatchCommand.mockClear();
+  captureSnapshotWithInteractor.mockClear();
   for (const [device, flags] of [
     [ANDROID_EMULATOR, { snapshotInteractiveOnly: true, snapshotScope: 'action file' }],
     [
@@ -132,7 +134,7 @@ test('snapshot capture preserves backend scope outside iOS interactive presentat
     ],
     [MACOS_DEVICE, { snapshotInteractiveOnly: true, snapshotScope: 'action file' }],
   ] as const) {
-    dispatchCommand.mockResolvedValueOnce({ nodes: [] });
+    captureSnapshotWithInteractor.mockResolvedValueOnce({ nodes: [] });
     await captureSnapshotData({
       device,
       session: undefined,
@@ -142,7 +144,7 @@ test('snapshot capture preserves backend scope outside iOS interactive presentat
     });
   }
 
-  expect(dispatchCommand.mock.calls.map((call) => call[4]?.snapshotScope)).toEqual([
+  expect(captureSnapshotWithInteractor.mock.calls.map((call) => call[0]?.options.scope)).toEqual([
     'action file',
     'action file',
     'action file',
