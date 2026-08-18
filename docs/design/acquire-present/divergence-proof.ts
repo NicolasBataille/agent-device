@@ -16,12 +16,14 @@
 //  P3  — with DELIBERATELY different raw trees, every presented delta is attributable to an
 //        owning raw-input delta; interpretation contributes zero unattributed differences.
 //
-// Membership policy modeled (decided under external review pass 3, finding 3): membership is
-// `interactive-type OR content`. Geometric actionability feeds ONLY the emitted `hittable`
-// field, never membership — a framed node with neither an interactive type nor content is not
-// agent-addressable and stays out of `-i` regular output (it remains in raw). This is an
-// intentional delta vs the shipped tree policy's "hittable-non-other" branch, reviewed as part
-// of migration step 3.
+// Membership policy modeled (external review pass 3 finding 3, content definition corrected in
+// the verification pass): membership is `interactive-type OR semantic content`, where semantic
+// content = non-empty label OR identifier OR value, REGARDLESS of element type — matching the
+// shipped tree's definition (Snapshot.swift:883). Labeled images, labeled Other containers, and
+// identifier/value-only nodes are all members; decorative means UNLABELED, never a type. The
+// ONLY intended membership delta vs the shipped tree policy is dropping the hittable-non-other
+// branch (an unlabeled, non-interactive-typed but hittable node). Geometric actionability feeds
+// ONLY the emitted `hittable` field, never membership.
 //
 // Frame emptiness follows CGRect semantics: a rect with EITHER dimension zero is empty, and
 // empty-frame nodes take the frameless escape hatch (presentation-visible when they carry
@@ -32,10 +34,17 @@ type Rect = { x: number; y: number; w: number; h: number };
 type RawNode = {
   type: string;
   label?: string;
+  identifier?: string;
+  value?: string;
   frame: Rect;
   sourceHittable?: boolean; // acquired fact; never gates membership; never serialized
   children?: RawNode[];
 };
+
+// Shipped-tree content rule (Snapshot.swift:883): any non-empty label, identifier, or value,
+// regardless of type. ONE definition, shared by the HEAD model and the after-model.
+const hasSemanticContent = (n: RawNode) =>
+  Boolean(n.label?.trim() || n.identifier?.trim() || n.value?.trim());
 
 const SCROLL = new Set(['scrollview', 'table', 'collectionview']);
 const INTERACTIVE = new Set(['button', 'textfield', 'switch', 'link', 'cell', 'tabbar']);
@@ -50,14 +59,16 @@ const hasArea = (r: Rect) => r.w * r.h > 0;
 const hasFrame = (r: Rect) => r.w > 0 && r.h > 0;
 const inside = (px: number, py: number, r: Rect) =>
   px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-const key = (n: RawNode) => `${n.type}|${n.label ?? ''}|${n.frame.x},${n.frame.y},${n.frame.w},${n.frame.h}`;
+const key = (n: RawNode) =>
+  `${n.type}|${n.label ?? ''}|${n.identifier ?? ''}|${n.value ?? ''}|${n.frame.x},${n.frame.y},${n.frame.w},${n.frame.h}`;
 const viewport = f(0, 0, 402, 874);
 
 function checkoutScreen(): RawNode {
   const rows: RawNode[] = [];
   for (let i = 0; i < 8; i++) {
     rows.push({ type: 'button', label: `Item row ${i + 1}`, frame: f(16, 180 + i * 62, 300, 56), sourceHittable: true });
-    rows.push({ type: 'image', label: `thumb ${i + 1}`, frame: f(330, 180 + i * 62, 48, 48) });
+    // Genuinely decorative: UNLABELED image (decorative is a labeling fact, not a type).
+    rows.push({ type: 'image', frame: f(330, 180 + i * 62, 48, 48) });
     rows.push({ type: 'statictext', label: `$${(i + 1) * 7}.00`, frame: f(16, 180 + i * 62 + 40, 120, 16) });
   }
   return {
@@ -65,8 +76,12 @@ function checkoutScreen(): RawNode {
       { type: 'navigationbar', label: 'Checkout', frame: f(0, 59, 402, 44), children: [
         { type: 'button', label: 'Back', frame: f(8, 59, 44, 44), sourceHittable: true },
       ]},
-      { type: 'scrollview', label: 'Order summary', frame: f(0, 120, 402, 560), children: [
+      { type: 'scrollview', label: 'Order summary', identifier: 'checkout-form', frame: f(0, 120, 402, 560), children: [
         { type: 'other', label: 'Your items', frame: f(0, 120, 402, 48) },
+        // Meaningful accessibility content that membership MUST keep:
+        { type: 'image', label: 'Red sneakers product photo', frame: f(16, 130, 80, 44) },
+        { type: 'other', identifier: 'promo-banner', frame: f(110, 130, 180, 44) }, // identifier-only
+        { type: 'other', value: '3 items', frame: f(300, 130, 86, 44) }, // value-only
         ...rows,
         // RN/SwiftUI-style frameless semantic wrapper with real content.
         { type: 'other', label: 'a11y wrapper', frame: f(0, 0, 0, 0), children: [
@@ -99,8 +114,7 @@ function headTreeInteractive(root: RawNode): Set<string> {
   const out = new Set<string>();
   const walk = (n: RawNode, scroll: Rect | null) => {
     if (visibleAtHead(n, scroll)) {
-      const hasContent = (n.label ?? '').length > 0 && n.type !== 'image' && n.type !== 'other';
-      if (INTERACTIVE.has(n.type) || n.sourceHittable === true || hasContent) out.add(key(n));
+      if (INTERACTIVE.has(n.type) || n.sourceHittable === true || hasSemanticContent(n)) out.add(key(n));
     }
     const next = SCROLL.has(n.type) ? intersect(scroll ?? viewport, n.frame) : scroll;
     (n.children ?? []).forEach((c) => walk(c, next));
@@ -137,9 +151,9 @@ function presentRegular(root: RawNode): { nodes: Presented[]; hints: string[]; i
     const eff = intersect(n.frame, clip);
     const visible = frameless || hasArea(eff);
     const interactive = INTERACTIVE.has(n.type);
-    const hasContent = (n.label ?? '').length > 0 && n.type !== 'image' && n.type !== 'other';
-    // Membership: interactive-type OR content. Geometry feeds only the hittable field.
-    const include = visible && (interactive || hasContent);
+    // Membership: interactive-type OR semantic content (label/identifier/value, type-agnostic).
+    // Geometry feeds only the hittable field.
+    const include = visible && (interactive || hasSemanticContent(n));
     const hittable = !frameless && hasArea(eff) && interactive;
     if (include) {
       if (!frameless && !hasArea(eff)) invariantViolations++;
@@ -151,8 +165,8 @@ function presentRegular(root: RawNode): { nodes: Presented[]; hints: string[]; i
         rawFrame: n.frame,
         hitPoint: { x: emittedRect.x + emittedRect.w / 2, y: emittedRect.y + emittedRect.h / 2 },
       });
-    } else if (!visible && !frameless && n.label && anchor && hasArea(intersect(n.frame, viewport))) {
-      hints.push(`[${n.frame.y < anchor.rect.y ? 'above' : 'below'} ${anchor.label}] ${n.label}`);
+    } else if (!visible && !frameless && hasSemanticContent(n) && anchor && hasArea(intersect(n.frame, viewport))) {
+      hints.push(`[${n.frame.y < anchor.rect.y ? 'above' : 'below'} ${anchor.label}] ${n.label ?? n.identifier ?? n.value}`);
     }
     const isScroll = SCROLL.has(n.type) && hasFrame(n.frame);
     const childClip = isScroll ? intersect(clip, n.frame) : clip;
@@ -195,12 +209,19 @@ const p2SelfDiv = symDiff(setOf(a1), setOf(a2)).length;
 const p2Subset = subset(setOf(a1), presentRaw(sample));
 const gift = a1.nodes.find((n) => n.key.includes('Gift wrap'))!;
 const degenerate = a1.nodes.find((n) => n.key.includes('Free shipping'))!;
+const labeledImage = a1.nodes.some((n) => n.key.includes('Red sneakers product photo'));
+const identifierOnly = a1.nodes.some((n) => n.key.includes('promo-banner'));
+const valueOnly = a1.nodes.some((n) => n.key.includes('3 items'));
+const unlabeledThumbInRegular = a1.nodes.some((n) => n.key.startsWith('image|||'));
+const unlabeledThumbInRaw = [...presentRaw(sample)].some((k) => k.startsWith('image|||'));
 const p2HitPoints = a1.nodes.every((n) => inside(n.hitPoint.x, n.hitPoint.y, n.rect));
 console.log(`\nP2 AFTER: self-divergence ${p2SelfDiv}, invariant violations ${a1.invariantViolations}`);
 console.log(`  interactive ⊆ raw: ${p2Subset}; raw unpruned: ${presentRaw(sample).size} raw vs ${a1.nodes.length} regular`);
 console.log(`  clipped 'Gift wrap': rawFrame h=${gift.rawFrame.h}, emitted rect h=${gift.rect.h}, centered hitPoint y=${gift.hitPoint.y} (raw midpoint ${gift.rawFrame.y + gift.rawFrame.h / 2})`);
 console.log(`  degenerate-frame (h=0) content node: visible=${degenerate !== undefined}, hittable=${degenerate?.hittable} (frameless hatch, CGRect emptiness)`);
 console.log(`  every centered hit point inside emitted rect: ${p2HitPoints}; evidence on wire: ${a1.nodes.some((n) => 'hitTestEvidence' in n) ? 'YES (BUG)' : 'none'}`);
+console.log(`  content rule (type-agnostic): labeled image kept=${labeledImage}, identifier-only kept=${identifierOnly}, value-only kept=${valueOnly}`);
+console.log(`  unlabeled decorative image: regular=${unlabeledThumbInRegular} (dropped), raw=${unlabeledThumbInRaw} (kept)`);
 
 // ---------- P2b: fact-availability neutrality (C1) ----------
 const stripped = structuredClone(sample);
@@ -255,7 +276,9 @@ const randFrame = (): Rect => {
 };
 const randTree = (d: number): RawNode => ({
   type: rnd() < 0.2 ? 'scrollview' : rnd() < 0.45 ? 'button' : rnd() < 0.6 ? 'image' : 'statictext',
-  label: rnd() < 0.85 ? `n${Math.floor(rnd() * 1e6)}` : undefined,
+  label: rnd() < 0.6 ? `n${Math.floor(rnd() * 1e6)}` : undefined,
+  identifier: rnd() < 0.25 ? `id${Math.floor(rnd() * 1e6)}` : undefined,
+  value: rnd() < 0.15 ? `v${Math.floor(rnd() * 1e6)}` : undefined,
   frame: randFrame(),
   sourceHittable: rnd() < 0.3 ? rnd() < 0.5 : undefined,
   children: d > 0 ? Array.from({ length: Math.floor(rnd() * 4) }, () => randTree(d - 1)) : [],
@@ -302,6 +325,7 @@ CONTRACT COVERAGE OF THIS MODEL
 
 const pass =
   p1Divergent.length > 0 && p2SelfDiv === 0 && a1.invariantViolations === 0 && p2Subset && p2HitPoints &&
+  labeledImage && identifierOnly && valueOnly && !unlabeledThumbInRegular && unlabeledThumbInRaw &&
   degenerate !== undefined && degenerate.hittable === false &&
   p2bMembership === 0 && p2bFields === 0 &&
   unattributed.length === 0 && sharedFieldDeltas === 0 &&

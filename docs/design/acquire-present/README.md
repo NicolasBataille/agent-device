@@ -29,10 +29,13 @@ adapters and the capture-plan loop). Its verdict is labeled `MODEL OBLIGATIONS P
 deliberately: this is executable design evidence, not a proof of the production path. The live
 acceptance test is the fixture/nightly differential described in #1797's migration step 4.
 
-Membership modeled here is `interactive-type OR content` (external review pass 3, finding 3):
-geometric actionability feeds only the emitted `hittable` field, never membership. This is an
-intentional delta vs the shipped tree policy's "hittable-non-other" branch, reviewed as part
-of migration step 3.
+Membership modeled here is `interactive-type OR semantic content`, where semantic content is a
+non-empty label, identifier, or value **regardless of element type** — the shipped tree's own
+definition (Snapshot.swift:883). Labeled images, labeled containers, and identifier/value-only
+nodes are members; "decorative" means unlabeled, never a type. Fixtures pin all of these. The
+ONLY intended membership delta vs the shipped tree policy is dropping the hittable-non-other
+branch; geometric actionability feeds only the emitted `hittable` field, never membership
+(external review pass 3 finding 3, content definition corrected in the verification pass).
 
 Run:
 
