@@ -4,7 +4,7 @@ import {
   snapshotCaptureAnnotationsFrom,
   type SnapshotCaptureAnnotations,
 } from '@agent-device/contracts/capture';
-import { publicPlatformString } from '@agent-device/kernel/device';
+import { isIosFamily, publicPlatformString } from '@agent-device/kernel/device';
 import { isAndroidInputMethodNode } from '@agent-device/contracts/platform';
 import {
   attachRefs,
@@ -92,7 +92,7 @@ export async function captureSnapshotData(params: CaptureSnapshotParams): Promis
   const { device, session, flags, logPath, snapshotScope } = params;
   const context = contextFromFlags(
     logPath,
-    { ...flags, snapshotScope },
+    snapshotCaptureFlagsForBackend(device, { ...flags, snapshotScope }),
     session?.appBundleId,
     session?.trace?.outPath,
   );
@@ -173,18 +173,18 @@ export function buildSnapshotState(
   const rawNodes = data?.nodes ?? [];
   const snapshotRaw = flags?.snapshotRaw;
   const normalizedNodes = normalizeSnapshotTree(snapshotRaw ? rawNodes : pruneGroupNodes(rawNodes));
+  const presentableNodes = shouldPresentIosInteractiveSnapshot(data?.backend, flags)
+    ? presentIosInteractiveSnapshot(normalizedNodes)
+    : normalizedNodes;
   const scopedNodes =
     flags?.snapshotScope && data?.backend !== 'macos-helper'
-      ? scopeSnapshotNodes(normalizedNodes, flags.snapshotScope)
-      : normalizedNodes;
+      ? scopeSnapshotNodes(presentableNodes, flags.snapshotScope)
+      : presentableNodes;
   const snapshotQuality = snapshotCaptureAnnotationsFrom(data).quality;
-  const presentableNodes = shouldPresentIosInteractiveSnapshot(data?.backend, flags)
-    ? presentIosInteractiveSnapshot(scopedNodes)
-    : scopedNodes;
   const nodes = attachRefs(
     snapshotRaw
-      ? presentableNodes
-      : annotateCoveredSnapshotNodes(presentableNodes, {
+      ? scopedNodes
+      : annotateCoveredSnapshotNodes(scopedNodes, {
           isAdditionalOverlayNode:
             data?.backend === 'android' ? isAndroidInputMethodNode : undefined,
         }),
@@ -201,6 +201,21 @@ export function buildSnapshotState(
     // route-level comparisons on the next capture.
     comparisonSafe: isAndroidComparisonSafeSnapshot(data?.backend, flags),
   };
+}
+
+function snapshotCaptureFlagsForBackend(
+  device: SessionState['device'],
+  flags: CommandFlags | undefined,
+): CommandFlags | undefined {
+  if (
+    !isIosFamily(device) ||
+    flags?.snapshotInteractiveOnly !== true ||
+    flags.snapshotRaw === true ||
+    flags.snapshotScope === undefined
+  ) {
+    return flags;
+  }
+  return { ...flags, snapshotScope: undefined };
 }
 
 function shouldPresentIosInteractiveSnapshot(

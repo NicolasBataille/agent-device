@@ -138,6 +138,20 @@ export const closedComposerWithRetainedActionShelfNodes: RawSnapshotNode[] =
       return { ...node };
     });
 
+export const closedComposerWithRetainedRegularTreeActionNodes: RawSnapshotNode[] =
+  openComposerActionShelfNodes.map((node) => {
+    if (node.identifier === 'AttachButton') {
+      return {
+        ...node,
+        rect: { x: 12, y: 792, width: 36, height: 36 },
+      };
+    }
+    if (node.index === 15 || node.index === 16) {
+      return { ...node, label: 'Record Voice Message' };
+    }
+    return { ...node };
+  });
+
 export const navigationTitleWithAppProvidedDetailsAffordanceNodes: RawSnapshotNode[] = [
   {
     index: 0,

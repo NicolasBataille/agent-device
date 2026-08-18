@@ -1,6 +1,14 @@
-import { expect, test } from 'vitest';
-import { buildSnapshotState } from '../snapshot-capture.ts';
+import { expect, test, vi } from 'vitest';
+import { buildSnapshotState, captureSnapshotData } from '../snapshot-capture.ts';
 import { buildSnapshotVisibility } from '../../../snapshot/snapshot-visibility.ts';
+import {
+  ANDROID_EMULATOR,
+  IOS_SIMULATOR,
+  MACOS_DEVICE,
+} from '../../../__tests__/test-utils/index.ts';
+
+const dispatchCommand = vi.hoisted(() => vi.fn());
+vi.mock('../../../core/dispatch.ts', () => ({ dispatchCommand }));
 
 test('buildSnapshotState handles undefined nodes gracefully', () => {
   const state = buildSnapshotState({ nodes: undefined, truncated: undefined }, undefined);
@@ -93,6 +101,51 @@ test('buildSnapshotState applies iOS interactive presentation for xctest snapsho
     ['Application', 'Settings', undefined],
     ['CollectionView', undefined, 0],
     ['Cell', 'General', 1],
+  ]);
+});
+
+test('iOS interactive capture does not send local presentation scope to XCTest', async () => {
+  dispatchCommand.mockClear();
+  dispatchCommand.mockResolvedValueOnce({ nodes: [], backend: 'xctest' });
+
+  await captureSnapshotData({
+    device: IOS_SIMULATOR,
+    session: undefined,
+    flags: { snapshotInteractiveOnly: true, snapshotScope: 'action file' },
+    snapshotScope: 'action file',
+    logPath: '/tmp/snapshot-capture-test.log',
+  });
+
+  expect(dispatchCommand).toHaveBeenCalledOnce();
+  expect(dispatchCommand.mock.calls[0]?.[4]).toEqual(
+    expect.objectContaining({ snapshotInteractiveOnly: true, snapshotScope: undefined }),
+  );
+});
+
+test('snapshot capture preserves backend scope outside iOS interactive presentation', async () => {
+  dispatchCommand.mockClear();
+  for (const [device, flags] of [
+    [ANDROID_EMULATOR, { snapshotInteractiveOnly: true, snapshotScope: 'action file' }],
+    [
+      IOS_SIMULATOR,
+      { snapshotInteractiveOnly: true, snapshotRaw: true, snapshotScope: 'action file' },
+    ],
+    [MACOS_DEVICE, { snapshotInteractiveOnly: true, snapshotScope: 'action file' }],
+  ] as const) {
+    dispatchCommand.mockResolvedValueOnce({ nodes: [] });
+    await captureSnapshotData({
+      device,
+      session: undefined,
+      flags,
+      snapshotScope: 'action file',
+      logPath: '/tmp/snapshot-capture-test.log',
+    });
+  }
+
+  expect(dispatchCommand.mock.calls.map((call) => call[4]?.snapshotScope)).toEqual([
+    'action file',
+    'action file',
+    'action file',
   ]);
 });
 

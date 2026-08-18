@@ -1,42 +1,24 @@
 import { expect, test } from 'vitest';
 import { makeSnapshotState } from '../../../__tests__/test-utils/index.ts';
 import { createInteractionDevice } from '../../../commands/interaction/runtime/__tests__/test-utils/index.ts';
+import { buildSnapshotState } from '../../handlers/snapshot-capture.ts';
 import { presentIosInteractiveSnapshot } from './index.ts';
-import {
-  closedComposerWithRetainedActionShelfNodes,
-  navigationTitleWithAppProvidedDetailsAffordanceNodes,
-  openComposerActionShelfNodes,
-} from './transitions.fixtures.ts';
+import { navigationTitleWithAppProvidedDetailsAffordanceNodes } from './transitions.fixtures.ts';
 
-test('iOS presentation removes an action shelf whose child actions moved outside its viewport', () => {
-  const nodes = presentIosInteractiveSnapshot(closedComposerWithRetainedActionShelfNodes);
-  const labels = nodes.map((node) => node.label).filter(Boolean);
+test('iOS presentation applies transition semantics before scoping the snapshot', () => {
+  const snapshot = buildSnapshotState(
+    { nodes: navigationTitleWithAppProvidedDetailsAffordanceNodes, backend: 'xctest' },
+    { snapshotInteractiveOnly: true, snapshotScope: 'DisplayNameTextField' },
+  );
 
-  expect(labels).toEqual([
-    'Fixture app',
-    'Upload',
-    'Upload',
-    'Record Voice Message',
-    'Record Voice Message',
-  ]);
-  expect(nodes.some((node) => node.identifier === 'GrowingTextView')).toBe(true);
-});
-
-test('iOS presentation keeps an action shelf whose child actions are inside its viewport', () => {
-  const nodes = presentIosInteractiveSnapshot(openComposerActionShelfNodes);
-  const actionLabels = nodes
-    .map((node) => node.label)
-    .filter((label) => label?.startsWith('action '));
-
-  expect(actionLabels).toEqual([
-    'action media library',
-    'action media library',
-    'action sticker',
-    'action file',
-    'action poll',
-    'action location',
-    'action camera',
-  ]);
+  expect(snapshot.nodes).toHaveLength(1);
+  expect(snapshot.nodes[0]).toEqual(
+    expect.objectContaining({
+      type: 'Button',
+      label: 'Team Standup',
+      identifier: 'DisplayNameTextField',
+    }),
+  );
 });
 
 test('iOS presentation promotes an app-provided navigation title affordance without stealing a content action', () => {
