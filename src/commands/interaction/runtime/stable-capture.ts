@@ -9,6 +9,7 @@ import {
 import { runWithinWaitDeadline } from './wait-deadline.ts';
 import {
   stableCaptureSignal,
+  stableCaptureSignalsHaveBroadReplacement,
   stableCaptureSignalsEqual,
   type StableCaptureSignal,
 } from './stable-capture-signal.ts';
@@ -31,6 +32,10 @@ const STABLE_MIN_POLL_MS = 25;
 // loop clock while `now()` reads the wall clock — so a capture landing on the
 // deadline decides `settled` by sub-millisecond skew rather than by the UI.
 const QUIET_DEADLINE_EPSILON_MS = 2;
+// Broad replacements (for example, dismissing a modal into a room) can expose a coherent but
+// transitional AX tree for the default quiet window. Confirm those transitions longer without
+// adding latency to local mutations whose pre/post trees substantially overlap.
+const BROAD_TRANSITION_CONFIRMATION_QUIET_MS = 1_500;
 export const DEFAULT_STABLE_QUIET_MS = 500;
 export const DEFAULT_STABLE_TIMEOUT_MS = 10_000;
 // Below this node count a settled tree is suspicious: real app surfaces have
@@ -56,13 +61,22 @@ export type StableCaptureLoopResult = {
 export async function runStableCaptureLoop(
   runtime: AgentDeviceRuntime,
   options: CommandContext & SelectorSnapshotOptions,
-  params: { quietMs: number; timeoutMs: number; resetBudgetOnPrivateAxRecovery?: boolean },
+  params: {
+    quietMs: number;
+    timeoutMs: number;
+    resetBudgetOnPrivateAxRecovery?: boolean;
+    confirmBroadTransition?: boolean;
+  },
 ): Promise<StableCaptureLoopResult> {
   const { quietMs, timeoutMs } = params;
   const start = now(runtime);
   let deadlineMs = start + timeoutMs;
   let privateAxRecoveryBudgetReset = false;
   const session = await runtime.sessions.get(options.session ?? 'default');
+  const transitionBaseline = stableCaptureTransitionBaseline(
+    params.confirmBroadTransition,
+    session?.snapshot,
+  );
   let preferredBackend = preferredSnapshotBackendForVerdict(session?.snapshot?.snapshotQuality);
   // Cadence derives from the quiet window (never slower than the default
   // poll): a caller asking for a 50ms quiet window should not be forced onto a
@@ -73,6 +87,7 @@ export async function runStableCaptureLoop(
   let lastNodeCount = 0;
   let lastCapture: CapturedSnapshot | undefined;
   let quietSinceMs = start;
+  let requiredQuietMs = quietMs;
   while (now(runtime) < deadlineMs) {
     const capture = await captureStableSignalWithinDeadline(
       runtime,
@@ -93,6 +108,13 @@ export async function runStableCaptureLoop(
     captures += 1;
     lastCapture = capture;
     const signal = stableCaptureSignal(capture.snapshot);
+    requiredQuietMs = stableCaptureTransitionQuietMs({
+      captureNumber: captures,
+      baseline: transitionBaseline,
+      signal,
+      requestedQuietMs: quietMs,
+      currentQuietMs: requiredQuietMs,
+    });
     preferredBackend ??= preferredSnapshotBackendForVerdict(capture.snapshot.snapshotQuality);
     const nowMs = now(runtime);
     const recoveredDeadlineMs = extendedDeadlineAfterPrivateAxRecovery({
@@ -112,7 +134,7 @@ export async function runStableCaptureLoop(
       const recoveryDelayMs = stableCaptureDelayMs({
         nowMs,
         quietSinceMs,
-        quietMs,
+        quietMs: requiredQuietMs,
         pollMs,
         deadlineMs,
       });
@@ -124,7 +146,7 @@ export async function runStableCaptureLoop(
       lastSignal = signal;
       lastNodeCount = capture.snapshot.nodes.length;
       quietSinceMs = nowMs;
-    } else if (captures >= 2 && nowMs - quietSinceMs >= quietMs) {
+    } else if (captures >= 2 && nowMs - quietSinceMs >= requiredQuietMs) {
       return {
         settled: true,
         stalled: false,
@@ -134,7 +156,13 @@ export async function runStableCaptureLoop(
         lastCapture,
       };
     }
-    const delayMs = stableCaptureDelayMs({ nowMs, quietSinceMs, quietMs, pollMs, deadlineMs });
+    const delayMs = stableCaptureDelayMs({
+      nowMs,
+      quietSinceMs,
+      quietMs: requiredQuietMs,
+      pollMs,
+      deadlineMs,
+    });
     if (delayMs <= 0) break;
     await sleep(runtime, delayMs);
   }
@@ -146,6 +174,32 @@ export async function runStableCaptureLoop(
     nodeCount: lastNodeCount,
     lastCapture,
   };
+}
+
+function stableCaptureTransitionBaseline(
+  enabled: boolean | undefined,
+  snapshot: Parameters<typeof stableCaptureSignal>[0] | undefined,
+): StableCaptureSignal | undefined {
+  return enabled === true && snapshot?.backend === 'xctest'
+    ? stableCaptureSignal(snapshot)
+    : undefined;
+}
+
+function stableCaptureTransitionQuietMs(params: {
+  captureNumber: number;
+  baseline: StableCaptureSignal | undefined;
+  signal: StableCaptureSignal;
+  requestedQuietMs: number;
+  currentQuietMs: number;
+}): number {
+  if (
+    params.requestedQuietMs < DEFAULT_STABLE_QUIET_MS ||
+    params.captureNumber !== 1 ||
+    !stableCaptureSignalsHaveBroadReplacement(params.baseline, params.signal)
+  ) {
+    return params.currentQuietMs;
+  }
+  return Math.max(params.requestedQuietMs, BROAD_TRANSITION_CONFIRMATION_QUIET_MS);
 }
 
 function isPrivateAxRecovery(verdict: SnapshotQualityVerdict | undefined): boolean {

@@ -8,7 +8,12 @@ import {
   localCommandPolicy,
 } from '../../../runtime.ts';
 import { runStableCaptureLoop } from './stable-capture.ts';
-import { elementSettingsSnapshot } from './stable-capture.fixtures.ts';
+import {
+  elementSettingsSnapshot,
+  elementSettledRoomSnapshot,
+  elementThreadsNoticeSnapshot,
+  elementTransientRoomSnapshot,
+} from './stable-capture.fixtures.ts';
 
 test('regular captures settle from visible semantics while offscreen rows churn', async () => {
   let elapsedMs = 0;
@@ -44,3 +49,59 @@ test('regular captures settle from visible semantics while offscreen rows churn'
   assert.equal(outcome.captures, 2);
   assert.ok(outcome.waitedMs < 200, `settled after ${outcome.waitedMs}ms`);
 });
+
+test('settle confirms a broad screen replacement beyond a self-consistent transitional tree', async () => {
+  const { runtime } = transitionRuntime();
+
+  const outcome = await runStableCaptureLoop(
+    runtime,
+    { session: 'default' },
+    { quietMs: 500, timeoutMs: 5_000, confirmBroadTransition: true },
+  );
+
+  assert.equal(outcome.settled, true);
+  assert.equal(
+    outcome.lastCapture?.snapshot.nodes.some((node) => node.label === 'action file'),
+    false,
+  );
+  assert.ok(outcome.waitedMs >= 1_500, `settled transitional tree after ${outcome.waitedMs}ms`);
+});
+
+test('settle honors an explicitly shorter quiet window across a broad replacement', async () => {
+  const { runtime } = transitionRuntime();
+
+  const outcome = await runStableCaptureLoop(
+    runtime,
+    { session: 'default' },
+    { quietMs: 25, timeoutMs: 5_000, confirmBroadTransition: true },
+  );
+
+  assert.equal(outcome.settled, true);
+  assert.ok(outcome.captures <= 3, `short quiet window spent ${outcome.captures} captures`);
+  assert.ok(outcome.waitedMs < 800, `short quiet window settled after ${outcome.waitedMs}ms`);
+});
+
+function transitionRuntime() {
+  let elapsedMs = 0;
+  const clock = {
+    now: () => elapsedMs,
+    sleep: async (ms: number) => {
+      elapsedMs += ms;
+    },
+  };
+  const runtime = createAgentDevice({
+    backend: {
+      platform: 'ios',
+      captureSnapshot: async () => ({
+        snapshot: elapsedMs < 800 ? elementTransientRoomSnapshot : elementSettledRoomSnapshot,
+      }),
+    } satisfies AgentDeviceBackend,
+    artifacts: createLocalArtifactAdapter(),
+    sessions: createMemorySessionStore([
+      { name: 'default', snapshot: elementThreadsNoticeSnapshot },
+    ]),
+    policy: localCommandPolicy(),
+    clock,
+  });
+  return { runtime };
+}

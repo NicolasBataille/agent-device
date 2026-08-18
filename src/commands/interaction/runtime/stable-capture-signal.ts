@@ -66,6 +66,31 @@ export function stableCaptureSignalsEqual(
   });
 }
 
+export function stableCaptureSignalsHaveBroadReplacement(
+  left: StableCaptureSignal | undefined,
+  right: StableCaptureSignal,
+): boolean {
+  if (
+    !left ||
+    left.captureBackend !== right.captureBackend ||
+    left.nodes.length === 0 ||
+    right.nodes.length === 0
+  )
+    return false;
+  const remainingIdentities = new Map<string, number>();
+  for (const node of left.nodes) {
+    remainingIdentities.set(node.identity, (remainingIdentities.get(node.identity) ?? 0) + 1);
+  }
+  let sharedNodes = 0;
+  for (const node of right.nodes) {
+    const remaining = remainingIdentities.get(node.identity) ?? 0;
+    if (remaining === 0) continue;
+    sharedNodes += 1;
+    remainingIdentities.set(node.identity, remaining - 1);
+  }
+  return sharedNodes / Math.max(left.nodes.length, right.nodes.length) < 0.5;
+}
+
 function stableCaptureNodeSignal(node: SnapshotNode): SignalNode {
   return {
     identity: `${node.type ?? ''}#${stableSemanticIdentity(node)}`,
