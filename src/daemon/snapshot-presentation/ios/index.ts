@@ -2,6 +2,7 @@ import type { RawSnapshotNode } from '@agent-device/kernel/snapshot';
 import { collectIosImplicitScrollableActions } from './actions.ts';
 import { collectIosPresentationNoiseSuppression } from './noise.ts';
 import { collectIosRowPresentation } from './rows.ts';
+import { collectIosTransitionPresentation } from './transitions.ts';
 import { collectIosWebSemanticPresentation } from './web.ts';
 import {
   reindexSnapshotNodesWithSuppressedParents,
@@ -13,6 +14,7 @@ const IOS_PRESENTATION_RULES: Array<
 > = [
   // Semantic representatives must be collected before duplicate-label suppression.
   collectIosWebSemanticPresentation,
+  collectIosTransitionPresentation,
   collectIosImplicitScrollableActions,
   collectIosRowPresentation,
   collectIosPresentationNoiseSuppression,

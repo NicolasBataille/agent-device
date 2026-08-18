@@ -1,6 +1,11 @@
 import type { RawSnapshotNode } from '@agent-device/kernel/snapshot';
 import { normalizeType } from '@agent-device/contracts/snapshot';
-import { findNearestAncestor, mergeReplacement, type SnapshotTreeRuleContext } from '../tree.ts';
+import {
+  collectChildrenByParent,
+  findNearestAncestor,
+  mergeReplacement,
+  type SnapshotTreeRuleContext,
+} from '../tree.ts';
 
 /**
  * WebKit exposes HTML text through an `Other -> StaticText` wrapper pair on iOS.
@@ -88,17 +93,6 @@ function isDocumentTitleWrapper(
     webView.label?.trim() === label &&
     !isHtmlHeadingLevel(node.value)
   );
-}
-
-function collectChildrenByParent(nodes: RawSnapshotNode[]): Map<number, RawSnapshotNode[]> {
-  const childrenByParent = new Map<number, RawSnapshotNode[]>();
-  for (const node of nodes) {
-    if (typeof node.parentIndex !== 'number') continue;
-    const children = childrenByParent.get(node.parentIndex) ?? [];
-    children.push(node);
-    childrenByParent.set(node.parentIndex, children);
-  }
-  return childrenByParent;
 }
 
 function isWebView(node: RawSnapshotNode): boolean {

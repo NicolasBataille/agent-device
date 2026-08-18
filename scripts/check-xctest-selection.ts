@@ -1,5 +1,6 @@
 // `pnpm check:xctest-selection` — hold the hand-written `-only-testing:` and
-// `-skip-testing:` lists in the iOS workflows to the tests that actually exist (#1781 A7).
+// `-skip-testing:` lists to the tests that actually exist, and ensure those unit-test methods
+// are stripped from the Apple runner source copied into the npm package (#1781 A7).
 //
 // `xcodebuild` treats a test identifier that matches nothing as an empty set rather than an
 // error, in BOTH directions, and each direction fails silently in its own way:
@@ -22,8 +23,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runCmdSync } from '../src/utils/exec.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
+const packageAppleRunnerScript = path.join(repoRoot, 'scripts/package-apple-runner-source.mjs');
 
 /** The XCTest target directory; its basename is the target name the identifiers use. */
 export const RUNNER_TESTS_DIR = 'apple/runner/AgentDeviceRunner/AgentDeviceRunnerUITests';
@@ -242,9 +245,21 @@ export function formatSummary(report: SelectionReport): string {
   );
 }
 
+/** Reuse the package builder's source guard without writing dist or packing a tarball. */
+export function runnerPackageSourceFailures(root: string = repoRoot): string[] {
+  const result = runCmdSync(
+    process.execPath,
+    [packageAppleRunnerScript, '--root', root, '--check', '--quiet'],
+    { allowFailure: true },
+  );
+  if (result.exitCode === 0) return [];
+  const detail = (result.stderr || result.stdout).trim();
+  return [`Apple runner package source guard failed:\n${detail || 'unknown failure'}`];
+}
+
 function main(): number {
   const report = loadReport();
-  const failures = reportFailures(report);
+  const failures = [...reportFailures(report), ...runnerPackageSourceFailures()];
   process.stdout.write(formatSummary(report));
   if (failures.length === 0) return 0;
   process.stderr.write(`${failures.join('\n')}\n`);

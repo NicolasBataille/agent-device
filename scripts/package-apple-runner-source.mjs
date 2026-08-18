@@ -35,10 +35,7 @@ function packageAppleRunnerSource(options = {}) {
     throw new Error(`Apple runner source not found at ${sourceRoot}`);
   }
 
-  fs.rmSync(outputRoot, { recursive: true, force: true });
-  for (const legacyDir of LEGACY_OUTPUT_DIRS) {
-    fs.rmSync(path.join(root, legacyDir), { recursive: true, force: true });
-  }
+  prepareOutput(root, outputRoot, options.checkOnly);
   const summary = {
     outputRoot,
     copiedFiles: 0,
@@ -46,8 +43,18 @@ function packageAppleRunnerSource(options = {}) {
     strippedBlocks: 0,
   };
 
-  copyDirectory(sourceRoot, outputRoot, '', summary);
+  processDirectory(sourceRoot, options.checkOnly ? undefined : outputRoot, '', summary);
   return summary;
+}
+
+function prepareOutput(root, outputRoot, checkOnly) {
+  if (checkOnly) {
+    return;
+  }
+  fs.rmSync(outputRoot, { recursive: true, force: true });
+  for (const legacyDir of LEGACY_OUTPUT_DIRS) {
+    fs.rmSync(path.join(root, legacyDir), { recursive: true, force: true });
+  }
 }
 
 function stripRunnerUnitTestBlocks(source, filePath = '<swift source>') {
@@ -94,30 +101,45 @@ function consumeSkippedConditionalLine(state, line) {
   }
 }
 
-function copyDirectory(sourceDir, outputDir, relativeDir, summary) {
-  fs.mkdirSync(outputDir, { recursive: true });
+function processDirectory(sourceDir, outputDir, relativeDir, summary) {
+  if (outputDir) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
   const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
 
   for (const entry of entries) {
-    copyDirectoryEntry(entry, sourceDir, outputDir, relativeDir, summary);
+    processDirectoryEntry(entry, sourceDir, outputDir, relativeDir, summary);
   }
 }
 
-function copyDirectoryEntry(entry, sourceDir, outputDir, relativeDir, summary) {
+function processDirectoryEntry(entry, sourceDir, outputDir, relativeDir, summary) {
   const relativePath = path.join(relativeDir, entry.name);
   if (shouldSkipEntry(entry, relativePath)) {
     return;
   }
 
+  processIncludedEntry(entry, sourceDir, outputDir, relativePath, summary);
+}
+
+function processIncludedEntry(entry, sourceDir, outputDir, relativePath, summary) {
   const sourcePath = path.join(sourceDir, entry.name);
-  const outputPath = path.join(outputDir, entry.name);
+  const outputPath = outputDir ? path.join(outputDir, entry.name) : undefined;
   if (entry.isDirectory()) {
-    copyDirectory(sourcePath, outputPath, relativePath, summary);
+    processDirectory(sourcePath, outputPath, relativePath, summary);
     return;
   }
-  if (entry.isFile()) {
-    copyFile(sourcePath, outputPath, relativePath, summary);
+  if (!entry.isFile()) {
+    return;
   }
+  processFile(sourcePath, outputPath, relativePath, summary);
+}
+
+function processFile(sourcePath, outputPath, relativePath, summary) {
+  if (outputPath) {
+    copyFile(sourcePath, outputPath, relativePath, summary);
+    return;
+  }
+  validateFile(sourcePath, relativePath, summary);
 }
 
 function copyFile(sourcePath, outputPath, relativePath, summary) {
@@ -127,15 +149,27 @@ function copyFile(sourcePath, outputPath, relativePath, summary) {
     return;
   }
 
+  const stripped = validateSwiftFile(sourcePath, relativePath, summary);
+  fs.writeFileSync(outputPath, stripped.contents);
+  summary.copiedFiles += 1;
+}
+
+function validateFile(sourcePath, relativePath, summary) {
+  if (path.extname(sourcePath) !== '.swift') {
+    return undefined;
+  }
+  return validateSwiftFile(sourcePath, relativePath, summary);
+}
+
+function validateSwiftFile(sourcePath, relativePath, summary) {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const stripped = stripRunnerUnitTestBlocks(source, sourcePath);
   assertNoShippedTestMethods(stripped.contents, relativePath);
-  fs.writeFileSync(outputPath, stripped.contents);
-  summary.copiedFiles += 1;
   if (stripped.strippedBlocks > 0) {
     summary.strippedFiles += 1;
     summary.strippedBlocks += stripped.strippedBlocks;
   }
+  return stripped;
 }
 
 function assertNoShippedTestMethods(strippedContents, relativePath) {
@@ -185,7 +219,7 @@ function isConditionalEnd(line) {
 }
 
 function parseArgs(argv) {
-  const parsed = { root: process.cwd(), quiet: false };
+  const parsed = { root: process.cwd(), quiet: false, checkOnly: false };
   let index = 0;
   while (index < argv.length) {
     index = parseArg(argv, index, parsed);
@@ -197,6 +231,10 @@ function parseArg(argv, index, parsed) {
   const arg = argv[index];
   if (arg === '--quiet') {
     parsed.quiet = true;
+    return index + 1;
+  }
+  if (arg === '--check') {
+    parsed.checkOnly = true;
     return index + 1;
   }
   if (arg === '--root') {
@@ -222,10 +260,17 @@ if (isMainModule()) {
   const options = parseArgs(process.argv.slice(2));
   const summary = packageAppleRunnerSource(options);
   if (!options.quiet) {
-    const relativeOutput = path.relative(path.resolve(options.root), summary.outputRoot);
-    console.log(
-      `Packaged Apple runner source at ${relativeOutput} ` +
-        `(${summary.copiedFiles} files, stripped ${summary.strippedBlocks} unit-test blocks).`,
-    );
+    if (options.checkOnly) {
+      console.log(
+        `Apple runner source package guard passed ` +
+          `(${summary.strippedFiles} files contain ${summary.strippedBlocks} stripped blocks).`,
+      );
+    } else {
+      const relativeOutput = path.relative(path.resolve(options.root), summary.outputRoot);
+      console.log(
+        `Packaged Apple runner source at ${relativeOutput} ` +
+          `(${summary.copiedFiles} files, stripped ${summary.strippedBlocks} unit-test blocks).`,
+      );
+    }
   }
 }

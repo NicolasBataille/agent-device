@@ -10,6 +10,17 @@ export type SnapshotTreeRuleContext = {
   suppressedIndexes: Set<number>;
 };
 
+export function collectChildrenByParent(nodes: RawSnapshotNode[]): Map<number, RawSnapshotNode[]> {
+  const childrenByParent = new Map<number, RawSnapshotNode[]>();
+  for (const node of nodes) {
+    if (typeof node.parentIndex !== 'number') continue;
+    const children = childrenByParent.get(node.parentIndex) ?? [];
+    children.push(node);
+    childrenByParent.set(node.parentIndex, children);
+  }
+  return childrenByParent;
+}
+
 const descendantEndPositionCache = new WeakMap<RawSnapshotNode[], number[]>();
 
 export function collectDescendants(

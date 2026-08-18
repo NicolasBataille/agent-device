@@ -54,7 +54,7 @@ test('package apple runner source strips unit-test blocks without mutating check
   );
 });
 
-test('package apple runner source rejects unit tests that would ship un-stripped', async () => {
+test('package apple runner source check rejects unit tests without writing dist', async () => {
   const root = mkdtempForTestSync('agent-device-runner-package-testgate-');
   onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -72,13 +72,16 @@ test('package apple runner source rejects unit tests that would ship un-stripped
     ].join('\n'),
   );
 
-  const result = await runCmd(process.execPath, [packageScript, '--root', root, '--quiet'], {
-    allowFailure: true,
-  });
+  const result = await runCmd(
+    process.execPath,
+    [packageScript, '--root', root, '--check', '--quiet'],
+    { allowFailure: true },
+  );
 
   assert.notEqual(result.exitCode, 0);
   assert.match(result.stderr, /testLeaksIntoPackage/);
   assert.match(result.stderr, /AGENT_DEVICE_RUNNER_UNIT_TESTS/);
+  assert.equal(fs.existsSync(path.join(root, 'dist')), false);
 });
 
 test('package apple runner source allows only the runner entrypoint test method', async () => {

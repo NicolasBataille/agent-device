@@ -7,7 +7,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test } from 'vitest';
+import { mkdtempForTestSync } from '../../src/__tests__/test-utils/tmp-dir.ts';
 import {
   buildReport,
   counts,
@@ -20,6 +21,7 @@ import {
   PR_WORKFLOW_FILE,
   readSwiftSources,
   reportFailures,
+  runnerPackageSourceFailures,
   RUNNER_TESTS_DIR,
   type WorkflowSource,
 } from '../check-xctest-selection.ts';
@@ -83,6 +85,26 @@ describe('the real tree', () => {
 
     expect(counted).toBeGreaterThan(0);
     expect(loadReport(repoRoot).declared).toHaveLength(counted);
+  });
+
+  test('the package-source boundary rejects an unguarded runner unit test', () => {
+    const root = mkdtempForTestSync('agent-device-runner-package-selection-');
+    onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
+    const sourcePath = path.join(
+      root,
+      'apple/runner/AgentDeviceRunner/AgentDeviceRunnerUITests/RunnerTests+Fixture.swift',
+    );
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.writeFileSync(sourcePath, 'extension RunnerTests {\n  func testLeaksIntoPackage() {}\n}\n');
+
+    expect(runnerPackageSourceFailures(root).join('\n')).toContain('testLeaksIntoPackage');
+
+    fs.writeFileSync(
+      sourcePath,
+      '#if AGENT_DEVICE_RUNNER_UNIT_TESTS\nextension RunnerTests {\n' +
+        '  func testStaysInTests() {}\n}\n#endif\n',
+    );
+    expect(runnerPackageSourceFailures(root)).toEqual([]);
   });
 });
 

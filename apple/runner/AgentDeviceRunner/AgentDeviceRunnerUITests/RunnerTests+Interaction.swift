@@ -317,7 +317,11 @@ extension RunnerTests {
         .filter { element in
           guard element.exists else { return false }
           let frame = element.frame
-          return !frame.isEmpty && frameContainsPoint(frame, point, tolerance: 2)
+          return isCoordinateTextInputCandidate(
+            enabled: element.isEnabled,
+            frame: frame,
+            point: point
+          )
         }
         .sorted { left, right in
           let leftArea = max(1, left.frame.width * left.frame.height)
@@ -334,13 +338,6 @@ extension RunnerTests {
           return left.elementType.rawValue < right.elementType.rawValue
         }
     }
-  }
-
-  private func frameContainsPoint(_ frame: CGRect, _ point: CGPoint, tolerance: CGFloat) -> Bool {
-    point.x >= frame.minX - tolerance
-      && point.x <= frame.maxX + tolerance
-      && point.y >= frame.minY - tolerance
-      && point.y <= frame.maxY + tolerance
   }
 
   private func readableText(for element: XCUIElement) -> String? {

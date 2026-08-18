@@ -101,7 +101,7 @@ export const CHECK_CATALOG: readonly CheckSpec[] = [
   // Parses ios.yml and the Swift sources; no Xcode, no simulator, so it runs anywhere.
   gate(
     'xctest-selection',
-    'PR XCTest `-only-testing:` list names tests that exist',
+    'Runner XCTest selection and package-source boundary',
     'check:xctest-selection',
   ),
 

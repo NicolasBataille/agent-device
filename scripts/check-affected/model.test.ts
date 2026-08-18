@@ -82,7 +82,7 @@ test('Swift runner change selects both XCUITest platform builds', () => {
   assert.ok(ids(['src/platforms/apple/core/runner/Support.swift']).includes('swift-runner-ios'));
 });
 
-test('a runner XCTest source also selects the PR test-list check', () => {
+test('a runner XCTest source also selects the test-list and package-source check', () => {
   // Distinct from the rule above, which owns Swift *anywhere*: renaming a method under
   // AgentDeviceRunnerUITests/ silently shrinks ios.yml's hand-written `-only-testing:` list
   // (#1781 A7), and the platform builds cannot see that — they compile fine either way.

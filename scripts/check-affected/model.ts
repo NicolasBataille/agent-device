@@ -459,7 +459,7 @@ const BUILD_OWNERSHIP: ReadonlyArray<{
   {
     check: 'xctest-selection',
     rule: 'own:xctest-selection',
-    detail: "the PR lane's hand-written `-only-testing:` list names these methods",
+    detail: 'runner test methods must stay selected in CI and stripped from the npm source bundle',
     owns: (file) => file.startsWith('apple/runner/AgentDeviceRunner/AgentDeviceRunnerUITests/'),
   },
   {
