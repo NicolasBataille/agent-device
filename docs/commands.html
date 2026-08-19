@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/static/js/index.0943fa56c2.js"></script>
+<script defer src="/agent-device/static/js/index.00ff6e3869.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -823,6 +823,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <li><code>logs start</code> appends to <code>app.log</code> and rotates to <code>app.log.1</code> when the file exceeds 5 MB.</li>
 <li><code>open</code> prints <code>Session state: &lt;path&gt;</code> and JSON includes <code>sessionStateDir</code>, <code>runnerLogPath</code>, <code>requestLogPath</code>, and <code>eventLogPath</code>. Use the session directory to inspect concurrent runs without parsing global daemon logs.</li>
 <li><code>events.ndjson</code> contains the session event timeline; <code>requests/&lt;request-id&gt;.ndjson</code> contains daemon request diagnostics; <code>runner.log</code> contains Apple runner and <code>xcodebuild</code> output.</li>
+<li><code>events.ndjson</code> rotates to <code>events.ndjson.1</code> when it exceeds 5 MB (<code>AGENT_DEVICE_EVENT_LOG_MAX_BYTES</code> overrides, in whole bytes); one rotated generation is kept. <code>events</code> cursors stay absolute across rotation, so <code>nextCursor</code> still resumes; a cursor older than the retained window fails with <code>COMMAND_FAILED</code> and <code>details.reason: &quot;EVENT_LOG_CURSOR_EXPIRED&quot;</code>, with <code>details.earliestCursor</code> naming the oldest cursor that still resolves. If the retained files and their window record disagree — a hand-deleted generation, an edited file, a corrupt <code>events.ndjson.window.json</code> — <code>events</code> fails with <code>details.reason: &quot;EVENT_LOG_WINDOW_UNVERIFIED&quot;</code> rather than answering from a guessed offset; appends continue regardless.</li>
 <li>Event timeline entries preserve command names, status, durations, bounded device/app inventory previews, lifecycle outcomes, artifact basenames, and structural action details such as scroll distance/direction, safe refs, and coordinates. User-entered text, clipboard contents, push/event payloads, selector values, free-form flags/messages/paths, and raw unknown command arguments are omitted or replaced with content-free placeholders. <code>--no-record</code> suppresses <code>action.recorded</code> entries, but request start/finish entries still record command/status/timing.</li>
 <li><code>network dump [limit] [summary|headers|body|all]</code> parses recent HTTP(s) entries from <code>app.log</code> for app/device sessions and from managed <code>agent-browser</code> request history for web sessions; <code>network log ...</code> is an alias.</li>
 <li>Prefer <code>--include headers|body|all</code> when you want explicit detail level without relying on positional ordering.</li>
