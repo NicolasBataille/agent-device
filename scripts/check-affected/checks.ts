@@ -49,7 +49,7 @@ export const CHECK_CATALOG: readonly CheckSpec[] = [
     localRunnable: true,
   },
   gate('unit', 'Unit + smoke suite', 'check:unit'),
-  gate('coverage', 'Affected LCOV + changed-line coverage', 'check:coverage-changed'),
+  gate('coverage', 'Changed-line coverage', 'check:coverage-changed', false),
   gate('provider-integration', 'Provider-backed integration suite', 'test:integration:provider'),
   gate(
     'integration-progress',
@@ -78,8 +78,9 @@ export const CHECK_CATALOG: readonly CheckSpec[] = [
   // steps; before the registry became canonical, nothing in the repo could name
   // them, so nothing could ask whether they still ran.
   //
-  // `unit-ci` is the CI form of the unit suite. Locally you run `unit` and
-  // `coverage`, which together repeat it.
+  // `unit-ci` is the CI form of the unit suite under coverage. Local affected
+  // checks use Vitest's related graph without instrumentation; CI owns the
+  // full coverage run and changed-line verdict.
   gate('unit-ci', 'CI unit suite under coverage', 'test:coverage:ci', false),
   gate('affected-selector', 'Affected-check selector model', 'check:affected:test'),
   gate('gate-manifest', 'Gate manifest — every gate owned and wired', 'check:gate-manifest'),

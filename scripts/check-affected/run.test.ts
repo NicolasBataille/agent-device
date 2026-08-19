@@ -10,7 +10,6 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { runCmdSync } from '../../src/utils/exec.ts';
 import { CHECK_CATALOG } from './checks.ts';
-import { DEFAULT_VITEST_MAX_WORKERS } from '../lib/vitest-concurrency.ts';
 import { selectChecks } from './model.ts';
 import { type CommandExecutor, readChangedFiles, runChecks } from './run.ts';
 
@@ -171,26 +170,29 @@ test('runChecks skips GitHub-authoritative checks and passes when locals succeed
   }
 });
 
-test('runChecks combines related tests with lightweight changed-line coverage', async () => {
+test('runChecks leaves coverage to CI and runs plain related tests once', async () => {
   const executed: string[][] = [];
   const execute: CommandExecutor = async (command) => {
     executed.push(command);
     return 0;
   };
   const plan = selectChecks({ changedFiles: ['unknown/path.xyz'], packageEntryFiles: [] });
+  assert.equal(
+    CHECK_CATALOG.find((spec) => spec.id === 'coverage')?.localRunnable,
+    false,
+    'coverage must stay visible in the plan but must not run locally',
+  );
 
   const code = await runChecks(plan, { scripts: ALL_SCRIPTS }, ARGS, { execute, cwd: '.' });
 
   assert.equal(code, 0);
   const related = executed.filter((command) => command.includes('related'));
   assert.equal(related.length, 1);
-  assert.ok(related[0]?.includes('--coverage'));
-  assert.ok(related[0]?.includes('--coverage.reporter=lcov'));
-  assert.ok(related[0]?.includes(`--maxWorkers=${DEFAULT_VITEST_MAX_WORKERS}`));
+  assert.equal(related[0]?.includes('--coverage'), false);
   assert.ok(
     executed.findIndex((command) => command.includes('test:integration:node')) <
       executed.findIndex((command) => command.includes('related')),
-    'process-lifecycle integration must run before high-parallelism affected coverage',
+    'process-lifecycle integration must run before the related-project workload',
   );
   assert.equal(
     executed.some((command) => command.includes('test:coverage')),
@@ -206,6 +208,6 @@ test('runChecks combines related tests with lightweight changed-line coverage', 
   );
   assert.equal(
     executed.some((command) => command.includes('check:coverage-changed')),
-    true,
+    false,
   );
 });

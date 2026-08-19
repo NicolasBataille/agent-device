@@ -188,9 +188,9 @@ hand-maintained path map:
   implicitly.
 - **Always-on gates** (`lint`, `typecheck`, `layering`, `fallow`, `format`) fire
   for their input categories and are never silently skipped. Legacy
-  `src/platforms/` source also selects provider-integration and coverage.
+  `src/platforms/` source also selects provider-integration and reports coverage as CI-owned.
   `packages/platform-*` source selects the shared runtime-contract unit lane,
-  provider-integration, and coverage so a package move cannot narrow its evidence.
+  provider-integration, and CI-owned coverage so a package move cannot narrow its evidence.
 - **Commands** are resolved from real `package.json` scripts, so a renamed
   script fails loudly instead of dropping a gate.
 - A **small explicit build-ownership layer** covers the paths whose owning build
@@ -224,11 +224,10 @@ docs-only short-circuit its path would otherwise take. If the matrix moves
 again, move that entry with it.
 The plan documents the rule and changed path behind every selected check.
 
-Local coverage reuses the affected Vitest run as its LCOV producer and applies the changed-line
-coverage gate to that report. It does not run the full instrumented suite; global coverage
-thresholds and full unit/provider matrices remain authoritative in GitHub CI. When coverage is
-selected, `vitest-related` is folded into this one affected coverage run, and full unit/provider
-aggregates are not repeated locally.
+Coverage is never instrumented by `check:affected --run`. The plan still reports the coverage
+obligation and its authoritative GitHub job, while the local path runs plain `vitest related` and
+deduplicates full unit/provider aggregates. When CI reports a coverage failure, reproduce it in
+isolation with the coverage command named by that job; do not make every pre-push loop pay for LCOV.
 
 Model and catalog live under `scripts/check-affected/`; the derivation is guarded
 by `pnpm check:affected:test` (the `Affected-check Selector` CI job).
