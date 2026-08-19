@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1856/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1856/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1856/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1856/static/js/index.b4d01b47fd.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1856/static/js/index.15426f4a71.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -598,7 +598,7 @@ On physical Android devices, only <code>cmd fingerprint</code> is attempted.</li
 <li>On macOS, <code>settings permission grant ...</code> checks/request access and opens System Settings guidance when needed; it does not silently grant TCC permissions.</li>
 <li>On macOS, <code>settings permission deny ...</code> is intentionally unsupported.</li>
 <li>Android uses <code>pm grant|revoke</code> for runtime permissions (<code>reset</code> maps to revoke) and <code>appops</code> for notifications.</li>
-<li>Android kills the app process whenever a runtime permission it currently holds is revoked, so <code>settings permission deny|reset</code> after a grant leaves the session app not running. The response then carries <code>wasGranted: true</code> and a warning; relaunch with <code>open &lt;app&gt; --relaunch</code> before the next interaction. Revoking a permission the app does not hold is harmless.</li>
+<li>Android kills a running app whenever a runtime permission it currently holds is revoked, so <code>settings permission deny|reset</code> after a grant leaves the session app no longer running. The response then carries <code>wasGranted: true</code> and a warning; relaunch with <code>open &lt;app&gt; --relaunch</code> before the next interaction. Revoking a permission the app does not hold is harmless.</li>
 <li><code>full|limited</code> mode is supported only for iOS <code>photos</code>; other targets reject mode.</li>
 <li>Use <code>match</code>/<code>nonmatch</code> to simulate valid/invalid Face ID, Touch ID, and Android fingerprint outcomes.</li>
 </ul>
