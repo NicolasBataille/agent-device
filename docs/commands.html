@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/static/js/index.583757ec30.js"></script>
+<script defer src="/agent-device/static/js/index.eb5c6f0c8a.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -316,8 +316,8 @@ the requested projection, re-rooted at depth 0; no match returns an empty snapsh
 full tree. Under <code>-i</code> that means scoping to a layout container returns the actionable elements
 inside it, even when the container itself is filtered out. <code>--depth</code> then counts from the scope
 root. <code>@ref</code> scopes by that element&#x27;s label from the last snapshot. Android resolves scope inside
-its projection; on iOS the runner first narrows capture by label/identifier and the daemon applies
-the rule to the presented tree.</li>
+its TypeScript presentation; iOS keeps acquisition broad and resolves scope once inside the
+runner&#x27;s Swift presentation. The daemon does not reapply scope after either platform returns.</li>
 <li><code>--actions</code> names the custom accessibility affordances an element merged away (iOS
 <code>UIAccessibilityCustomAction</code>, React Native <code>accessibilityActions</code>), so a card whose reply/options
 controls are not separate elements still lists them. It is iOS-simulator-only and exists for
