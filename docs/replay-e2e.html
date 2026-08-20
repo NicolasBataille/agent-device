@@ -9,7 +9,7 @@
 <script defer src="/agent-device/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/static/js/lib-router.7cf88a311a.js"></script>
 <script defer src="/agent-device/static/js/476.cf0323f326.js"></script>
-<script defer src="/agent-device/static/js/index.eb5c6f0c8a.js"></script>
+<script defer src="/agent-device/static/js/index.2b622951f5.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -67,7 +67,7 @@ attempts own cleanup, and it is rejected for Maestro YAML because that runtime o
 <p>Supported subset:</p>
 <ul>
 <li>Flows: <code>launchApp</code>; <code>runFlow</code> file/inline with platform, visibility, and limited boolean conditions; <code>onFlowStart</code>/<code>onFlowComplete</code>; <code>repeat.times</code> and retry.</li>
-<li>Interactions: <code>tapOn</code>, <code>doubleTapOn</code>, <code>longPressOn</code>, <code>inputText</code>, <code>eraseText</code>, <code>openLink</code>, <code>hideKeyboard</code>, basic <code>pressKey</code>, and <code>back</code>; targets support <code>index</code>, <code>childOf</code>, <code>label</code>, points, and <code>optional</code>.</li>
+<li>Interactions: <code>tapOn</code>, <code>doubleTapOn</code>, <code>longPressOn</code>, <code>inputText</code> on the focused element, <code>eraseText</code>, <code>openLink</code>, <code>hideKeyboard</code>, basic <code>pressKey</code>, and <code>back</code>; tap targets poll until available and support <code>index</code>, <code>childOf</code>, <code>label</code>, points, and <code>optional</code>.</li>
 <li>Assertions and navigation: <code>assertVisible</code>, <code>assertNotVisible</code>, <code>extendedWaitUntil</code>, <code>scroll</code>, <code>scrollUntilVisible</code>, absolute/percentage/target <code>swipe</code>, <code>takeScreenshot</code>, <code>waitForAnimationToEnd</code>, and <code>stopApp</code>.</li>
 <li>Scripts: ordered <code>runScript</code> file/env scripts with <code>http.post</code>, <code>json</code>, and <code>output</code> variables.</li>
 </ul>
