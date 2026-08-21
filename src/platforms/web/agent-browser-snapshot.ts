@@ -95,7 +95,9 @@ function snapshotNodeFromLine(
     label: extractQuotedText(line) ?? readMetadataString(metadata, ['label', 'name', 'text']),
     value: extractValue(line) ?? readMetadataString(metadata, ['value']),
     depth,
-    enabled: readMetadataBoolean(metadata, ['enabled']),
+    enabled:
+      readMetadataBoolean(metadata, ['enabled']) ??
+      (isLineMarkedDisabled(line) ? false : undefined),
     focused: readMetadataBoolean(metadata, ['focused']),
   };
 }
@@ -164,6 +166,13 @@ function extractRole(line: string): string | undefined {
 
 function extractQuotedText(line: string): string | undefined {
   return line.match(/"([^"]+)"/)?.[1] ?? line.match(/'([^']+)'/)?.[1];
+}
+
+function isLineMarkedDisabled(line: string): boolean {
+  const annotations = line.match(/\[[^\]]*\]/g) ?? [];
+  return annotations.some(
+    (group) => /\bref\s*=\s*['"]?@?e\d+/i.test(group) && /\bdisabled\b/i.test(group),
+  );
 }
 
 function extractValue(line: string): string | undefined {
