@@ -9,7 +9,7 @@
 <script defer src="/agent-device/pr-preview/pr-1981/static/js/lib-react.e84adf13b9.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1981/static/js/lib-router.270f17bfa6.js"></script>
 <script defer src="/agent-device/pr-preview/pr-1981/static/js/476.52ed165336.js"></script>
-<script defer src="/agent-device/pr-preview/pr-1981/static/js/index.5eb2862256.js"></script>
+<script defer src="/agent-device/pr-preview/pr-1981/static/js/index.57a0c08567.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.12">
 <meta property="og:url" content="https://oss.callstack.com/agent-device">
@@ -307,12 +307,12 @@ disable the persistent fast path. Missing or failed helper artifacts are reporte
 source checkout must run <code>pnpm build:android</code> before Android verification. The helper serializes
 Android interactive window roots when available, so keyboard and system-overlay nodes can appear
 alongside the app root; <code>androidSnapshot.captureMode</code> and <code>androidSnapshot.windowCount</code> describe
-the capture. Android <code>--raw</code> is the acquired tree: it keeps nodes Android marks invisible and
-stale application windows. Default and <code>-i</code> snapshots keep same-window covered surfaces visible
-for diagnosis but mark their controls <code>interactionBlocked: &quot;covered&quot;</code>, so selectors cannot act
-on stale React Native screens. This result is identical on API 23 and newer even though API 23
-cannot report the acquisition-only <code>drawing-order</code> attribute. The helper does not report
-<code>checked</code>/<code>selected</code> state, and it caps
+the capture. Default and <code>-i</code> snapshots keep same-window covered surfaces visible for diagnosis
+and mark exactly ordered covered controls <code>interactionBlocked: &quot;covered&quot;</code>, so selectors cannot
+act on stale React Native screens. API 23 cannot report sibling <code>drawing-order</code>, so this scan fails
+conservative and <code>androidSnapshot.occlusionScanUnavailable: true</code> discloses the difference.
+Android <code>--raw</code> is the acquired tree: it also keeps nodes Android marks invisible and stale
+application windows. The helper does not report <code>checked</code>/<code>selected</code> state, and it caps
 captures at 5000 nodes before any <code>--scope</code> applies (<code>truncated: true</code>).</li>
 <li><code>--scope &lt;text|@ref&gt;</code> returns the subtree of the first node in document order whose label, value,
 or identifier contains the scope text (case-insensitive) and whose subtree still has content in
