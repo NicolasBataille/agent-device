@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Security (MCP/AI-SDK tool surface): `daemonAuthToken` and the Metro `bearerToken` are no longer
+  advertised as tool input properties, and an explicit value is refused with guidance instead of
+  being forwarded. Credentials are operator-owned: set `AGENT_DEVICE_DAEMON_AUTH_TOKEN` (or
+  `daemonAuthToken` in `~/.agent-device/config.json`) and `AGENT_DEVICE_METRO_BEARER_TOKEN` on the
+  process serving the tools. The model both reads untrusted app UI text and picks tool arguments,
+  so a model-writable credential parameter was a prompt-injection exfiltration path. CLI flags
+  (`--daemon-auth-token`, `--bearer-token`) and env/config resolution are unchanged.
 - Release hygiene: after `npm publish`, `release:mark-dev` moves `main` to the next patch with a
   `-dev` prerelease marker so the version on `main` never equals a published version (registry
   scanners diff the tool surface per version string, and a moving surface under a released number

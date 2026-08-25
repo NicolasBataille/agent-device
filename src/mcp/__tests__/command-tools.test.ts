@@ -1064,7 +1064,6 @@ const UNDESCRIBED_TOOL_INPUTS = new Set([
   'logs.message',
   'logs.restart',
   'metro.action',
-  'metro.bearerToken',
   'metro.bridgeScope',
   'metro.bundleUrl',
   'metro.installDependenciesIfNeeded',

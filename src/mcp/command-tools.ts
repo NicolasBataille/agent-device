@@ -47,6 +47,23 @@ type McpToolConfig = {
   outputFormat: McpOutputFormat;
 };
 
+/**
+ * Credential inputs are operator-owned, never model-writable: the model both
+ * reads untrusted app UI text and picks tool arguments, so a screen that
+ * steers it into writing a token or auth endpoint must find no parameter to
+ * write it into. These keys are removed from every advertised tool schema and
+ * refused as explicit input with migration guidance (the retired-field
+ * posture: refuse, never silently drop). Operator-sourced values still flow —
+ * env/config defaults merge in `resolveMcpConfigDefaults`, and the daemon and
+ * Metro clients fall back to their env vars on their own.
+ */
+const CREDENTIAL_INPUT_GUIDANCE: Readonly<Record<string, string>> = {
+  daemonAuthToken:
+    'daemonAuthToken is not accepted as a tool argument. Set the AGENT_DEVICE_DAEMON_AUTH_TOKEN environment variable (or daemonAuthToken in ~/.agent-device/config.json) for the process serving these tools.',
+  bearerToken:
+    'bearerToken is not accepted as a tool argument. Set the AGENT_DEVICE_METRO_BEARER_TOKEN or AGENT_DEVICE_DAEMON_AUTH_TOKEN environment variable for the process serving these tools.',
+};
+
 export function listCommandTools(): Array<{
   name: string;
   description: string;
@@ -63,7 +80,9 @@ export function listCommandTools(): Array<{
     return {
       name: definition.name,
       description: mcpBody(definition),
-      inputSchema: withMcpConfigSchema(definition.name, definition.inputSchema),
+      inputSchema: omitCredentialProperties(
+        withMcpConfigSchema(definition.name, definition.inputSchema),
+      ),
       // Only typed commands carry an outputSchema; untyped tools stay
       // byte-identical to today (no key at all), additive-only.
       ...(outputSchema ? { outputSchema } : {}),
@@ -77,6 +96,18 @@ export function createCommandToolExecutor(deps: CommandToolExecutorDeps = {}): C
     execute: async (name, input) => {
       if (!isCommandName(name)) {
         throw new AppError('INVALID_ARGS', `Unknown command tool: ${name}`);
+      }
+      // Checked against the RAW input, before config/env defaults merge:
+      // explicit (model-typed) credentials are refused, operator defaults
+      // keep flowing.
+      const credentialRejection = findCredentialInput(input);
+      if (credentialRejection) {
+        return buildErrorToolResult(
+          new AppError('INVALID_ARGS', credentialRejection),
+          refPins,
+          undefined,
+          input.session,
+        );
       }
       const metadata = findCommandMetadata(name);
       const supportedProperties = withMcpConfigSchema(name, metadata.inputSchema).properties;
@@ -216,6 +247,26 @@ function stripMcpConfigFields(input: Record<string, unknown>): Record<string, un
     ...commandInput
   } = input;
   return commandInput;
+}
+
+function omitCredentialProperties(
+  schema: JsonSchema & { properties: Record<string, JsonSchema> },
+): JsonSchema & { properties: Record<string, JsonSchema> } {
+  return {
+    ...schema,
+    properties: Object.fromEntries(
+      Object.entries(schema.properties).filter(
+        ([key]) => !Object.hasOwn(CREDENTIAL_INPUT_GUIDANCE, key),
+      ),
+    ),
+  };
+}
+
+function findCredentialInput(input: Record<string, unknown>): string | undefined {
+  for (const [key, guidance] of Object.entries(CREDENTIAL_INPUT_GUIDANCE)) {
+    if (Object.hasOwn(input, key)) return guidance;
+  }
+  return undefined;
 }
 
 function withMcpConfigSchema(
