@@ -102,12 +102,13 @@ export function listCommandTools(): Array<{
       definition.name in MCP_COMMAND_OUTPUT_SCHEMAS
         ? MCP_COMMAND_OUTPUT_SCHEMAS[definition.name as keyof typeof MCP_COMMAND_OUTPUT_SCHEMAS]
         : undefined;
+    const advertised = omitOperatorProperties(
+      withMcpConfigSchema(definition.name, definition.inputSchema),
+    );
     return {
       name: definition.name,
       description: withTimeoutNote(definition.name, mcpBody(definition)),
-      inputSchema: omitOperatorProperties(
-        withMcpConfigSchema(definition.name, definition.inputSchema),
-      ),
+      inputSchema: advertised,
       // Only typed commands carry an outputSchema; untyped tools stay
       // byte-identical to today (no key at all), additive-only.
       ...(outputSchema ? { outputSchema } : {}),
@@ -122,19 +123,27 @@ export function createCommandToolExecutor(deps: CommandToolExecutorDeps = {}): C
       if (!isCommandName(name)) {
         throw new AppError('INVALID_ARGS', `Unknown command tool: ${name}`);
       }
-      // Checked against the RAW input, before config/env defaults merge:
-      // explicit (model-typed) operator fields are refused, operator defaults
-      // keep flowing.
-      const operatorRejection = findOperatorInput(input);
-      if (operatorRejection) {
+      // Admission boundary. The MCP router (and the AI SDK adapter) forward raw
+      // tools/call arguments verbatim, so this executor is the one place the
+      // advertised schema is enforced. Every tool schema is
+      // additionalProperties:false, but nothing checked it — so an unadvertised
+      // key rode straight into config resolution. `config`/`remoteConfig` are
+      // the dangerous case: `resolveMcpConfigDefaults` reads them as CLI flags
+      // and loads that file, whose `daemonBaseUrl`/`daemonAuthToken` then reach
+      // the command route — a model-writable redirect to an arbitrary endpoint
+      // with the operator's token. Reject every raw key the advertised schema
+      // does not list, BEFORE config/env defaults merge (operator env/config
+      // values still resolve below — they never arrive as tool input).
+      const metadata = findCommandMetadata(name);
+      const rejection = findInadmissibleInput(name, metadata, input);
+      if (rejection) {
         return buildErrorToolResult(
-          new AppError('INVALID_ARGS', operatorRejection),
+          new AppError('INVALID_ARGS', rejection),
           refPins,
           undefined,
           input.session,
         );
       }
-      const metadata = findCommandMetadata(name);
       const supportedProperties = withMcpConfigSchema(name, metadata.inputSchema).properties;
       const resolvedInput = resolveMcpConfigDefaults(name, input, supportedProperties);
       const config = readMcpToolConfig(resolvedInput);
@@ -287,9 +296,49 @@ function omitOperatorProperties(
   };
 }
 
-function findOperatorInput(input: Record<string, unknown>): string | undefined {
-  for (const [key, guidance] of Object.entries(OPERATOR_INPUT_GUIDANCE)) {
-    if (Object.hasOwn(input, key)) return guidance;
+// Config-file-loading keys. Not per-command flags but flags the MCP config
+// resolver reads to load an arbitrary file; never model-writable, since that
+// file can carry operator credentials and endpoints. Rejected by admission
+// like any unadvertised key, with a message that points at the operator path.
+const CONFIG_LOADER_GUIDANCE: Readonly<Record<string, string>> = {
+  config:
+    'config is not accepted as a tool argument. Point the process serving these tools at a config file with the AGENT_DEVICE_CONFIG environment variable.',
+  remoteConfig:
+    'remoteConfig is not accepted as a tool argument. Configure the remote profile on the process serving these tools, not per tool call.',
+};
+
+/**
+ * The advertised property set for a tool — exactly what `listCommandTools`
+ * exposes. Admission and the tool listing derive from this one function so a
+ * key can never be hidden from the model yet admitted from the wire.
+ */
+type AdmissionMetadata = { inputSchema: JsonSchema; retiredInputKeys?: readonly string[] };
+
+function advertisedInputProperties(
+  name: CommandName,
+  metadata: AdmissionMetadata,
+): Record<string, JsonSchema> {
+  return omitOperatorProperties(withMcpConfigSchema(name, metadata.inputSchema)).properties;
+}
+
+/** The first raw input key the advertised schema does not list, with guidance, or undefined. */
+function findInadmissibleInput(
+  name: CommandName,
+  metadata: AdmissionMetadata,
+  input: Record<string, unknown>,
+): string | undefined {
+  const advertised = advertisedInputProperties(name, metadata);
+  // Retired keys are absent from the advertised schema but still recognized:
+  // admit them so the command's own reader answers with migration guidance
+  // (e.g. maxSize -> "use --scale") instead of a bare unknown-key rejection.
+  const retired = new Set(metadata.retiredInputKeys ?? []);
+  for (const key of Object.keys(input)) {
+    if (Object.hasOwn(advertised, key) || retired.has(key)) continue;
+    return (
+      OPERATOR_INPUT_GUIDANCE[key] ??
+      CONFIG_LOADER_GUIDANCE[key] ??
+      `${key} is not an accepted argument for the ${name} tool.`
+    );
   }
   return undefined;
 }

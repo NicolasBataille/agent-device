@@ -810,7 +810,7 @@ test('MCP tool error is a ref-issuing result: isError, structuredContent, and pi
     },
   });
 
-  const result = await executor.execute('replay', { positionals: ['/tmp/flow.ad'] });
+  const result = await executor.execute('replay', { path: '/tmp/flow.ad' });
 
   assert.equal(result.isError, true);
   const structured = result.structuredContent as {
@@ -908,7 +908,7 @@ test("MCP projections carry a caution divergence's alternateFrom (structuredCont
     },
   });
 
-  const result = await executor.execute('replay', { positionals: ['/tmp/flow.ad'] });
+  const result = await executor.execute('replay', { path: '/tmp/flow.ad' });
   assert.equal(result.isError, true);
   const structured = result.structuredContent as {
     details?: { divergence?: { resume?: { from?: number; alternateFrom?: number } } };

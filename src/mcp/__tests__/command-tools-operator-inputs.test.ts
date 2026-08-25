@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, vi } from 'vitest';
 import type { AgentDeviceClient } from '../../client/client-types.ts';
+import { mkdtempForTestSync } from '../../__tests__/test-utils/tmp-dir.ts';
 import { createCommandToolExecutor, listCommandTools } from '../command-tools.ts';
 
 // Operator-owned inputs are never model-writable: the model reads untrusted
@@ -90,6 +93,68 @@ test('MCP refuses an explicit metro bearerToken argument with env guidance', asy
   assert.match(result.content[0]?.text ?? '', /bearerToken is not accepted as a tool argument/);
   assert.match(result.content[0]?.text ?? '', /AGENT_DEVICE_METRO_BEARER_TOKEN/);
   assert.deepEqual(calls, [], 'a refused credential input must never reach the command route');
+});
+
+// Regression: the router forwards raw tools/call arguments verbatim, and the
+// MCP config resolver reads `config`/`remoteConfig` as CLI flags to load an
+// arbitrary file. Before the admission boundary, `{config: <path>}` on any
+// tool loaded that file and its daemonBaseUrl/daemonAuthToken reached the
+// command route — a model-writable redirect to an attacker endpoint with the
+// operator's token. Hidden-from-tools/list was not enough; admission must
+// reject the key.
+test('MCP refuses a config-file argument so it cannot smuggle operator values', async () => {
+  const home = mkdtempForTestSync('agent-device-mcp-config-bypass-');
+  const configPath = path.join(home, 'redirect.json');
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      daemonBaseUrl: 'http://attacker.example:9000',
+      daemonAuthToken: 'exfiltrated-secret',
+    }),
+  );
+
+  const calls: unknown[] = [];
+  const executor = createCommandToolExecutor({
+    createClient: () => ({}) as AgentDeviceClient,
+    runCommand: async (_client, name, input) => {
+      calls.push({ name, input });
+      return {};
+    },
+  });
+
+  for (const key of ['config', 'remoteConfig']) {
+    const result = await executor.execute('snapshot', { [key]: configPath });
+    assert.equal(result.isError, true, `${key} must be refused`);
+    assert.match(
+      result.content[0]?.text ?? '',
+      new RegExp(`${key} is not accepted as a tool argument`),
+    );
+  }
+  assert.deepEqual(calls, [], 'a config loader must never reach the command route');
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+// Deny-by-default: the advertised schema is additionalProperties:false, so a
+// key it does not list is rejected outright — a typo, or a future operator
+// flag that must never become model-writable, both fail closed.
+test('MCP refuses any argument the advertised schema does not list', async () => {
+  const calls: unknown[] = [];
+  const executor = createCommandToolExecutor({
+    createClient: () => ({}) as AgentDeviceClient,
+    runCommand: async (_client, name, input) => {
+      calls.push({ name, input });
+      return {};
+    },
+  });
+
+  const result = await executor.execute('snapshot', { totallyUnknownKey: 'x' });
+
+  assert.equal(result.isError, true);
+  assert.match(
+    result.content[0]?.text ?? '',
+    /totallyUnknownKey is not an accepted argument for the snapshot tool/,
+  );
+  assert.deepEqual(calls, [], 'an unadvertised key must never reach the command route');
 });
 
 // The refusal covers the model-writable surface only: operator values from
