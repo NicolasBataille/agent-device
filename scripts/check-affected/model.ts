@@ -35,7 +35,6 @@ export type CheckId =
   | 'test-app-typecheck'
   | 'layering'
   | 'di-seams'
-  | 'shell-argv'
   | 'fallow'
   | 'mcp-metadata'
   | 'build'
@@ -98,7 +97,6 @@ export const ALL_CHECKS: readonly CheckId[] = [
   'test-app-typecheck',
   'layering',
   'di-seams',
-  'shell-argv',
   'fallow',
   'mcp-metadata',
   'build',

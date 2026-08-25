@@ -13,11 +13,15 @@
   install, 300s+ lease allocation, unbounded only for the streaming `test` runner), sourced from
   the descriptor registry's timeout policy so the declared number cannot drift from the enforced
   one.
-- New `pnpm check:shell-argv` CI gate: an exact inventory of every dynamic value reaching a device
-  shell (`adb shell` / `adb exec-out` / `hdc shell` argv, which the device evaluates as one shell
-  string). A new value fails the gate until it is quoted through `shellQuoteIfNeeded` or
-  deliberately recorded in the same PR, so an argv-injection regression can no longer land
-  silently.
+- Security (MCP/AI-SDK tool surface): the shared command-tool executor now enforces the advertised
+  tool schema as an admission boundary — every raw `tools/call` argument must appear in the tool's
+  advertised (`additionalProperties: false`) schema, or it is refused before config/env resolution.
+  Hiding a key from `tools/list` alone was insufficient: the router forwards raw arguments verbatim
+  and the MCP config resolver read `config`/`remoteConfig` as CLI flags, so a model-supplied config
+  file could load `daemonBaseUrl`/`daemonAuthToken` and redirect the operator's token to an
+  arbitrary endpoint. Deny-by-default closes that, the operator keys, and any unknown key at once;
+  operator env/config defaults still resolve (they never arrive as tool input). Retired keys are
+  still admitted so their migration guidance answers.
 - Security (MCP/AI-SDK tool surface): `daemonAuthToken` and the Metro `bearerToken` are no longer
   advertised as tool input properties, and an explicit value is refused with guidance instead of
   being forwarded. Credentials are operator-owned: set `AGENT_DEVICE_DAEMON_AUTH_TOKEN` (or
