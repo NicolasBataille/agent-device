@@ -15,7 +15,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { diffInventory, findShellArgvValues, toInventory, type SourceFile } from './model.ts';
+import {
+  diffInventory,
+  findShellArgvValues,
+  toInventory,
+  type InventoryDiff,
+  type SourceFile,
+} from './model.ts';
 
 const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
   encoding: 'utf8',
@@ -47,47 +53,53 @@ function readRecordedInventory(): Record<string, number> {
   return JSON.parse(fs.readFileSync(inventoryPath, 'utf8')) as Record<string, number>;
 }
 
-export function main(argv: readonly string[]): number {
-  const update = argv.includes('--update');
+function reportAdded(added: readonly string[]): void {
+  process.stderr.write(
+    `${added.length} NEW dynamic value(s) reach a device shell (adb/hdc argv is evaluated ` +
+      'as one shell string on the device):\n',
+  );
+  for (const entry of added) process.stderr.write(`  + ${entry}\n`);
+  process.stderr.write(
+    '\nQuote free-form text with shellQuoteIfNeeded (src/utils/shell-quote.ts). Only a value ' +
+      'validated upstream (number, enum, resolver-checked identifier) may instead be recorded ' +
+      'with `pnpm check:shell-argv --update`, so the reviewer sees the inventory grow.\n\n',
+  );
+}
+
+function reportStale(stale: readonly string[]): void {
+  process.stderr.write(`${stale.length} stale inventory entr(ies) no longer match a site:\n`);
+  for (const entry of stale) process.stderr.write(`  - ${entry}\n`);
+  process.stderr.write('\nRun `pnpm check:shell-argv --update` to shrink the inventory.\n\n');
+}
+
+function updateInventory(scanned: Record<string, number>, fileCount: number): number {
+  fs.writeFileSync(inventoryPath, `${JSON.stringify(scanned, null, 2)}\n`);
+  process.stdout.write(
+    `Device-shell argv inventory updated: ${Object.keys(scanned).length} distinct value(s) ` +
+      `across ${fileCount} production files.\n`,
+  );
+  return 0;
+}
+
+function reportDrift({ added, stale }: InventoryDiff): number {
+  if (added.length > 0) reportAdded(added);
+  if (stale.length > 0) reportStale(stale);
+  return 1;
+}
+
+function main(argv: readonly string[]): number {
   const files = readSources(listProductionSourceFiles());
   const scanned = toInventory(findShellArgvValues(files));
+  if (argv.includes('--update')) return updateInventory(scanned, files.length);
 
-  if (update) {
-    fs.writeFileSync(inventoryPath, `${JSON.stringify(scanned, null, 2)}\n`);
-    process.stdout.write(
-      `Device-shell argv inventory updated: ${Object.keys(scanned).length} distinct value(s) ` +
-        `across ${files.length} production files.\n`,
-    );
-    return 0;
-  }
+  const drift = diffInventory(scanned, readRecordedInventory());
+  if (drift.added.length + drift.stale.length > 0) return reportDrift(drift);
 
-  const { added, stale } = diffInventory(scanned, readRecordedInventory());
-  if (added.length === 0 && stale.length === 0) {
-    process.stdout.write(
-      `Device-shell argv guard: OK — ${files.length} production files scanned, ` +
-        `${Object.keys(scanned).length} inventoried dynamic value(s), no drift.\n`,
-    );
-    return 0;
-  }
-
-  if (added.length > 0) {
-    process.stderr.write(
-      `${added.length} NEW dynamic value(s) reach a device shell (adb/hdc argv is evaluated ` +
-        'as one shell string on the device):\n',
-    );
-    for (const entry of added) process.stderr.write(`  + ${entry}\n`);
-    process.stderr.write(
-      '\nQuote free-form text with shellQuoteIfNeeded (src/utils/shell-quote.ts). Only a value ' +
-        'validated upstream (number, enum, resolver-checked identifier) may instead be recorded ' +
-        'with `pnpm check:shell-argv --update`, so the reviewer sees the inventory grow.\n\n',
-    );
-  }
-  if (stale.length > 0) {
-    process.stderr.write(`${stale.length} stale inventory entr(ies) no longer match a site:\n`);
-    for (const entry of stale) process.stderr.write(`  - ${entry}\n`);
-    process.stderr.write('\nRun `pnpm check:shell-argv --update` to shrink the inventory.\n\n');
-  }
-  return 1;
+  process.stdout.write(
+    `Device-shell argv guard: OK — ${files.length} production files scanned, ` +
+      `${Object.keys(scanned).length} inventoried dynamic value(s), no drift.\n`,
+  );
+  return 0;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

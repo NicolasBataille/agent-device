@@ -50,19 +50,16 @@ function lineOf(source: string, offset: number): number {
 
 /** A string the element is statically known to be: a literal, or an expression-free template. */
 function staticStringValue(node: AstNode | null): string | null {
-  if (!node) return null;
-  if (node['type'] === 'Literal' && typeof node['value'] === 'string') {
-    return node['value'] as string;
+  if (node === null) return null;
+  if (node['type'] === 'Literal') {
+    return typeof node['value'] === 'string' ? node['value'] : null;
   }
-  if (
-    node['type'] === 'TemplateLiteral' &&
-    ((node['expressions'] as unknown[]) ?? []).length === 0
-  ) {
-    const quasis = (node['quasis'] as AstNode[]) ?? [];
-    const cooked = (quasis[0]?.['value'] as AstNode | undefined)?.['cooked'];
-    return quasis.length === 1 && typeof cooked === 'string' ? cooked : null;
-  }
-  return null;
+  if (node['type'] !== 'TemplateLiteral') return null;
+  // oxc always materializes `expressions` and `quasis` on a TemplateLiteral.
+  const quasis = node['quasis'] as AstNode[];
+  if ((node['expressions'] as unknown[]).length > 0 || quasis.length !== 1) return null;
+  const cooked = ((quasis[0] as AstNode)['value'] as AstNode)['cooked'];
+  return typeof cooked === 'string' ? cooked : null;
 }
 
 function calleeName(node: AstNode): string | null {
@@ -76,71 +73,65 @@ function calleeName(node: AstNode): string | null {
 }
 
 /**
- * Walks one argv element and collects its innermost statically-unsafe
- * expressions. Compositions of safe parts (templates, `+`, ternaries, spreads
- * of array literals) recurse so `...(flag ? ['-m', module] : [])` inventories
- * `module`, not the whole spread.
+ * Node types that are safe as compositions: recurse into the named fields so
+ * `...(flag ? ['-m', module] : [])` inventories `module`, not the whole
+ * spread. The ternary's test never reaches the shell, so it is not listed.
  */
+const COMPOSITE_CHILD_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  TemplateLiteral: ['expressions'],
+  ConditionalExpression: ['consequent', 'alternate'],
+  SpreadElement: ['argument'],
+  ParenthesizedExpression: ['expression'],
+  ArrayExpression: ['elements'],
+};
+
+function isSafeLeaf(node: AstNode): boolean {
+  if (node['type'] === 'Literal') return true;
+  return node['type'] === 'CallExpression' && QUOTE_FUNCTION_NAMES.has(calleeName(node) ?? '');
+}
+
+function compositeChildFields(node: AstNode): readonly string[] | undefined {
+  if (node['type'] === 'BinaryExpression' && node['operator'] === '+') return ['left', 'right'];
+  return COMPOSITE_CHILD_FIELDS[node['type'] as string];
+}
+
+/** Walks one argv element and collects its innermost statically-unsafe expressions. */
 function collectUnsafe(node: AstNode | null, source: string, file: string, out: ShellArgvValue[]) {
-  if (!node || typeof node !== 'object') return;
-  switch (node['type']) {
-    case 'Literal':
-      return;
-    case 'TemplateLiteral': {
-      for (const expression of (node['expressions'] as AstNode[]) ?? []) {
-        collectUnsafe(expression, source, file, out);
-      }
-      return;
-    }
-    case 'CallExpression': {
-      const name = calleeName(node);
-      if (name !== null && QUOTE_FUNCTION_NAMES.has(name)) return;
-      break;
-    }
-    case 'BinaryExpression': {
-      if (node['operator'] === '+') {
-        collectUnsafe(node['left'] as AstNode, source, file, out);
-        collectUnsafe(node['right'] as AstNode, source, file, out);
-        return;
-      }
-      break;
-    }
-    case 'ConditionalExpression': {
-      collectUnsafe(node['consequent'] as AstNode, source, file, out);
-      collectUnsafe(node['alternate'] as AstNode, source, file, out);
-      return;
-    }
-    case 'SpreadElement': {
-      collectUnsafe(node['argument'] as AstNode, source, file, out);
-      return;
-    }
-    case 'ParenthesizedExpression': {
-      collectUnsafe(node['expression'] as AstNode, source, file, out);
-      return;
-    }
-    case 'ArrayExpression': {
-      for (const element of (node['elements'] as (AstNode | null)[]) ?? []) {
-        collectUnsafe(element, source, file, out);
-      }
-      return;
-    }
-    default:
-      break;
+  if (!node || typeof node !== 'object' || isSafeLeaf(node)) return;
+  const childFields = compositeChildFields(node);
+  if (childFields === undefined) {
+    const start = node['start'] as number;
+    out.push({
+      file,
+      line: lineOf(source, start),
+      expression: source
+        .slice(start, node['end'] as number)
+        .replace(/\s+/g, ' ')
+        .trim(),
+    });
+    return;
   }
-  const start = node['start'] as number;
-  const end = node['end'] as number;
-  out.push({
-    file,
-    line: lineOf(source, start),
-    expression: source.slice(start, end).replace(/\s+/g, ' ').trim(),
-  });
+  for (const field of childFields) {
+    const value = node[field];
+    for (const child of Array.isArray(value) ? value : [value]) {
+      collectUnsafe(child as AstNode | null, source, file, out);
+    }
+  }
+}
+
+/** The elements after the subcommand when `record` is a device-shell argv array, else empty. */
+function deviceShellArgvElements(record: AstNode): readonly (AstNode | null)[] {
+  if (record['type'] !== 'ArrayExpression') return [];
+  const elements = (record['elements'] as (AstNode | null)[]) ?? [];
+  const subcommand = staticStringValue(elements[0] ?? null);
+  if (subcommand === null || !DEVICE_SHELL_SUBCOMMANDS.has(subcommand)) return [];
+  return elements.slice(1);
 }
 
 export function findShellArgvValues(files: readonly SourceFile[]): ShellArgvValue[] {
   const values: ShellArgvValue[] = [];
   for (const { path: file, source } of files) {
     if (!source.includes("'shell'") && !source.includes("'exec-out'")) continue;
-    const parsed = parseSync(file, source);
     const visit = (node: unknown): void => {
       if (node === null || typeof node !== 'object') return;
       if (Array.isArray(node)) {
@@ -148,18 +139,12 @@ export function findShellArgvValues(files: readonly SourceFile[]): ShellArgvValu
         return;
       }
       const record = node as AstNode;
-      if (record['type'] === 'ArrayExpression') {
-        const elements = (record['elements'] as (AstNode | null)[]) ?? [];
-        const subcommand = staticStringValue(elements[0] ?? null);
-        if (subcommand !== null && DEVICE_SHELL_SUBCOMMANDS.has(subcommand)) {
-          for (const element of elements.slice(1)) {
-            collectUnsafe(element, source, file, values);
-          }
-        }
+      for (const element of deviceShellArgvElements(record)) {
+        collectUnsafe(element, source, file, values);
       }
       for (const value of Object.values(record)) visit(value);
     };
-    visit(parsed.program);
+    visit(parseSync(file, source).program);
   }
   return values;
 }
