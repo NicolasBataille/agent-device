@@ -13,12 +13,13 @@ import {
 import { type TvRemoteButton, toAndroidTvRemoteKeyevent } from '@agent-device/contracts/tv-remote';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
-import { runAndroidAdb } from './adb.ts';
+import { runAndroidShell } from './adb.ts';
+import { sh } from '@agent-device/kernel/shell';
 import { executeAndroidTouchPlan, readAndroidGestureViewport } from './touch-executor.ts';
 import type { AndroidHelperSessionOptions } from './snapshot-helper-types.ts';
 
 export async function pressAndroid(device: DeviceInfo, x: number, y: number): Promise<void> {
-  await runAndroidAdb(device, ['shell', 'input', 'tap', String(x), String(y)]);
+  await runAndroidShell(device, [sh.lit('input'), sh.lit('tap'), sh.num(x), sh.num(y)]);
 }
 
 export async function pressAndroidTvRemote(
@@ -28,19 +29,19 @@ export async function pressAndroidTvRemote(
 ): Promise<void> {
   const keyevent = toAndroidTvRemoteKeyevent(button);
   const keyeventArgs = durationMs && durationMs > 0 ? ['keyevent', '--longpress'] : ['keyevent'];
-  await runAndroidAdb(device, ['shell', 'input', ...keyeventArgs, keyevent]);
+  await runAndroidShell(device, [sh.lit('input'), ...sh.lits(...keyeventArgs), sh.arg(keyevent)]);
 }
 
 export async function backAndroid(device: DeviceInfo): Promise<void> {
-  await runAndroidAdb(device, ['shell', 'input', 'keyevent', '4']);
+  await runAndroidShell(device, sh.lits('input', 'keyevent', '4'));
 }
 
 export async function homeAndroid(device: DeviceInfo): Promise<void> {
-  await runAndroidAdb(device, ['shell', 'input', 'keyevent', '3']);
+  await runAndroidShell(device, sh.lits('input', 'keyevent', '3'));
 }
 
 export async function pressAndroidEnter(device: DeviceInfo): Promise<void> {
-  await runAndroidAdb(device, ['shell', 'input', 'keyevent', 'ENTER']);
+  await runAndroidShell(device, sh.lits('input', 'keyevent', 'ENTER'));
 }
 
 export async function setAndroidOrientation(
@@ -48,26 +49,18 @@ export async function setAndroidOrientation(
   orientation: DeviceRotation,
 ): Promise<void> {
   const userRotation = resolveAndroidUserRotation(orientation);
-  await runAndroidAdb(device, [
-    'shell',
-    'settings',
-    'put',
-    'system',
-    'accelerometer_rotation',
-    '0',
-  ]);
-  await runAndroidAdb(device, [
-    'shell',
-    'settings',
-    'put',
-    'system',
-    'user_rotation',
-    userRotation,
+  await runAndroidShell(
+    device,
+    sh.lits('settings', 'put', 'system', 'accelerometer_rotation', '0'),
+  );
+  await runAndroidShell(device, [
+    ...sh.lits('settings', 'put', 'system', 'user_rotation'),
+    sh.arg(userRotation),
   ]);
 }
 
 export async function appSwitcherAndroid(device: DeviceInfo): Promise<void> {
-  await runAndroidAdb(device, ['shell', 'input', 'keyevent', '187']);
+  await runAndroidShell(device, sh.lits('input', 'keyevent', '187'));
 }
 
 export async function longPressAndroid(
@@ -164,7 +157,7 @@ function resolveAndroidUserRotation(orientation: DeviceRotation): string {
 export async function getAndroidScreenSize(
   device: DeviceInfo,
 ): Promise<{ width: number; height: number }> {
-  const result = await runAndroidAdb(device, ['shell', 'wm', 'size']);
+  const result = await runAndroidShell(device, sh.lits('wm', 'size'));
   const match = result.stdout.match(/Physical size:\s*(\d+)x(\d+)/);
   if (!match) throw new AppError('COMMAND_FAILED', 'Unable to read screen size');
   return { width: Number(match[1]), height: Number(match[2]) };

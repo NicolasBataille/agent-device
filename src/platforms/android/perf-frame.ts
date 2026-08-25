@@ -1,6 +1,8 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
-import { resolveAndroidAdbExecutor, type AndroidAdbExecutor } from './adb-executor.ts';
+import { type AndroidAdbExecutor } from './adb-executor.ts';
+import { runAndroidShell } from './adb.ts';
+import { sh } from '@agent-device/kernel/shell';
 import { parseAndroidFramePerfSample, type AndroidFramePerfSample } from './perf-frame-parser.ts';
 
 export {
@@ -21,11 +23,12 @@ export async function sampleAndroidFramePerf(
   packageName: string,
   options: AndroidFramePerfOptions = {},
 ): Promise<AndroidFramePerfSample> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
   try {
-    const result = await adb(['shell', 'dumpsys', 'gfxinfo', packageName, 'framestats'], {
-      timeoutMs: ANDROID_FRAME_PERF_TIMEOUT_MS,
-    });
+    const result = await runAndroidShell(
+      device,
+      [...sh.lits('dumpsys', 'gfxinfo'), sh.arg(packageName), sh.lit('framestats')],
+      { timeoutMs: ANDROID_FRAME_PERF_TIMEOUT_MS },
+    );
     const sample = parseAndroidFramePerfSample(
       result.stdout,
       packageName,
@@ -41,14 +44,14 @@ export async function sampleAndroidFramePerf(
 export async function resetAndroidFramePerfStats(
   device: DeviceInfo,
   packageName: string,
-  options: AndroidFramePerfOptions = {},
+  _options: AndroidFramePerfOptions = {},
 ): Promise<void> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
   try {
-    await adb(['shell', 'dumpsys', 'gfxinfo', packageName, 'reset'], {
-      allowFailure: true,
-      timeoutMs: ANDROID_FRAME_RESET_TIMEOUT_MS,
-    });
+    await runAndroidShell(
+      device,
+      [...sh.lits('dumpsys', 'gfxinfo'), sh.arg(packageName), sh.lit('reset')],
+      { allowFailure: true, timeoutMs: ANDROID_FRAME_RESET_TIMEOUT_MS },
+    );
   } catch {
     // Reset is best-effort; sampling/open should still succeed if adb times out or disappears.
   }

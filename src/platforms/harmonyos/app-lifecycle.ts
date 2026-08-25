@@ -1,7 +1,8 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
+import { sh } from '@agent-device/kernel/shell';
 import { runCmd } from '../../utils/exec.ts';
-import { runHarmonyHdc } from './hdc.ts';
+import { runHarmonyShell } from './hdc.ts';
 
 export function parseHarmonyBundleList(rawOutput: string): string[] {
   return rawOutput
@@ -91,7 +92,7 @@ export async function listHarmonyApps(
   options: HarmonyAppListOptions = {},
 ): Promise<Array<{ package: string; name: string }>> {
   if (filter === 'all') {
-    const result = await runHarmonyHdc(device, ['shell', 'bm', 'dump', '-a'], {
+    const result = await runHarmonyShell(device, sh.lits('bm', 'dump', '-a'), {
       timeoutMs: 15_000,
       signal: options.signal,
     });
@@ -105,7 +106,7 @@ export async function listHarmonyApps(
   );
   const signal = combineHarmonySignals(options.signal, deadlineController.signal);
   try {
-    const result = await runHarmonyHdc(device, ['shell', 'bm', 'dump', '-a'], {
+    const result = await runHarmonyShell(device, sh.lits('bm', 'dump', '-a'), {
       timeoutMs: 15_000,
       signal,
     });
@@ -155,10 +156,14 @@ async function listHarmonyUserInstalledPackages(
         if (packageIndex >= packages.length) return;
         const bundleName = packages[packageIndex];
         if (!bundleName) return;
-        const result = await runHarmonyHdc(device, ['shell', 'bm', 'dump', '-n', bundleName], {
-          timeoutMs: 15_000,
-          signal,
-        });
+        const result = await runHarmonyShell(
+          device,
+          [...sh.lits('bm', 'dump', '-n'), sh.arg(bundleName)],
+          {
+            timeoutMs: 15_000,
+            signal,
+          },
+        );
         const isSystemApp = parseHarmonyIsSystemApp(result.stdout);
         if (isSystemApp === undefined) {
           throw new AppError(
@@ -206,7 +211,7 @@ export async function openHarmonyApp(
     ? { ability: options.activity }
     : parseHarmonyLaunchTarget(
         (
-          await runHarmonyHdc(device, ['shell', 'bm', 'dump', '-n', bundleId], {
+          await runHarmonyShell(device, [...sh.lits('bm', 'dump', '-n'), sh.arg(bundleId)], {
             signal: options?.signal,
             timeoutMs: 15_000,
           })
@@ -221,9 +226,14 @@ export async function openHarmonyApp(
       },
     );
   }
-  const args = ['shell', 'aa', 'start', '-a', launchTarget.ability, '-b', bundleId];
-  if (launchTarget.module) args.push('-m', launchTarget.module);
-  const result = await runHarmonyHdc(device, args, { signal: options?.signal });
+  const args = [
+    ...sh.lits('aa', 'start', '-a'),
+    sh.arg(launchTarget.ability),
+    sh.lit('-b'),
+    sh.arg(bundleId),
+  ];
+  if (launchTarget.module) args.push(sh.lit('-m'), sh.arg(launchTarget.module));
+  const result = await runHarmonyShell(device, args, { signal: options?.signal });
   if (!result.stdout.includes('start ability successfully')) {
     throw new AppError('COMMAND_FAILED', `Failed to start ${bundleId}`, {
       details: { output: result.stdout.trim() },
@@ -232,5 +242,5 @@ export async function openHarmonyApp(
 }
 
 export async function closeHarmonyApp(device: DeviceInfo, bundleId: string): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'aa', 'force-stop', bundleId]);
+  await runHarmonyShell(device, [...sh.lits('aa', 'force-stop'), sh.arg(bundleId)]);
 }

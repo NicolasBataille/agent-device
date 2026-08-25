@@ -8,14 +8,13 @@ import type { FillUnconfirmedVerification } from '@agent-device/contracts/intera
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
 import { emitDiagnostic } from '../../utils/diagnostics.ts';
-import { shellQuoteIfNeeded } from '../../utils/shell-quote.ts';
+import { sh, type ShellSafe } from '@agent-device/kernel/shell';
 import {
-  resolveAndroidAdbExecutor,
   resolveAndroidAdbProvider,
   resolveAndroidTextInjector,
   type AndroidTextInputAction,
 } from './adb-executor.ts';
-import { runAndroidAdb, sleep } from './adb.ts';
+import { runAndroidShell, sleep } from './adb.ts';
 import { getAndroidKeyboardState, type AndroidKeyboardState } from './device-input-state.ts';
 import {
   buildAndroidFillUnconfirmedVerification,
@@ -141,7 +140,7 @@ async function typeAndroidTestIme(
   text: string,
   delayMs: number,
 ): Promise<void> {
-  const adb = resolveAndroidAdbExecutor(device);
+  const adb = resolveAndroidAdbProvider(device).exec;
   const artifact = await selectAndroidImeHelperArtifact(resolveAndroidAdbProvider(device));
   const packageName = artifact.manifest.packageName;
   const parts = text.split('\n');
@@ -154,7 +153,7 @@ async function typeAndroidTestIme(
       }
     }
     if (partIndex + 1 < parts.length) {
-      await runAndroidAdb(device, ['shell', 'input', 'keyevent', 'ENTER']);
+      await runAndroidShell(device, sh.lits('input', 'keyevent', 'ENTER'));
     }
   }
   emitAndroidTextDiagnostic('type', 'test-ime', text);
@@ -168,7 +167,7 @@ async function fillAndroidTestIme(
   beforeTarget: AndroidFillVerification['targetInput'],
   helper: AndroidHelperSessionOptions,
 ): Promise<AndroidFillVerification> {
-  const adb = resolveAndroidAdbExecutor(device);
+  const adb = resolveAndroidAdbProvider(device).exec;
   const artifact = await selectAndroidImeHelperArtifact(resolveAndroidAdbProvider(device));
   const packageName = artifact.manifest.packageName;
   let lastVerification: AndroidFillVerification | null = null;
@@ -200,7 +199,7 @@ async function typeAndroidShell(
       }
     }
     if (partIndex + 1 < parts.length) {
-      await runAndroidAdb(device, ['shell', 'input', 'keyevent', 'ENTER']);
+      await runAndroidShell(device, sh.lits('input', 'keyevent', 'ENTER'));
     }
   }
   emitAndroidTextDiagnostic(options.action, 'adb-shell', options.text);
@@ -209,11 +208,9 @@ async function typeAndroidShell(
 async function typeAndroidShellChunk(device: DeviceInfo, text: string): Promise<void> {
   if (!text) return;
   try {
-    await runAndroidAdb(device, [
-      'shell',
-      'input',
-      'text',
-      shellQuoteIfNeeded(encodeAndroidInputText(text)),
+    await runAndroidShell(device, [
+      ...sh.lits('input', 'text'),
+      sh.arg(encodeAndroidInputText(text)),
     ]);
   } catch (error) {
     if (isAndroidInputTextUnsupported(error)) {
@@ -225,15 +222,15 @@ async function typeAndroidShellChunk(device: DeviceInfo, text: string): Promise<
 
 async function clearFocusedText(device: DeviceInfo, count: number): Promise<void> {
   const deletes = Math.max(0, count);
-  await runAndroidAdb(device, ['shell', 'input', 'keyevent', 'KEYCODE_MOVE_END'], {
+  await runAndroidShell(device, sh.lits('input', 'keyevent', 'KEYCODE_MOVE_END'), {
     allowFailure: true,
   });
   const batchSize = 24;
   for (let i = 0; i < deletes; i += batchSize) {
     const size = Math.min(batchSize, deletes - i);
-    await runAndroidAdb(
+    await runAndroidShell(
       device,
-      ['shell', 'input', 'keyevent', ...Array(size).fill('KEYCODE_DEL')],
+      [...sh.lits('input', 'keyevent'), ...Array<ShellSafe>(size).fill(sh.lit('KEYCODE_DEL'))],
       {
         allowFailure: true,
       },

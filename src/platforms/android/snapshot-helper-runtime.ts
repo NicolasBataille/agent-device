@@ -1,4 +1,5 @@
 import { normalizeError } from '@agent-device/kernel/errors';
+import { sh, shellArgvToStrings } from '@agent-device/kernel/shell';
 import { emitDiagnostic } from '../../utils/diagnostics.ts';
 import { sleep } from './adb.ts';
 import type { AndroidAdbExecutor } from './adb-executor.ts';
@@ -34,10 +35,13 @@ export async function resetAndroidSnapshotHelperRuntime(
   packageName: string,
 ): Promise<void> {
   try {
-    await adb(['shell', 'am', 'force-stop', packageName], {
-      allowFailure: true,
-      timeoutMs: HELPER_RUNTIME_RESET_TIMEOUT_MS,
-    });
+    await adb(
+      ['shell', ...shellArgvToStrings([...sh.lits('am', 'force-stop'), sh.arg(packageName)])],
+      {
+        allowFailure: true,
+        timeoutMs: HELPER_RUNTIME_RESET_TIMEOUT_MS,
+      },
+    );
     await sleep(HELPER_RUNTIME_RESET_DELAY_MS);
     emitDiagnostic({
       level: 'debug',

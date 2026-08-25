@@ -1,14 +1,16 @@
+import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
-import type { AndroidAdbExecutor } from './adb-executor.ts';
+import { sh, shellQuote } from '@agent-device/kernel/shell';
+import { runAndroidShell } from './adb.ts';
 import { buildAndroidNativeToolUnavailableHint } from './perf-native-errors.ts';
 import { ANDROID_PERF_TIMEOUT_MS, type AndroidNativePerfKind } from './perf-native-types.ts';
 
 export async function resolveAndroidAppPid(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   packageName: string,
 ): Promise<string> {
   try {
-    const result = await adb(['shell', 'pidof', packageName], {
+    const result = await runAndroidShell(device, [sh.lit('pidof'), sh.arg(packageName)], {
       allowFailure: true,
       timeoutMs: ANDROID_PERF_TIMEOUT_MS,
     });
@@ -24,14 +26,20 @@ export async function resolveAndroidAppPid(
 }
 
 export async function assertAndroidNativeToolAvailable(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   tool: AndroidNativePerfKind,
   packageName: string,
 ): Promise<void> {
-  const result = await adb(['shell', `command -v ${tool} || which ${tool}`], {
-    allowFailure: true,
-    timeoutMs: ANDROID_PERF_TIMEOUT_MS,
-  });
+  // shell-safe-approved: tool-availability lookup fragment; `tool` is shellQuote-escaped
+  // before interpolation (both occurrences), so the fragment carries no unquoted dynamic value.
+  const result = await runAndroidShell(
+    device,
+    [sh.raw(`command -v ${shellQuote(tool)} || which ${shellQuote(tool)}`)],
+    {
+      allowFailure: true,
+      timeoutMs: ANDROID_PERF_TIMEOUT_MS,
+    },
+  );
   if (result.exitCode === 0 && result.stdout.trim()) return;
   throw new AppError('UNSUPPORTED_OPERATION', `Android device does not expose ${tool}`, {
     package: packageName,

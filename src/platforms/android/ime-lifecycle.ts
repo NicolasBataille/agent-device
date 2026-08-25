@@ -1,10 +1,12 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { normalizeError } from '@agent-device/kernel/errors';
+import { sh, shellArgvToStrings } from '@agent-device/kernel/shell';
 import { emitDiagnostic } from '../../utils/diagnostics.ts';
 import { runCmd } from '../../utils/exec.ts';
 import { withKeyedLock } from '../../utils/keyed-lock.ts';
-import { resolveAndroidAdbExecutor, resolveAndroidAdbProvider } from './adb-executor.ts';
+import { resolveAndroidAdbProvider } from './adb-executor.ts';
 import type { AndroidAdbExecutor } from './adb-executor.ts';
+import { runAndroidShell } from './adb.ts';
 import {
   ANDROID_IME_HELPER_SERVICE_COMPONENT,
   ensureAndroidImeHelper,
@@ -72,8 +74,8 @@ async function activateAndroidTestImeAfterStartupRecovery(
   device: DeviceInfo,
   options: { stateDir: string },
 ): Promise<AndroidTestImeActivationResult> {
-  const adb = resolveAndroidAdbExecutor(device);
   const adbProvider = resolveAndroidAdbProvider(device);
+  const adb = adbProvider.exec;
   const deviceKey = getAndroidImeHelperDeviceKey(device);
 
   // The acquisition seam, and the only step whose failure is an outcome rather than a rejection.
@@ -151,14 +153,18 @@ async function activateAndroidTestImeAfterStartupRecovery(
     };
   }
 
-  await adb(['shell', 'ime', 'enable', manifest.serviceComponent], {
+  await runAndroidShell(device, [...sh.lits('ime', 'enable'), sh.arg(manifest.serviceComponent)], {
     allowFailure: true,
     timeoutMs: 10_000,
   });
-  const setResult = await adb(['shell', 'ime', 'set', manifest.serviceComponent], {
-    allowFailure: true,
-    timeoutMs: 10_000,
-  });
+  const setResult = await runAndroidShell(
+    device,
+    [...sh.lits('ime', 'set'), sh.arg(manifest.serviceComponent)],
+    {
+      allowFailure: true,
+      timeoutMs: 10_000,
+    },
+  );
   // Confirm the switch actually took effect by reading it back; do not trust the exit code alone.
   const activeIme = await readAndroidDefaultInputMethod(adb);
   if (activeIme !== manifest.serviceComponent) {
@@ -228,7 +234,7 @@ export async function restoreAndroidTestIme(
     // Drop the owned-flag first so restoreAndroidTestImeFor's "owned by a live session" guard does
     // not skip this intentional close-time restore.
     activeTestImeDevices.delete(deviceKey);
-    const adb = resolveAndroidAdbExecutor(device);
+    const adb = resolveAndroidAdbProvider(device).exec;
     const result = await restoreAndroidTestImeFor(adb, device);
     if (isDeviceRecoveryComplete(result.reason)) {
       await clearAndroidTestImeRecoveryMarker(options.stateDir, device.id);
@@ -275,7 +281,10 @@ async function restoreAndroidTestImeFor(
     });
     return { restored: false, previousIme, reason: 'helper-not-active' };
   }
-  await adb(['shell', 'ime', 'set', previousIme], { allowFailure: true, timeoutMs: 10_000 });
+  await runAndroidShell(device, [...sh.lits('ime', 'set'), sh.arg(previousIme)], {
+    allowFailure: true,
+    timeoutMs: 10_000,
+  });
   const afterIme = await readAndroidDefaultInputMethod(adb);
   if (afterIme !== previousIme) {
     // Restore did not take effect. Keep the persisted value so recovery can retry — clearing it
@@ -337,7 +346,7 @@ export async function restoreOrphanedAndroidTestImeOnDaemonStartup(params: {
     };
     try {
       await withAndroidTestImeRecoveryLock(params.stateDir, serial, async () => {
-        const adb = resolveAndroidAdbExecutor(device);
+        const adb = resolveAndroidAdbProvider(device).exec;
         const result = await restoreAndroidTestImeFor(adb, device);
         if (result.restored) {
           emitDiagnostic({
@@ -371,7 +380,14 @@ function withAndroidTestImeRecoveryLock<T>(
 
 export async function readAndroidDefaultInputMethod(adb: AndroidAdbExecutor): Promise<string> {
   const result = await adb(
-    ['shell', 'settings', 'get', SETTINGS_NAMESPACE, DEFAULT_INPUT_METHOD_KEY],
+    [
+      'shell',
+      ...shellArgvToStrings([
+        ...sh.lits('settings', 'get'),
+        sh.lit(SETTINGS_NAMESPACE),
+        sh.lit(DEFAULT_INPUT_METHOD_KEY),
+      ]),
+    ],
     { allowFailure: true, timeoutMs: 5_000 },
   );
   return normalizeSettingsValue(result.exitCode === 0 ? result.stdout : '');
@@ -379,7 +395,14 @@ export async function readAndroidDefaultInputMethod(adb: AndroidAdbExecutor): Pr
 
 async function readPersistedPreviousIme(adb: AndroidAdbExecutor): Promise<string | undefined> {
   const result = await adb(
-    ['shell', 'settings', 'get', SETTINGS_NAMESPACE, SETTINGS_KEY_PREVIOUS_IME],
+    [
+      'shell',
+      ...shellArgvToStrings([
+        ...sh.lits('settings', 'get'),
+        sh.lit(SETTINGS_NAMESPACE),
+        sh.lit(SETTINGS_KEY_PREVIOUS_IME),
+      ]),
+    ],
     { allowFailure: true, timeoutMs: 5_000 },
   );
   const value = normalizeSettingsValue(result.exitCode === 0 ? result.stdout : '');
@@ -390,7 +413,15 @@ async function readPersistedPreviousIme(adb: AndroidAdbExecutor): Promise<string
 // not switch the IME unless the restore target is durably recorded.
 async function writePersistedPreviousIme(adb: AndroidAdbExecutor, value: string): Promise<boolean> {
   const result = await adb(
-    ['shell', 'settings', 'put', SETTINGS_NAMESPACE, SETTINGS_KEY_PREVIOUS_IME, value],
+    [
+      'shell',
+      ...shellArgvToStrings([
+        ...sh.lits('settings', 'put'),
+        sh.lit(SETTINGS_NAMESPACE),
+        sh.lit(SETTINGS_KEY_PREVIOUS_IME),
+        sh.arg(value),
+      ]),
+    ],
     { allowFailure: true, timeoutMs: 5_000 },
   );
   if (result.exitCode !== 0) return false;
@@ -398,10 +429,20 @@ async function writePersistedPreviousIme(adb: AndroidAdbExecutor, value: string)
 }
 
 async function clearPersistedPreviousIme(adb: AndroidAdbExecutor): Promise<void> {
-  await adb(['shell', 'settings', 'delete', SETTINGS_NAMESPACE, SETTINGS_KEY_PREVIOUS_IME], {
-    allowFailure: true,
-    timeoutMs: 5_000,
-  });
+  await adb(
+    [
+      'shell',
+      ...shellArgvToStrings([
+        ...sh.lits('settings', 'delete'),
+        sh.lit(SETTINGS_NAMESPACE),
+        sh.lit(SETTINGS_KEY_PREVIOUS_IME),
+      ]),
+    ],
+    {
+      allowFailure: true,
+      timeoutMs: 5_000,
+    },
+  );
 }
 
 /** Restores the device record changed by a failed pre-switch transaction; never touches markers. */

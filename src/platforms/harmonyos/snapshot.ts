@@ -6,7 +6,8 @@ import type { DeviceInfo } from '@agent-device/kernel/device';
 import type { RawSnapshotNode, Rect } from '@agent-device/kernel/snapshot';
 import { AppError } from '@agent-device/kernel/errors';
 import type { SnapshotOptions } from '@agent-device/contracts/interaction';
-import { runHarmonyHdc } from './hdc.ts';
+import { sh } from '@agent-device/kernel/shell';
+import { runHarmonyHdc, runHarmonyShell } from './hdc.ts';
 
 const MAX_NODES = 5_000;
 
@@ -28,16 +29,16 @@ export async function snapshotHarmony(
   const localDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-device-harmony-layout-'));
   const localPath = path.join(localDirectory, 'layout.json');
   try {
-    await runHarmonyHdc(device, ['shell', 'uitest', 'dumpLayout', '-p', remotePath], {
+    await runHarmonyShell(device, [...sh.lits('uitest', 'dumpLayout', '-p'), sh.arg(remotePath)], {
       timeoutMs: 30_000,
     });
     await runHarmonyHdc(device, ['file', 'recv', remotePath, localPath], { timeoutMs: 15_000 });
     const raw = await fs.readFile(localPath, 'utf8');
     return buildHarmonySnapshot(parseHarmonyLayout(raw), options);
   } finally {
-    await runHarmonyHdc(device, ['shell', 'rm', '-f', remotePath], { allowFailure: true }).catch(
-      () => {},
-    );
+    await runHarmonyShell(device, [...sh.lits('rm', '-f'), sh.arg(remotePath)], {
+      allowFailure: true,
+    }).catch(() => {});
     await fs.rm(localDirectory, { recursive: true, force: true });
   }
 }

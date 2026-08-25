@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { AppError, normalizeError } from '@agent-device/kernel/errors';
+import { sh, shellArgvToStrings } from '@agent-device/kernel/shell';
 import { findProjectRoot, readVersion } from '../../utils/version.ts';
 import {
   androidAdbResultError,
@@ -207,7 +208,13 @@ async function readInstalledAndroidPackageVersionCode(
   signal?: AbortSignal,
 ): Promise<number | undefined> {
   const result = await adb(
-    ['shell', 'cmd', 'package', 'list', 'packages', '--show-versioncode', packageName],
+    [
+      'shell',
+      ...shellArgvToStrings([
+        ...sh.lits('cmd', 'package', 'list', 'packages', '--show-versioncode'),
+        sh.arg(packageName),
+      ]),
+    ],
     { allowFailure: true, timeoutMs: 5_000, signal },
   );
   if (result.exitCode !== 0) return undefined;
@@ -223,11 +230,14 @@ async function readInstalledAndroidPackageSha256(
   packageName: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const pathResult = await adb(['shell', 'pm', 'path', packageName], {
-    allowFailure: true,
-    timeoutMs: ANDROID_HELPER_IDENTITY_TIMEOUT_MS,
-    signal,
-  });
+  const pathResult = await adb(
+    ['shell', ...shellArgvToStrings([...sh.lits('pm', 'path'), sh.arg(packageName)])],
+    {
+      allowFailure: true,
+      timeoutMs: ANDROID_HELPER_IDENTITY_TIMEOUT_MS,
+      signal,
+    },
+  );
   const remotePath = readBaseApkPath(`${pathResult.stdout}\n${pathResult.stderr}`);
   if (pathResult.exitCode !== 0 || !remotePath) {
     throw new AppError('COMMAND_FAILED', 'Could not resolve installed Android helper APK');

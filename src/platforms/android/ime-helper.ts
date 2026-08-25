@@ -1,5 +1,6 @@
 import { AppError } from '@agent-device/kernel/errors';
 import type { DeviceInfo } from '@agent-device/kernel/device';
+import { sh, shellArgvToStrings, type ShellSafe } from '@agent-device/kernel/shell';
 import type { AndroidImeHelperArtifact, AndroidImeHelperManifest } from './ime-helper-types.ts';
 import {
   androidAdbResultError,
@@ -150,12 +151,18 @@ async function sendAndroidImeHelperBroadcast(
   action: string,
   extras: Record<string, string>,
 ): Promise<void> {
-  const args = ['shell', 'am', 'broadcast', '-p', packageName, '-a', action];
-  args.push('--es', 'protocol', ANDROID_IME_HELPER_PROTOCOL);
+  const args: ShellSafe[] = [
+    ...sh.lits('am', 'broadcast', '-p'),
+    sh.arg(packageName),
+    sh.lit('-a'),
+    sh.arg(action),
+    ...sh.lits('--es', 'protocol'),
+    sh.lit(ANDROID_IME_HELPER_PROTOCOL),
+  ];
   for (const [key, value] of Object.entries(extras)) {
-    args.push('--es', key, value);
+    args.push(sh.lit('--es'), sh.arg(key), sh.arg(value));
   }
-  const result = await adb(args, {
+  const result = await adb(['shell', ...shellArgvToStrings(args)], {
     allowFailure: true,
     timeoutMs: ANDROID_IME_HELPER_BROADCAST_TIMEOUT_MS,
   });

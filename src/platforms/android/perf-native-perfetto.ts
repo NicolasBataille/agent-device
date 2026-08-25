@@ -1,6 +1,7 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
-import { resolveAndroidAdbExecutor, type AndroidAdbExecutor } from './adb-executor.ts';
+import { sh } from '@agent-device/kernel/shell';
+import { runAndroidShell } from './adb.ts';
 import {
   buildAndroidNativeRemotePath,
   cleanupAndroidRemotePath,
@@ -28,11 +29,10 @@ export async function startAndroidPerfettoTrace(
   device: DeviceInfo,
   packageName: string,
   outPath: string,
-  options: AndroidNativePerfOptions = {},
+  _options: AndroidNativePerfOptions = {},
 ): Promise<AndroidNativePerfStartResult> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
-  const appPid = await resolveAndroidAppPid(adb, packageName);
-  await assertAndroidNativeToolAvailable(adb, 'perfetto', packageName);
+  const appPid = await resolveAndroidAppPid(device, packageName);
+  await assertAndroidNativeToolAvailable(device, 'perfetto', packageName);
   const remotePath = buildAndroidNativeRemotePath(
     packageName,
     'app.perfetto-trace',
@@ -40,10 +40,10 @@ export async function startAndroidPerfettoTrace(
   );
   let profilerPid: string;
   try {
-    await resetAndroidFramePerfStats(device, packageName, { adb });
-    profilerPid = await startAndroidPerfettoBackgroundTool(adb, remotePath, packageName);
+    await resetAndroidFramePerfStats(device, packageName);
+    profilerPid = await startAndroidPerfettoBackgroundTool(device, remotePath, packageName);
   } catch (error) {
-    await cleanupAndroidRemotePath(adb, remotePath);
+    await cleanupAndroidRemotePath(device, remotePath);
     throw error;
   }
   const session = {
@@ -76,30 +76,30 @@ export async function stopAndroidPerfettoTrace(
 }
 
 async function startAndroidPerfettoBackgroundTool(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   remotePath: string,
   packageName: string,
 ): Promise<string> {
   try {
-    const result = await adb(
+    const result = await runAndroidShell(
+      device,
       [
-        'shell',
-        'perfetto',
-        '--background-wait',
-        '-o',
-        remotePath,
-        '-t',
-        `${ANDROID_NATIVE_MAX_SECONDS}s`,
-        'sched',
-        'freq',
-        'idle',
-        'am',
-        'wm',
-        'gfx',
-        'view',
-        'binder_driver',
-        'hal',
-        'dalvik',
+        ...sh.lits('perfetto', '--background-wait', '-o'),
+        sh.arg(remotePath),
+        sh.lit('-t'),
+        sh.arg(`${ANDROID_NATIVE_MAX_SECONDS}s`),
+        ...sh.lits(
+          'sched',
+          'freq',
+          'idle',
+          'am',
+          'wm',
+          'gfx',
+          'view',
+          'binder_driver',
+          'hal',
+          'dalvik',
+        ),
       ],
       {
         timeoutMs: ANDROID_NATIVE_PROFILE_TIMEOUT_MS,

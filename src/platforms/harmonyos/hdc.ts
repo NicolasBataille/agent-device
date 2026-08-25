@@ -1,4 +1,6 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
+import { type ShellArgv, shellArgvToStrings } from '@agent-device/kernel/shell';
+import { AppError } from '@agent-device/kernel/errors';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { runCmd, type ExecOptions, type ExecResult } from '../../utils/exec.ts';
@@ -10,8 +12,35 @@ export type HarmonyHdcOptions = Pick<
 
 export const DEFAULT_HARMONY_HDC_TIMEOUT_MS = 15_000;
 
-/** Runs an HDC command scoped to exactly one discovered HarmonyOS target. */
+/**
+ * Runs a non-shell HDC command scoped to one HarmonyOS target. `shell` is
+ * rejected here — its argv is re-parsed on the device and must go through
+ * `runHarmonyShell` with `ShellSafe` atoms.
+ */
 export async function runHarmonyHdc(
+  device: Pick<DeviceInfo, 'id'>,
+  args: string[],
+  options?: HarmonyHdcOptions,
+): Promise<ExecResult> {
+  if (args[0] === 'shell') {
+    throw new AppError(
+      'INVALID_ARGS',
+      'Device-shell argv must go through runHarmonyShell with ShellSafe atoms, not runHarmonyHdc.',
+    );
+  }
+  return await runHdcUnchecked(device, args, options);
+}
+
+/** Runs an `hdc shell` command from typed `ShellSafe` atoms (`sh.*`). */
+export async function runHarmonyShell(
+  device: Pick<DeviceInfo, 'id'>,
+  args: ShellArgv,
+  options?: HarmonyHdcOptions,
+): Promise<ExecResult> {
+  return await runHdcUnchecked(device, ['shell', ...shellArgvToStrings(args)], options);
+}
+
+async function runHdcUnchecked(
   device: Pick<DeviceInfo, 'id'>,
   args: string[],
   options?: HarmonyHdcOptions,

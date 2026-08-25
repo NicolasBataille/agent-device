@@ -1,5 +1,6 @@
 import { isIosFamily, type DeviceInfo } from '@agent-device/kernel/device';
 import { AppError, asAppError } from '@agent-device/kernel/errors';
+import { sh, type ShellArgv, shellArgvToStrings } from '@agent-device/kernel/shell';
 import { escapeXmlTextAndAttribute } from '@agent-device/xml';
 import type { RuntimeHintValues } from '@agent-device/contracts/platform';
 import { execFailureDetails, type ExecResult } from './utils/exec.ts';
@@ -157,13 +158,13 @@ async function clearAndroidRuntimeHints(device: DeviceInfo, packageName: string)
 }
 
 /** Android mechanics stay implementation-lazy until an admitted Android hint operation runs. */
-async function runRuntimeHintsAndroidAdb(
+async function runRuntimeHintsAndroidShell(
   device: DeviceInfo,
-  args: string[],
+  args: ShellArgv,
   options?: Readonly<{ allowFailure?: boolean; stdin?: string }>,
 ): Promise<ExecResult> {
-  const { runAndroidAdb } = await import('./platforms/android/adb.ts');
-  return await runAndroidAdb(device, args, options);
+  const { runAndroidShell } = await import('./platforms/android/adb.ts');
+  return await runAndroidShell(device, args, options);
 }
 
 async function readAndroidDevPrefs(
@@ -171,9 +172,9 @@ async function readAndroidDevPrefs(
   packageName: string,
   prefsPath: string,
 ): Promise<string> {
-  const result = await runRuntimeHintsAndroidAdb(
+  const result = await runRuntimeHintsAndroidShell(
     device,
-    ['shell', 'run-as', packageName, 'cat', prefsPath],
+    [sh.lit('run-as'), sh.arg(packageName), sh.lit('cat'), sh.arg(prefsPath)],
     { allowFailure: true },
   );
   if (result.exitCode !== 0) return DEFAULT_ANDROID_PREFS_XML;
@@ -197,10 +198,13 @@ async function assertAndroidAppSandboxAccessible(
   device: DeviceInfo,
   packageName: string,
 ): Promise<void> {
-  const probeArgs = ['shell', 'run-as', packageName, 'id'];
-  const probeResult = await runRuntimeHintsAndroidAdb(device, probeArgs, { allowFailure: true });
+  const probeArgs = [sh.lit('run-as'), sh.arg(packageName), sh.lit('id')];
+  const probeResult = await runRuntimeHintsAndroidShell(device, probeArgs, { allowFailure: true });
   if (probeResult.exitCode === 0) return;
-  throw androidRuntimeHintsProbeError(probeResult, packageName, probeArgs);
+  throw androidRuntimeHintsProbeError(probeResult, packageName, [
+    'shell',
+    ...shellArgvToStrings(probeArgs),
+  ]);
 }
 
 function androidRuntimeHintsProbeError(
@@ -228,18 +232,17 @@ async function writeAndroidDevPrefsFiles(
   packageName: string,
   files: Array<{ path: string; xml: string }>,
 ): Promise<void> {
-  await runRuntimeHintsAndroidAdb(device, [
-    'shell',
-    'run-as',
-    packageName,
-    'mkdir',
-    '-p',
-    'shared_prefs',
+  await runRuntimeHintsAndroidShell(device, [
+    sh.lit('run-as'),
+    sh.arg(packageName),
+    ...sh.lits('mkdir', '-p', 'shared_prefs'),
   ]);
   for (const file of files) {
-    await runRuntimeHintsAndroidAdb(device, ['shell', 'run-as', packageName, 'tee', file.path], {
-      stdin: file.xml.trimEnd(),
-    });
+    await runRuntimeHintsAndroidShell(
+      device,
+      [sh.lit('run-as'), sh.arg(packageName), sh.lit('tee'), sh.arg(file.path)],
+      { stdin: file.xml.trimEnd() },
+    );
   }
 }
 

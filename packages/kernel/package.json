@@ -33,6 +33,10 @@
       "types": "./src/redaction.ts",
       "default": "./src/redaction.ts"
     },
+    "./shell": {
+      "types": "./src/shell-safe.ts",
+      "default": "./src/shell-safe.ts"
+    },
     "./bounds": {
       "types": "./src/bounds.ts",
       "default": "./src/bounds.ts"

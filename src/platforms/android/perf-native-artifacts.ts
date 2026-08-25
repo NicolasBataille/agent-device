@@ -3,8 +3,10 @@ import path from 'node:path';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
 import { sleep } from '../../utils/timeouts.ts';
+import { sh } from '@agent-device/kernel/shell';
 import type { AndroidAdbExecutor } from './adb-executor.ts';
 import { resolveAndroidAdbExecutor } from './adb-executor.ts';
+import { runAndroidShell } from './adb.ts';
 import { annotateAndroidNativePerfError } from './perf-native-errors.ts';
 import { buildAndroidNativePerfStopSummary } from './perf-native-summary.ts';
 import {
@@ -27,11 +29,11 @@ export async function stopAndroidNativePerfSession(
   options: AndroidNativePerfOptions,
 ): Promise<AndroidNativePerfStopResult> {
   const adb = resolveAndroidAdbExecutor(device, options.adb);
-  await stopAndroidBackgroundTool(adb, session);
-  await waitForAndroidNativeArtifact(adb, session);
+  await stopAndroidBackgroundTool(device, session);
+  await waitForAndroidNativeArtifact(device, session);
   await pullAndroidNativeArtifact(adb, session);
   const sizeBytes = await readFileSize(session.outPath);
-  await cleanupAndroidRemotePath(adb, session.remotePath);
+  await cleanupAndroidRemotePath(device, session.remotePath);
   const stoppedAt = Date.now();
   const durationMs = Math.max(0, stoppedAt - session.startedAt);
   const summary = await buildAndroidNativePerfStopSummary(device, session, sizeBytes, durationMs, {
@@ -58,16 +60,15 @@ export async function stopAndroidNativePerfSession(
 export async function cleanupAndroidNativePerfSession(
   device: DeviceInfo,
   session: AndroidNativePerfSession,
-  options: AndroidNativePerfOptions = {},
+  _options: AndroidNativePerfOptions = {},
 ): Promise<void> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
   try {
     if (session.state === 'running') {
-      await stopAndroidBackgroundTool(adb, session);
-      await waitForAndroidNativeArtifact(adb, session).catch(() => {});
+      await stopAndroidBackgroundTool(device, session);
+      await waitForAndroidNativeArtifact(device, session).catch(() => {});
     }
   } finally {
-    await cleanupAndroidRemotePath(adb, session.remotePath);
+    await cleanupAndroidRemotePath(device, session.remotePath);
   }
 }
 
@@ -81,11 +82,12 @@ export function buildAndroidNativeRemotePath(
 }
 
 export async function cleanupAndroidRemotePath(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   remotePath: string,
 ): Promise<void> {
   try {
-    await adb(['shell', `rm -f ${shellQuote(remotePath)}`], {
+    // shell-safe-approved: fixed `rm -f` on a shellQuote-escaped device path
+    await runAndroidShell(device, [sh.raw(`rm -f ${shellQuote(remotePath)}`)], {
       allowFailure: true,
       timeoutMs: ANDROID_PERF_TIMEOUT_MS,
     });
@@ -120,11 +122,13 @@ export function shellQuote(value: string): string {
 }
 
 async function stopAndroidBackgroundTool(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   session: AndroidNativePerfSession,
 ): Promise<void> {
   try {
-    await adb(['shell', buildStopProfilerCommand(session.profilerPid)], {
+    // shell-safe-approved: buildStopProfilerCommand emits a fixed kill/wait script whose only
+    // interpolation is the profiler pid, shellQuote-escaped inside the builder
+    await runAndroidShell(device, [sh.raw(buildStopProfilerCommand(session.profilerPid))], {
       timeoutMs: ANDROID_NATIVE_PROFILE_TIMEOUT_MS,
     });
   } catch (error) {
@@ -170,12 +174,12 @@ async function pullAndroidNativeArtifact(
 }
 
 async function waitForAndroidNativeArtifact(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   session: AndroidNativePerfSession,
 ): Promise<void> {
   let previousSize: number | undefined;
   for (let attempt = 0; attempt < ANDROID_NATIVE_ARTIFACT_POLL_ATTEMPTS; attempt += 1) {
-    const size = await readAndroidRemoteFileSize(adb, session.remotePath);
+    const size = await readAndroidRemoteFileSize(device, session.remotePath);
     if (size !== undefined && size > 0 && size === previousSize) {
       return;
     }
@@ -191,14 +195,18 @@ async function waitForAndroidNativeArtifact(
 }
 
 async function readAndroidRemoteFileSize(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   remotePath: string,
 ): Promise<number | undefined> {
   const quotedPath = shellQuote(remotePath);
-  const result = await adb(
+  // shell-safe-approved: file-size probe on a shellQuote-escaped device path — every
+  // interpolation uses `quotedPath`; the surrounding `[ -f ] / stat / wc` script is fixed
+  const result = await runAndroidShell(
+    device,
     [
-      'shell',
-      `if [ -f ${quotedPath} ]; then stat -c %s ${quotedPath} 2>/dev/null || wc -c < ${quotedPath}; fi`,
+      sh.raw(
+        `if [ -f ${quotedPath} ]; then stat -c %s ${quotedPath} 2>/dev/null || wc -c < ${quotedPath}; fi`,
+      ),
     ],
     {
       allowFailure: true,

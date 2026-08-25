@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs';
 import { AppError } from '@agent-device/kernel/errors';
 import type { DeviceInfo } from '@agent-device/kernel/device';
-import { runAndroidAdb, sleep } from './adb.ts';
+import { runAndroidExecOut, runAndroidShell, sleep } from './adb.ts';
+import { sh, type ShellSafe } from '@agent-device/kernel/shell';
 
 // PNG file signature: 0x89 P N G \r \n 0x1A \n
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -36,12 +37,14 @@ export async function screenshotAndroid(
  * for consistent screenshots.
  */
 async function enableAndroidDemoMode(device: DeviceInfo): Promise<void> {
-  const shell = (cmd: string) => runAndroidAdb(device, ['shell', cmd], { allowFailure: true });
+  const shell = (command: ShellSafe) => runAndroidShell(device, [command], { allowFailure: true });
 
-  await shell('settings put global sysui_demo_allowed 1');
+  // shell-safe-approved: fixed authored demo-mode enable command, no dynamic input
+  await shell(sh.raw('settings put global sysui_demo_allowed 1'));
 
   const broadcast = (extra: string) =>
-    shell(`am broadcast -a com.android.systemui.demo -e command ${extra}`);
+    // shell-safe-approved: authored systemui demo broadcast; `extra` is a fixed literal from the calls below, not external input
+    shell(sh.raw(`am broadcast -a com.android.systemui.demo -e command ${extra}`));
 
   await broadcast('clock -e hhmm 0941');
   await broadcast('notifications -e visible false');
@@ -49,9 +52,10 @@ async function enableAndroidDemoMode(device: DeviceInfo): Promise<void> {
 
 /** Disable demo mode and restore the live status bar. */
 async function disableAndroidDemoMode(device: DeviceInfo): Promise<void> {
-  await runAndroidAdb(
+  await runAndroidShell(
     device,
-    ['shell', 'am broadcast -a com.android.systemui.demo -e command exit'],
+    // shell-safe-approved: authored systemui demo exit broadcast, no dynamic input
+    [sh.raw('am broadcast -a com.android.systemui.demo -e command exit')],
     {
       allowFailure: true,
     },
@@ -59,7 +63,7 @@ async function disableAndroidDemoMode(device: DeviceInfo): Promise<void> {
 }
 
 async function captureAndroidScreenshot(device: DeviceInfo, outPath: string): Promise<void> {
-  const result = await runAndroidAdb(device, ['exec-out', 'screencap', '-p'], {
+  const result = await runAndroidExecOut(device, sh.lits('screencap', '-p'), {
     binaryStdout: true,
   });
   if (!result.stdoutBuffer) {

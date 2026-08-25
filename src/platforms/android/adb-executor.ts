@@ -446,7 +446,39 @@ export function createLocalAndroidAdbProvider(device: DeviceInfo): AndroidAdbPro
   };
 }
 
-export function resolveAndroidAdbExecutor(
+const DEVICE_SHELL_SUBCOMMANDS = new Set(['shell', 'exec-out']);
+
+/**
+ * The device-shell execution guard. `adb shell`/`exec-out` argv is re-parsed by
+ * the device `sh`, so it must be built from typed `ShellSafe` atoms and reach
+ * the device only through `runAndroidShell`/`runAndroidExecOut`. This rejects a
+ * raw `['shell', …]`/`['exec-out', …]` array at the boundary — including a
+ * variable-built one, since it checks the value at runtime — so a raw string
+ * (or free-form app text) can never reach the device shell through the
+ * general-purpose executor.
+ */
+function assertNotDeviceShell(args: readonly string[]): void {
+  if (args.length > 0 && DEVICE_SHELL_SUBCOMMANDS.has(args[0]!)) {
+    throw new AppError(
+      'INVALID_ARGS',
+      `Device-shell argv must go through runAndroidShell/runAndroidExecOut with ShellSafe atoms, not the raw adb executor (got ${JSON.stringify(args[0])}).`,
+    );
+  }
+}
+
+function guardDeviceShell(executor: AndroidAdbExecutor): AndroidAdbExecutor {
+  return async (args, options) => {
+    assertNotDeviceShell(args);
+    return await executor(args, options);
+  };
+}
+
+/**
+ * The device-shell escape from the guard: `runAndroidShell`/`runAndroidExecOut`
+ * (in adb.ts) resolve the executor through this, having already built their
+ * argv from `ShellSafe` atoms. Not for general use.
+ */
+export function resolveAndroidAdbShellExecutor(
   device: DeviceInfo,
   executor?: AndroidAdbExecutor,
 ): AndroidAdbExecutor {
@@ -454,6 +486,13 @@ export function resolveAndroidAdbExecutor(
   if (executor) return executor;
   if (scoped?.serial === device.id) return scoped.provider.exec;
   return createDeviceAdbExecutor(device);
+}
+
+export function resolveAndroidAdbExecutor(
+  device: DeviceInfo,
+  executor?: AndroidAdbExecutor,
+): AndroidAdbExecutor {
+  return guardDeviceShell(resolveAndroidAdbShellExecutor(device, executor));
 }
 
 export function resolveAndroidAdbProvider(

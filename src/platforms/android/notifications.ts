@@ -1,6 +1,7 @@
 import { AppError } from '@agent-device/kernel/errors';
 import type { DeviceInfo } from '@agent-device/kernel/device';
-import { runAndroidAdb } from './adb.ts';
+import { runAndroidShell } from './adb.ts';
+import { sh, type ShellSafe } from '@agent-device/kernel/shell';
 
 type AndroidBroadcastPayload = {
   action?: string;
@@ -18,10 +19,15 @@ export async function pushAndroidNotification(
     typeof payload.action === 'string' && payload.action.trim()
       ? payload.action.trim()
       : `${packageName}.TEST_PUSH`;
-  const args = ['shell', 'am', 'broadcast', '-a', action, '-p', packageName];
+  const args: ShellSafe[] = [
+    ...sh.lits('am', 'broadcast', '-a'),
+    sh.arg(action),
+    sh.lit('-p'),
+    sh.arg(packageName),
+  ];
   const receiver = typeof payload.receiver === 'string' ? payload.receiver.trim() : '';
   if (receiver) {
-    args.push('-n', receiver);
+    args.push(sh.lit('-n'), sh.arg(receiver));
   }
   const rawExtras = payload.extras;
   if (
@@ -37,25 +43,25 @@ export async function pushAndroidNotification(
     appendBroadcastExtra(args, key, rawValue);
     extrasCount += 1;
   }
-  await runAndroidAdb(device, args, { signal: options.signal });
+  await runAndroidShell(device, args, { signal: options.signal });
   return { action, extrasCount };
 }
 
-function appendBroadcastExtra(args: string[], key: string, value: unknown): void {
+function appendBroadcastExtra(args: ShellSafe[], key: string, value: unknown): void {
   if (typeof value === 'string') {
-    args.push('--es', key, value);
+    args.push(sh.lit('--es'), sh.arg(key), sh.arg(value));
     return;
   }
   if (typeof value === 'boolean') {
-    args.push('--ez', key, value ? 'true' : 'false');
+    args.push(sh.lit('--ez'), sh.arg(key), sh.lit(value ? 'true' : 'false'));
     return;
   }
   if (typeof value === 'number' && Number.isFinite(value)) {
     if (Number.isInteger(value)) {
-      args.push('--ei', key, String(value));
+      args.push(sh.lit('--ei'), sh.arg(key), sh.num(value));
       return;
     }
-    args.push('--ef', key, String(value));
+    args.push(sh.lit('--ef'), sh.arg(key), sh.num(value));
     return;
   }
   throw new AppError(

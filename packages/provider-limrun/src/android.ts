@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { sh, type ShellArgv, shellArgvToStrings } from '@agent-device/kernel/shell';
 import type Limrun from '@limrun/api';
 import {
   createInstanceClient as createAndroidInstanceClient,
@@ -94,10 +95,14 @@ export async function installLimrunAndroidApp(
   signal?.throwIfAborted();
   const packageName = normalizeOptionalString(options?.packageNameHint);
   if (options?.relaunch && packageName) {
-    await runLimrunAndroidAdb(session, ['shell', 'am', 'force-stop', packageName], {
-      allowFailure: true,
-      signal,
-    });
+    await runLimrunAndroidShell(
+      session,
+      [sh.lit('am'), sh.lit('force-stop'), sh.arg(packageName)],
+      {
+        allowFailure: true,
+        signal,
+      },
+    );
   }
   const asset = await awaitLimrunDeploymentOperation(
     operationDrain,
@@ -175,7 +180,30 @@ async function runLimrunAndroidAdb(
   args: string[],
   options?: LimrunAdbCommandOptions,
 ): Promise<LimrunAdbCommandResult> {
+  if (args[0] === 'shell' || args[0] === 'exec-out') {
+    throw new Error(
+      'Device-shell argv must go through runLimrunAndroidShell with ShellSafe atoms, not runLimrunAndroidAdb.',
+    );
+  }
   const { adbArgs, result } = await executeLimrunAndroidAdb(session, args, options);
+  return await requireSuccessfulLimrunAndroidAdb(
+    adbArgs,
+    result,
+    options?.allowFailure,
+    session.dependencies,
+  );
+}
+
+async function runLimrunAndroidShell(
+  session: LimrunAndroidAdbSession,
+  args: ShellArgv,
+  options?: LimrunAdbCommandOptions,
+): Promise<LimrunAdbCommandResult> {
+  const { adbArgs, result } = await executeLimrunAndroidAdb(
+    session,
+    ['shell', ...shellArgvToStrings(args)],
+    options,
+  );
   return await requireSuccessfulLimrunAndroidAdb(
     adbArgs,
     result,

@@ -1,5 +1,6 @@
 import { AppError } from '@agent-device/kernel/errors';
 import type { DeviceInfo } from '@agent-device/kernel/device';
+import { sh, shellArgvToStrings } from '@agent-device/kernel/shell';
 import type { AndroidAdbProcess } from './adb-executor.ts';
 import type { AndroidAdbExecutor } from './snapshot-helper-types.ts';
 
@@ -48,11 +49,17 @@ export async function recoverAndroidSnapshotHelperRetirement(params: {
   const retirement = unconfirmedRetirements.get(params.deviceKey);
   if (!retirement) return;
   try {
-    const result = await params.adb(['shell', 'am', 'force-stop', retirement.packageName], {
-      allowFailure: true,
-      timeoutMs: RETIREMENT_RECOVERY_TIMEOUT_MS,
-      signal: params.signal,
-    });
+    const result = await params.adb(
+      [
+        'shell',
+        ...shellArgvToStrings([...sh.lits('am', 'force-stop'), sh.arg(retirement.packageName)]),
+      ],
+      {
+        allowFailure: true,
+        timeoutMs: RETIREMENT_RECOVERY_TIMEOUT_MS,
+        signal: params.signal,
+      },
+    );
     params.signal?.throwIfAborted();
     if (result.exitCode === 0) {
       unconfirmedRetirements.delete(params.deviceKey);
@@ -222,11 +229,14 @@ async function forceStopAndroidSnapshotHelperRuntime(params: {
 }): Promise<boolean> {
   const signal = params.signal ?? AbortSignal.timeout(params.timeoutMs);
   try {
-    const result = await params.adb(['shell', 'am', 'force-stop', params.packageName], {
-      allowFailure: true,
-      timeoutMs: params.timeoutMs,
-      signal,
-    });
+    const result = await params.adb(
+      ['shell', ...shellArgvToStrings([...sh.lits('am', 'force-stop'), sh.arg(params.packageName)])],
+      {
+        allowFailure: true,
+        timeoutMs: params.timeoutMs,
+        signal,
+      },
+    );
     return result.exitCode === 0;
   } catch {
     return false;

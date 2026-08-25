@@ -8,8 +8,9 @@ import {
 import type { SettingOptions } from '@agent-device/contracts/settings';
 import { parseAppearanceAction } from '../appearance.ts';
 import { parseSettingState } from '../setting-state.ts';
-import { runAndroidAdb } from './adb.ts';
-import { androidAdbResultError } from './adb-executor.ts';
+import { runAndroidAdb, runAndroidShell } from './adb.ts';
+import { sh } from '@agent-device/kernel/shell';
+import { androidAdbResultError, type AndroidAdbExecutorResult } from './adb-executor.ts';
 import { resolveAndroidApp } from './app-deployment-resolution.ts';
 import { setAndroidPermission } from './settings-permission.ts';
 
@@ -31,23 +32,20 @@ export async function setAndroidSetting(
   switch (normalized) {
     case 'wifi': {
       const enabled = parseSettingState(state);
-      await runAndroidAdb(device, ['shell', 'svc', 'wifi', enabled ? 'enable' : 'disable']);
+      await runAndroidShell(device, [...sh.lits('svc', 'wifi'), sh.lit(enabled ? 'enable' : 'disable')]);
       return;
     }
     case 'airplane': {
       const enabled = parseSettingState(state);
       const flag = enabled ? '1' : '0';
       const bool = enabled ? 'true' : 'false';
-      await runAndroidAdb(device, ['shell', 'settings', 'put', 'global', 'airplane_mode_on', flag]);
-      await runAndroidAdb(device, [
-        'shell',
-        'am',
-        'broadcast',
-        '-a',
-        'android.intent.action.AIRPLANE_MODE',
-        '--ez',
-        'state',
-        bool,
+      await runAndroidShell(device, [
+        ...sh.lits('settings', 'put', 'global', 'airplane_mode_on'),
+        sh.arg(flag),
+      ]);
+      await runAndroidShell(device, [
+        ...sh.lits('am', 'broadcast', '-a', 'android.intent.action.AIRPLANE_MODE', '--ez', 'state'),
+        sh.arg(bool),
       ]);
       return;
     }
@@ -69,25 +67,29 @@ export async function setAndroidSetting(
       }
       const enabled = parseSettingState(state);
       const mode = enabled ? '3' : '0';
-      await runAndroidAdb(device, ['shell', 'settings', 'put', 'secure', 'location_mode', mode]);
+      await runAndroidShell(device, [
+        ...sh.lits('settings', 'put', 'secure', 'location_mode'),
+        sh.arg(mode),
+      ]);
       return;
     }
     case 'animations': {
       const enabled = parseSettingState(state);
       const scale = enabled ? '1' : '0';
       for (const key of ANDROID_ANIMATION_SCALE_SETTINGS) {
-        await runAndroidAdb(device, ['shell', 'settings', 'put', 'global', key, scale]);
+        await runAndroidShell(device, [
+          ...sh.lits('settings', 'put', 'global'),
+          sh.arg(key),
+          sh.arg(scale),
+        ]);
       }
       return { scale, keys: [...ANDROID_ANIMATION_SCALE_SETTINGS] };
     }
     case 'appearance': {
       const target = await resolveAndroidAppearanceTarget(device, state);
-      await runAndroidAdb(device, [
-        'shell',
-        'cmd',
-        'uimode',
-        'night',
-        target === 'dark' ? 'yes' : 'no',
+      await runAndroidShell(device, [
+        ...sh.lits('cmd', 'uimode', 'night'),
+        sh.lit(target === 'dark' ? 'yes' : 'no'),
       ]);
       return;
     }
@@ -108,10 +110,10 @@ export async function setAndroidSetting(
           'settings clear-app-state requires a package name, not an intent.',
         );
       }
-      await runAndroidAdb(device, ['shell', 'am', 'force-stop', resolved.value], {
+      await runAndroidShell(device, [...sh.lits('am', 'force-stop'), sh.arg(resolved.value)], {
         allowFailure: true,
       });
-      const result = await runAndroidAdb(device, ['shell', 'pm', 'clear', resolved.value], {
+      const result = await runAndroidShell(device, [...sh.lits('pm', 'clear'), sh.arg(resolved.value)], {
         allowFailure: true,
       });
       if (result.exitCode !== 0 || !/\bSuccess\b/i.test(result.stdout)) {
@@ -162,11 +164,11 @@ async function runAndroidFingerprintCommand(
   const attempts = androidFingerprintCommandAttempts(device, action);
   const failures: CommandAttemptFailure[] = [];
 
-  for (const args of attempts) {
-    const result = await runAndroidAdb(device, args, { allowFailure: true });
+  for (const attempt of attempts) {
+    const result = await attempt.run();
     if (result.exitCode === 0) return;
     failures.push({
-      args,
+      args: attempt.args,
       stdout: result.stdout,
       stderr: result.stderr,
       exitCode: result.exitCode,
@@ -198,17 +200,40 @@ async function runAndroidFingerprintCommand(
   });
 }
 
+type AndroidFingerprintAttempt = {
+  args: string[];
+  run: () => Promise<AndroidAdbExecutorResult>;
+};
+
 function androidFingerprintCommandAttempts(
   device: DeviceInfo,
   action: AndroidFingerprintAction,
-): string[][] {
+): AndroidFingerprintAttempt[] {
   const fingerprintId = action === 'match' ? '1' : '9999';
-  const attempts: string[][] = [
-    ['shell', 'cmd', 'fingerprint', 'touch', fingerprintId],
-    ['shell', 'cmd', 'fingerprint', 'finger', fingerprintId],
+  const attempts: AndroidFingerprintAttempt[] = [
+    {
+      args: ['shell', 'cmd', 'fingerprint', 'touch', fingerprintId],
+      run: () =>
+        runAndroidShell(device, [...sh.lits('cmd', 'fingerprint', 'touch'), sh.arg(fingerprintId)], {
+          allowFailure: true,
+        }),
+    },
+    {
+      args: ['shell', 'cmd', 'fingerprint', 'finger', fingerprintId],
+      run: () =>
+        runAndroidShell(
+          device,
+          [...sh.lits('cmd', 'fingerprint', 'finger'), sh.arg(fingerprintId)],
+          { allowFailure: true },
+        ),
+    },
   ];
   if (device.kind === 'emulator') {
-    attempts.push(['emu', 'finger', 'touch', fingerprintId]);
+    attempts.push({
+      args: ['emu', 'finger', 'touch', fingerprintId],
+      run: () =>
+        runAndroidAdb(device, ['emu', 'finger', 'touch', fingerprintId], { allowFailure: true }),
+    });
   }
   return attempts;
 }
@@ -233,7 +258,7 @@ async function resolveAndroidAppearanceTarget(
   const action = parseAppearanceAction(state);
   if (action !== 'toggle') return action;
 
-  const currentResult = await runAndroidAdb(device, ['shell', 'cmd', 'uimode', 'night'], {
+  const currentResult = await runAndroidShell(device, sh.lits('cmd', 'uimode', 'night'), {
     allowFailure: true,
   });
   if (currentResult.exitCode !== 0) {

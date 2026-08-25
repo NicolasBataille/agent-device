@@ -7,16 +7,21 @@ import {
 } from '@agent-device/contracts/scroll-gesture';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
+import { sh } from '@agent-device/kernel/shell';
 import { sleep } from '../../utils/timeouts.ts';
-import { runHarmonyHdc } from './hdc.ts';
+import { runHarmonyShell } from './hdc.ts';
 import { readHarmonyGestureViewport } from './snapshot.ts';
 
 export async function pressHarmony(device: DeviceInfo, x: number, y: number): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'click', String(x), String(y)]);
+  await runHarmonyShell(device, [...sh.lits('uitest', 'uiInput', 'click'), sh.num(x), sh.num(y)]);
 }
 
 export async function doubleClickHarmony(device: DeviceInfo, x: number, y: number): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'doubleClick', String(x), String(y)]);
+  await runHarmonyShell(device, [
+    ...sh.lits('uitest', 'uiInput', 'doubleClick'),
+    sh.num(x),
+    sh.num(y),
+  ]);
 }
 
 export async function longPressHarmony(
@@ -28,11 +33,15 @@ export async function longPressHarmony(
   // API 24's native longClick produces the actual ArkUI long-press gesture. A
   // stationary swipe returns success but does not dispatch LongPressGesture on
   // either verified target, so do not treat it as an equivalent fallback.
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'longClick', String(x), String(y)]);
+  await runHarmonyShell(device, [
+    ...sh.lits('uitest', 'uiInput', 'longClick'),
+    sh.num(x),
+    sh.num(y),
+  ]);
 }
 
 export async function typeHarmony(device: DeviceInfo, text: string, delayMs = 0): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'text', text]);
+  await runHarmonyShell(device, [...sh.lits('uitest', 'uiInput', 'text'), sh.arg(text)]);
   if (delayMs > 0) await sleep(delayMs);
 }
 
@@ -45,14 +54,11 @@ export async function fillHarmony(
 ): Promise<void> {
   // `inputText` focuses the exact point before writing. It is the supported API 24
   // path and avoids relying on desktop-only Ctrl+A key aliases.
-  await runHarmonyHdc(device, [
-    'shell',
-    'uitest',
-    'uiInput',
-    'inputText',
-    String(x),
-    String(y),
-    text,
+  await runHarmonyShell(device, [
+    ...sh.lits('uitest', 'uiInput', 'inputText'),
+    sh.num(x),
+    sh.num(y),
+    sh.arg(text),
   ]);
   if (delayMs > 0) await sleep(delayMs);
 }
@@ -70,16 +76,13 @@ export async function scrollHarmony(
     referenceWidth: viewport.width,
     referenceHeight: viewport.height,
   });
-  await runHarmonyHdc(device, [
-    'shell',
-    'uitest',
-    'uiInput',
-    'swipe',
-    String(plan.x1),
-    String(plan.y1),
-    String(plan.x2),
-    String(plan.y2),
-    String(options?.durationMs ?? DEFAULT_MOBILE_SCROLL_DURATION_MS),
+  await runHarmonyShell(device, [
+    ...sh.lits('uitest', 'uiInput', 'swipe'),
+    sh.num(plan.x1),
+    sh.num(plan.y1),
+    sh.num(plan.x2),
+    sh.num(plan.y2),
+    sh.num(options?.durationMs ?? DEFAULT_MOBILE_SCROLL_DURATION_MS),
   ]);
   return plan;
 }
@@ -107,37 +110,35 @@ export async function performHarmonyGesture(
     Math.min(40_000, Math.round((distance / plan.durationMs) * 1_000)),
   );
   const command = plan.intent === 'fling' ? 'fling' : 'swipe';
-  await runHarmonyHdc(device, [
-    'shell',
-    'uitest',
-    'uiInput',
-    command,
-    String(Math.round(start.point.x)),
-    String(Math.round(start.point.y)),
-    String(Math.round(end.point.x)),
-    String(Math.round(end.point.y)),
-    String(velocity),
+  await runHarmonyShell(device, [
+    ...sh.lits('uitest', 'uiInput'),
+    sh.arg(command),
+    sh.num(Math.round(start.point.x)),
+    sh.num(Math.round(start.point.y)),
+    sh.num(Math.round(end.point.x)),
+    sh.num(Math.round(end.point.y)),
+    sh.num(velocity),
   ]);
   return { backend: 'harmonyos-hdc-uiinput', command, velocity, viewport: plan.viewport };
 }
 
 export async function backHarmony(device: DeviceInfo): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'keyEvent', 'Back']);
+  await runHarmonyShell(device, sh.lits('uitest', 'uiInput', 'keyEvent', 'Back'));
 }
 
 export async function homeHarmony(device: DeviceInfo): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'keyEvent', 'Home']);
+  await runHarmonyShell(device, sh.lits('uitest', 'uiInput', 'keyEvent', 'Home'));
 }
 
 export async function appSwitcherHarmony(device: DeviceInfo): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'keyEvent', 'Recent']);
+  await runHarmonyShell(device, sh.lits('uitest', 'uiInput', 'keyEvent', 'Recent'));
 }
 
 export async function pressHarmonyKeyboardKey(
   device: DeviceInfo,
   key: 'Enter' | 'Back',
 ): Promise<void> {
-  await runHarmonyHdc(device, ['shell', 'uitest', 'uiInput', 'keyEvent', key]);
+  await runHarmonyShell(device, [...sh.lits('uitest', 'uiInput', 'keyEvent'), sh.arg(key)]);
 }
 
 export async function setHarmonyOrientation(

@@ -6,7 +6,8 @@ import {
 } from '../platforms/android/app-lifecycle.ts';
 import { snapshotAndroid } from '../platforms/android/snapshot.ts';
 import { androidSnapshotPublicationInput } from '../platforms/android/snapshot-capture.ts';
-import { runAndroidAdb } from '../platforms/android/adb.ts';
+import { runAndroidShell } from '../platforms/android/adb.ts';
+import { sh } from '@agent-device/kernel/shell';
 import { emitDiagnostic } from '../utils/diagnostics.ts';
 import { AppError, normalizeError, type NormalizedError } from '@agent-device/kernel/errors';
 import { centerOfRect, type SnapshotNode } from '@agent-device/kernel/snapshot';
@@ -308,9 +309,9 @@ async function tapAndroidDialogButton(
   // effect), even when invoked from apparent readiness work, so a ref action
   // cannot continue against the recovered UI.
   expireRefFrame(session);
-  const result = await runAndroidAdb(
+  const result = await runAndroidShell(
     session.device,
-    ['shell', 'input', 'tap', String(Math.round(x)), String(Math.round(y))],
+    [sh.lit('input'), sh.lit('tap'), sh.num(Math.round(x)), sh.num(Math.round(y))],
     { allowFailure: true },
   );
   if (result.exitCode !== 0) {

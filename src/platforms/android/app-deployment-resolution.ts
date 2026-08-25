@@ -1,7 +1,8 @@
 import { AppError } from '@agent-device/kernel/errors';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { createAppResolutionCache, type AppResolutionCacheScope } from '../app-resolution-cache.ts';
-import { runAndroidAdb } from './adb.ts';
+import { runAndroidShell } from './adb.ts';
+import { sh } from '@agent-device/kernel/shell';
 import { classifyAndroidAppTarget } from './open-target.ts';
 
 const ALIASES: Record<string, { type: 'intent' | 'package'; value: string }> = {
@@ -46,7 +47,7 @@ export async function resolveAndroidApp(
   const cached = androidAppResolutionCache.get(cacheScope, trimmed);
   if (cached) return cached;
 
-  const result = await runAndroidAdb(device, ['shell', 'pm', 'list', 'packages']);
+  const result = await runAndroidShell(device, sh.lits('pm', 'list', 'packages'));
   const packages = result.stdout
     .split('\n')
     .map((line: string) => line.replace('package:', '').trim())

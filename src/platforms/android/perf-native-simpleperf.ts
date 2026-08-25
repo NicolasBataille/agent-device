@@ -1,6 +1,7 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
-import { resolveAndroidAdbExecutor, type AndroidAdbExecutor } from './adb-executor.ts';
+import { sh } from '@agent-device/kernel/shell';
+import { runAndroidShell } from './adb.ts';
 import {
   buildAndroidNativeRemotePath,
   cleanupAndroidRemotePath,
@@ -34,17 +35,21 @@ export async function startAndroidSimpleperfProfile(
   device: DeviceInfo,
   packageName: string,
   outPath: string,
-  options: AndroidNativePerfOptions = {},
+  _options: AndroidNativePerfOptions = {},
 ): Promise<AndroidNativePerfStartResult> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
-  const appPid = await resolveAndroidAppPid(adb, packageName);
-  await assertAndroidNativeToolAvailable(adb, 'simpleperf', packageName);
+  const appPid = await resolveAndroidAppPid(device, packageName);
+  await assertAndroidNativeToolAvailable(device, 'simpleperf', packageName);
   const remotePath = buildAndroidNativeRemotePath(packageName, 'cpu.perf.data');
   let profilerPid: string;
   try {
-    profilerPid = await startAndroidSimpleperfBackgroundTool(adb, appPid, remotePath, packageName);
+    profilerPid = await startAndroidSimpleperfBackgroundTool(
+      device,
+      appPid,
+      remotePath,
+      packageName,
+    );
   } catch (error) {
-    await cleanupAndroidRemotePath(adb, remotePath);
+    await cleanupAndroidRemotePath(device, remotePath);
     throw error;
   }
   const session = {
@@ -80,11 +85,10 @@ export async function writeAndroidSimpleperfReport(
   device: DeviceInfo,
   session: AndroidNativePerfSession,
   outPath: string,
-  options: AndroidNativePerfOptions = {},
+  _options: AndroidNativePerfOptions = {},
 ): Promise<AndroidSimpleperfReportResult> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
-  await assertAndroidNativeToolAvailable(adb, 'simpleperf', session.packageName);
-  const report = await runAndroidSimpleperfReport(adb, session);
+  await assertAndroidNativeToolAvailable(device, 'simpleperf', session.packageName);
+  const report = await runAndroidSimpleperfReport(device, session);
   const generatedAt = new Date().toISOString();
   const entries = parseSimpleperfReportEntries(report.stdout);
   const topFunctions = entries.slice(0, SIMPLEPERF_AGENT_TOP_FUNCTION_LIMIT).map((entry) => ({
@@ -124,15 +128,22 @@ export async function writeAndroidSimpleperfReport(
 }
 
 async function startAndroidSimpleperfBackgroundTool(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   appPid: string,
   remotePath: string,
   packageName: string,
 ): Promise<string> {
   try {
-    const result = await adb(['shell', buildSimpleperfStartCommand(appPid, remotePath)], {
-      timeoutMs: ANDROID_NATIVE_PROFILE_TIMEOUT_MS,
-    });
+    // shell-safe-approved: buildSimpleperfStartCommand emits a background-launch script whose
+    // dynamic parts (appPid, remotePath, stderr path) are all shellQuote-escaped and the
+    // duration is a numeric String(...) — no unquoted dynamic value reaches the fragment
+    const result = await runAndroidShell(
+      device,
+      [sh.raw(buildSimpleperfStartCommand(appPid, remotePath))],
+      {
+        timeoutMs: ANDROID_NATIVE_PROFILE_TIMEOUT_MS,
+      },
+    );
     const pid = findPidToken(result.stdout);
     if (pid) return pid;
     throw new AppError('COMMAND_FAILED', 'Android simpleperf did not return a profiler pid', {
@@ -178,20 +189,16 @@ function buildBackgroundShellCommand(argv: string[], label: string): string {
 }
 
 async function runAndroidSimpleperfReport(
-  adb: AndroidAdbExecutor,
+  device: DeviceInfo,
   session: AndroidNativePerfSession,
 ): Promise<{ stdout: string }> {
   try {
-    return await adb(
+    return await runAndroidShell(
+      device,
       [
-        'shell',
-        'simpleperf',
-        'report',
-        '-i',
-        session.remotePath,
-        '--stdio',
-        '--sort',
-        'comm,dso,symbol',
+        ...sh.lits('simpleperf', 'report', '-i'),
+        sh.arg(session.remotePath),
+        ...sh.lits('--stdio', '--sort', 'comm,dso,symbol'),
       ],
       {
         timeoutMs: ANDROID_NATIVE_PROFILE_TIMEOUT_MS,

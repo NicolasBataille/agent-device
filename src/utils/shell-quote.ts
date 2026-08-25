@@ -1,9 +1,5 @@
-const SAFE_SHELL_ARG = /^[A-Za-z0-9_@%+=:,./-]+$/;
-
-export function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-export function shellQuoteIfNeeded(value: string): string {
-  return SAFE_SHELL_ARG.test(value) ? value : shellQuote(value);
-}
+// Re-exported from the kernel so the string-quoting helpers have a single home
+// shared with the branded `ShellSafe` device-shell atoms (`@agent-device/kernel/shell`).
+// Callers that build human-facing hint strings keep using these plain-string
+// helpers; device-shell argv must go through `sh.*` / the typed funnels instead.
+export { shellQuote, shellQuoteIfNeeded } from '@agent-device/kernel/shell';

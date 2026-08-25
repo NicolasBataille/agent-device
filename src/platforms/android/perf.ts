@@ -8,6 +8,8 @@ import {
   resolveAndroidAdbExecutor,
   type AndroidAdbExecutor,
 } from './adb-executor.ts';
+import { runAndroidShell } from './adb.ts';
+import { sh } from '@agent-device/kernel/shell';
 import { parseNumericToken } from './perf-parsing.ts';
 export {
   ANDROID_FRAME_SAMPLE_DESCRIPTION,
@@ -70,13 +72,14 @@ export type AndroidHeapSnapshotResult = {
 export async function sampleAndroidMemoryPerf(
   device: DeviceInfo,
   packageName: string,
-  options: AndroidPerfOptions = {},
+  _options: AndroidPerfOptions = {},
 ): Promise<AndroidMemoryPerfSample> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
   try {
-    const result = await adb(['shell', 'dumpsys', 'meminfo', packageName], {
-      timeoutMs: ANDROID_PERF_TIMEOUT_MS,
-    });
+    const result = await runAndroidShell(
+      device,
+      [...sh.lits('dumpsys', 'meminfo'), sh.arg(packageName)],
+      { timeoutMs: ANDROID_PERF_TIMEOUT_MS },
+    );
     return parseAndroidMemInfoSample(result.stdout, packageName, new Date().toISOString());
   } catch (error) {
     throw annotateAndroidPerfSamplingError('memory', packageName, error);
@@ -90,16 +93,20 @@ export async function captureAndroidHeapSnapshot(
   options: AndroidPerfOptions = {},
 ): Promise<AndroidHeapSnapshotResult> {
   const adb = resolveAndroidAdbExecutor(device, options.adb);
-  const pid = await resolveAndroidAppPid(adb, packageName);
+  const pid = await resolveAndroidAppPid(device, packageName);
   const remotePath = buildAndroidRemoteHeapPath(packageName);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
   const hadLocalArtifact = await fileExists(outPath);
   try {
     requireExecSuccess(
-      await adb(['shell', 'am', 'dumpheap', packageName, remotePath], {
-        allowFailure: true,
-        timeoutMs: ANDROID_HEAP_DUMP_TIMEOUT_MS,
-      }),
+      await runAndroidShell(
+        device,
+        [...sh.lits('am', 'dumpheap'), sh.arg(packageName), sh.arg(remotePath)],
+        {
+          allowFailure: true,
+          timeoutMs: ANDROID_HEAP_DUMP_TIMEOUT_MS,
+        },
+      ),
       `Failed to capture Android heap dump for ${packageName}`,
       (dumpResult) => ({
         kind: 'android-hprof',
@@ -159,7 +166,7 @@ export async function captureAndroidHeapSnapshot(
       remotePath,
     };
   } finally {
-    await adb(['shell', 'rm', '-f', remotePath], {
+    await runAndroidShell(device, [...sh.lits('rm', '-f'), sh.arg(remotePath)], {
       allowFailure: true,
       timeoutMs: ANDROID_PERF_TIMEOUT_MS,
     }).catch(() => {});
@@ -217,8 +224,8 @@ export function parseAndroidMemInfoSample(
   };
 }
 
-async function resolveAndroidAppPid(adb: AndroidAdbExecutor, packageName: string): Promise<number> {
-  const result = await adb(['shell', 'pidof', packageName], {
+async function resolveAndroidAppPid(device: DeviceInfo, packageName: string): Promise<number> {
+  const result = await runAndroidShell(device, [sh.lit('pidof'), sh.arg(packageName)], {
     allowFailure: true,
     timeoutMs: ANDROID_PERF_TIMEOUT_MS,
   });

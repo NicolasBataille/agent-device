@@ -2,6 +2,7 @@ import type { PointerTrajectory } from '@agent-device/contracts/interaction';
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import type { Rect } from '@agent-device/kernel/snapshot';
 import { AppError } from '@agent-device/kernel/errors';
+import { sh, shellArgvToStrings } from '@agent-device/kernel/shell';
 import { execFailureDetails } from '../../utils/exec.ts';
 import { emitDiagnostic, withDiagnosticTimer } from '../../utils/diagnostics.ts';
 import {
@@ -265,7 +266,14 @@ async function runOneShotTouchHelper<Result>(options: {
   readResult: (record: Record<string, string>) => Result;
 }): Promise<Result> {
   const result = await options.adb(
-    ['shell', 'am', 'instrument', '-w', ...options.extraArgs, options.runner],
+    [
+      'shell',
+      ...shellArgvToStrings([
+        ...sh.lits('am', 'instrument', '-w'),
+        ...options.extraArgs.map(sh.arg),
+        sh.arg(options.runner),
+      ]),
+    ],
     { allowFailure: true, timeoutMs: options.timeoutMs },
   );
   let finalRecord: Record<string, string>;

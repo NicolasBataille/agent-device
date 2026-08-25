@@ -1,7 +1,9 @@
 import type { DeviceInfo } from '@agent-device/kernel/device';
 import { AppError } from '@agent-device/kernel/errors';
 import { splitNonEmptyTrimmedLines } from '../../utils/parsing.ts';
-import { resolveAndroidAdbExecutor, type AndroidAdbExecutor } from './adb-executor.ts';
+import { type AndroidAdbExecutor } from './adb-executor.ts';
+import { runAndroidShell } from './adb.ts';
+import { sh } from '@agent-device/kernel/shell';
 import { roundPercent } from '../perf-utils.ts';
 
 export const ANDROID_LEGACY_CPU_SAMPLE_METHOD = 'adb-shell-dumpsys-cpuinfo';
@@ -21,11 +23,10 @@ export type AndroidLegacyCpuPerfSample = {
 export async function sampleLegacyAndroidCpuPerf(
   device: DeviceInfo,
   packageName: string,
-  options: { adb?: AndroidAdbExecutor } = {},
+  _options: { adb?: AndroidAdbExecutor } = {},
 ): Promise<AndroidLegacyCpuPerfSample> {
-  const adb = resolveAndroidAdbExecutor(device, options.adb);
   try {
-    const result = await adb(['shell', 'dumpsys', 'cpuinfo'], {
+    const result = await runAndroidShell(device, sh.lits('dumpsys', 'cpuinfo'), {
       timeoutMs: ANDROID_LEGACY_CPU_TIMEOUT_MS,
     });
     return parseLegacyAndroidCpuInfo(result.stdout, packageName, new Date().toISOString());
