@@ -13,6 +13,11 @@
   install, 300s+ lease allocation, unbounded only for the streaming `test` runner), sourced from
   the descriptor registry's timeout policy so the declared number cannot drift from the enforced
   one.
+- New `pnpm check:shell-argv` CI gate: an exact inventory of every dynamic value reaching a device
+  shell (`adb shell` / `adb exec-out` / `hdc shell` argv, which the device evaluates as one shell
+  string). A new value fails the gate until it is quoted through `shellQuoteIfNeeded` or
+  deliberately recorded in the same PR, so an argv-injection regression can no longer land
+  silently.
 - Security (MCP/AI-SDK tool surface): `daemonAuthToken` and the Metro `bearerToken` are no longer
   advertised as tool input properties, and an explicit value is refused with guidance instead of
   being forwarded. Credentials are operator-owned: set `AGENT_DEVICE_DAEMON_AUTH_TOKEN` (or

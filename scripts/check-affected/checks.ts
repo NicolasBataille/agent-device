@@ -40,6 +40,7 @@ export const CHECK_CATALOG: readonly CheckSpec[] = [
   gate('test-app-typecheck', 'Expo test app typecheck', 'test-app:typecheck', false),
   gate('layering', 'Import-direction layering guard', 'check:layering'),
   gate('di-seams', 'Test-only DI seam guard', 'check:di-seams'),
+  gate('shell-argv', 'Device-shell argv inventory', 'check:shell-argv'),
   gate('fallow', 'Fallow code-quality audit', 'check:fallow'),
   gate('mcp-metadata', 'MCP registry metadata sync', 'check:mcp-metadata'),
   gate('build', 'Build (tsdown + declarations)', 'build'),

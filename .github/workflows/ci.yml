@@ -83,6 +83,16 @@ jobs:
         uses: ./.github/actions/run-gate
         with: { gate: di-seams }
 
+      # Device-shell argv is evaluated as one shell string on the device (adb
+      # shell / adb exec-out / hdc shell), so scripts/shell-argv keeps an exact
+      # inventory of every dynamic value that reaches one. A new value fails
+      # until it is quoted through shellQuoteIfNeeded or deliberately recorded
+      # (pnpm check:shell-argv --update) in the same PR; a stale entry fails the
+      # other way, so the inventory always matches the code.
+      - name: Fail if a new dynamic value reaches a device shell uninventoried
+        uses: ./.github/actions/run-gate
+        with: { gate: shell-argv }
+
       - name: Run oxlint
         uses: ./.github/actions/run-gate
         with: { gate: lint }
