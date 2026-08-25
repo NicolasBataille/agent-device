@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Security (MCP/AI-SDK tool surface): the operator-owned endpoint and path inputs — `daemonBaseUrl`,
+  the Metro `proxyBaseUrl`, `stateDir`, `cwd`, `iosSimulatorDeviceSet`, `iosXctestrunFile`,
+  `iosXctestDerivedDataPath`, `iosXctestEnvDir` — follow the credential inputs off the
+  model-writable tool surface: no longer advertised, refused as explicit input with guidance, and
+  resolved from env/config only (a model-writable `daemonBaseUrl`/`proxyBaseUrl` would redirect the
+  env-resolved token to an arbitrary server). Dropping these plus the credential fields shrinks
+  `tools/list` by roughly half. CLI flags and the SDK client options are unchanged.
+- MCP tool descriptions now declare their enforced client timeout envelope (90s default, 180s
+  install, 300s+ lease allocation, unbounded only for the streaming `test` runner), sourced from
+  the descriptor registry's timeout policy so the declared number cannot drift from the enforced
+  one.
 - Security (MCP/AI-SDK tool surface): `daemonAuthToken` and the Metro `bearerToken` are no longer
   advertised as tool input properties, and an explicit value is refused with guidance instead of
   being forwarded. Credentials are operator-owned: set `AGENT_DEVICE_DAEMON_AUTH_TOKEN` (or

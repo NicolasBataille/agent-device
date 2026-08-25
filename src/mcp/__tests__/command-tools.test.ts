@@ -27,11 +27,11 @@ test('MCP command tool executor hides client creation behind an execution adapte
   });
 
   const result = await executor.execute('wait', {
-    stateDir: '/tmp/agent-device-mcp',
+    includeCost: true,
     mcpOutputFormat: 'optimized',
   });
 
-  assert.deepEqual(createdConfigs, [{ stateDir: '/tmp/agent-device-mcp' }]);
+  assert.deepEqual(createdConfigs, [{ cost: true }]);
   assert.deepEqual(calls, [
     {
       client,
@@ -120,7 +120,7 @@ test('MCP tool schemas add MCP client config fields at the MCP boundary', () => 
   const devicesTool = listCommandTools().find((tool) => tool.name === 'devices');
 
   assert.ok(devicesTool);
-  assert.ok('stateDir' in (devicesTool.inputSchema.properties ?? {}));
+  assert.equal('stateDir' in (devicesTool.inputSchema.properties ?? {}), false);
   assert.deepEqual(
     (devicesTool.inputSchema.properties?.mcpOutputFormat as { enum?: unknown[] } | undefined)?.enum,
     ['optimized', 'json'],
@@ -1076,7 +1076,6 @@ const UNDESCRIBED_TOOL_INPUTS = new Set([
   'metro.port',
   'metro.probeTimeoutMs',
   'metro.projectRoot',
-  'metro.proxyBaseUrl',
   'metro.publicBaseUrl',
   'metro.reuseExisting',
   'metro.runtimeFilePath',
