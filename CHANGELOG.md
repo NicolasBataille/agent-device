@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Release hygiene: after `npm publish`, `release:mark-dev` moves `main` to the next patch with a
+  `-dev` prerelease marker so the version on `main` never equals a published version (registry
+  scanners diff the tool surface per version string, and a moving surface under a released number
+  reads as a republish). `release:prepare` refuses to publish while the `-dev` marker is in place.
 - Parameterized `fill --record-as` protection is now recording-session-scoped instead of
   fill-step-scoped (ADR 0017 amendment): a later, unrelated recorded action (`wait`, `is`, `get`) can no
   longer re-serialize an app-rendered echo of an already-parameterized value into its own result or
