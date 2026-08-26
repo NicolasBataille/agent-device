@@ -16,10 +16,16 @@ type PositionalInteractionTarget =
   | { ref: string; label?: string }
   | { selector: string };
 
+/**
+ * `text` is `undefined` when the grammar supplied NO text argument at all, and `''` when it
+ * supplied an empty one. `fill <target> ""` is the clear-field primitive (#2063), so the two
+ * cannot collapse: without the distinction a forgotten argument (`fill @e57`) would silently
+ * erase the field instead of being refused.
+ */
 export type DecodedFillTarget =
-  | { kind: 'ref'; target: { ref: string; label?: string }; text: string }
-  | { kind: 'selector'; target: { selector: string }; text: string }
-  | { kind: 'point'; target: { x: number; y: number }; text: string };
+  | { kind: 'ref'; target: { ref: string; label?: string }; text: string | undefined }
+  | { kind: 'selector'; target: { selector: string }; text: string | undefined }
+  | { kind: 'point'; target: { x: number; y: number }; text: string | undefined };
 
 const BARE_SNAPSHOT_REF_PATTERN = /^e\d+$/;
 
@@ -52,8 +58,8 @@ export function readInteractionTargetFromPositionals(
 export function readFillTargetFromPositionals(positionals: string[]): DecodedFillTarget {
   const firstPositional = positionals[0];
   if (firstPositional?.startsWith('@')) {
-    const text =
-      positionals.length >= 3 ? positionals.slice(2).join(' ') : positionals.slice(1).join(' ');
+    const textPositionals = positionals.length >= 3 ? positionals.slice(2) : positionals.slice(1);
+    const text = textPositionals.length === 0 ? undefined : textPositionals.join(' ');
     return {
       kind: 'ref',
       target: {
@@ -74,13 +80,14 @@ export function readFillTargetFromPositionals(positionals: string[]): DecodedFil
     return {
       kind: 'selector',
       target: { selector: selectorArgs.selectorExpression },
-      text: selectorArgs.rest.join(' '),
+      text: selectorArgs.rest.length === 0 ? undefined : selectorArgs.rest.join(' '),
     };
   }
+  const pointText = positionals.slice(2);
   return {
     kind: 'point',
     target: readPointTarget(positionals.slice(0, 2)),
-    text: positionals.slice(2).join(' '),
+    text: pointText.length === 0 ? undefined : pointText.join(' '),
   };
 }
 

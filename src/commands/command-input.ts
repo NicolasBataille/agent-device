@@ -162,8 +162,14 @@ export function requiredField<T>(
   };
 }
 
-export function stringField(description?: string): CommandField<string> {
-  return optionalField(stringSchema(description), optionalString);
+export function stringField(
+  description?: string,
+  options: { allowEmpty?: boolean } = {},
+): CommandField<string> {
+  return optionalField(
+    stringSchema(description),
+    options.allowEmpty === true ? optionalAnyString : optionalString,
+  );
 }
 
 /**
@@ -401,6 +407,21 @@ function requiredString(record: Record<string, unknown>, key: string): string {
   const value = record[key];
   if (typeof value !== 'string' || value.length === 0) {
     throw new AppError('INVALID_ARGS', `Expected ${key} to be a non-empty string.`);
+  }
+  return value;
+}
+
+/**
+ * Opt-in reader for the one field where the empty string is a VALUE, not a missing input:
+ * `fill <target> ""` is the clear-field primitive (#2063). `requiredField` still refuses a
+ * missing key, so "" and absent stay distinguishable; every other string field keeps
+ * {@link optionalString}'s non-empty rule.
+ */
+function optionalAnyString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new AppError('INVALID_ARGS', `Expected ${key} to be a string.`);
   }
   return value;
 }

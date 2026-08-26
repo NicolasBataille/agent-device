@@ -49,3 +49,25 @@ test('fill projects recordAs through the typed daemon flags', () => {
   expect(request.positionals).toEqual(['id="password"', 'live-secret']);
   expect(request.options.recordAs).toBe('PASSWORD');
 });
+
+// The empty text has to survive the CLI grammar AND the daemon projection for `fill @e57 ""` to
+// reach the runner as a clear (#2063); a missing text argument must still read as missing, so the
+// reader distinguishes "no text positional" from "an empty one".
+
+test('fill reads an empty text positional as an empty text, not a missing one', () => {
+  const input = interactionCliReaders.fill(['@e57', ''], BASE_FLAGS);
+
+  expect(input.text).toBe('');
+});
+
+test('fill reads a missing text positional as undefined so required validation fires', () => {
+  expect(interactionCliReaders.fill(['@e57'], BASE_FLAGS).text).toBeUndefined();
+  expect(interactionCliReaders.fill(['label="Email"'], BASE_FLAGS).text).toBeUndefined();
+  expect(interactionCliReaders.fill(['10', '20'], BASE_FLAGS).text).toBeUndefined();
+});
+
+test('fill projects an empty text as its own positional', () => {
+  const request = interactionDaemonWriters.fill({ ref: '@e57', text: '' });
+
+  expect(request.positionals).toEqual(['@e57', '']);
+});

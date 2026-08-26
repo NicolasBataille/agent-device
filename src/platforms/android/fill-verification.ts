@@ -321,6 +321,13 @@ function isAcceptableAndroidFillMatch(actual: string | null, expected: string): 
   if (actual === expected) {
     return true;
   }
+  // `fill <target> ""` is the clear-field primitive (#2063). A cleared input has no text in the
+  // hierarchy dump, which reads back as `null` rather than `''` — without this the clear would
+  // succeed on the device and still be reported as `text_mismatch`. The normalization below
+  // cannot cover it: it treats both sides as empty and refuses on the emptiness check.
+  if (expected.length === 0) {
+    return actual === null || actual.length === 0;
+  }
   const normalizedActual = normalizeFillVerificationText(actual);
   const normalizedExpected = normalizeFillVerificationText(expected);
   if (!normalizedActual || !normalizedExpected) {

@@ -61,7 +61,7 @@ const interactionCommandDescriptions = {
     'Activate a UI target by snapshot ref, selector, or coordinates. Prefer a ref or selector after a snapshot; use coordinates only when semantic targeting is unavailable. This can change app state; use settle or verify to confirm the result without a follow-up snapshot.',
   press:
     'Short-press a UI target by snapshot ref, selector, or coordinates. Use longpress instead when the target requires a context-menu or hold gesture.',
-  fill: 'Replace text in a UI input selected by snapshot ref, selector, or coordinates. Prefer refs or selectors after snapshot; use recordAs to keep sensitive text out of a recorded replay while sending it to the live app.',
+  fill: 'Replace text in a UI input selected by snapshot ref, selector, or coordinates. Pass an empty text to clear the field. Prefer refs or selectors after snapshot; use recordAs to keep sensitive text out of a recorded replay while sending it to the live app.',
   longpress:
     'Hold a UI target by snapshot ref, selector, or coordinates to open a context menu or perform another hold gesture. Set durationMs when the default hold duration is unsuitable.',
   hover:
@@ -98,7 +98,11 @@ const pressFields = {
 
 const fillFields = {
   target: requiredField(interactionTargetField()),
-  text: requiredField(stringField('Text to enter into the target.')),
+  // "" is accepted and means "replace with nothing", i.e. clear the field (#2063). The key
+  // must still be present: omitting it is a missing argument, not a clear.
+  text: requiredField(
+    stringField('Text to enter into the target. Pass "" to clear it.', { allowEmpty: true }),
+  ),
   delayMs: integerField('Delay between typed characters.', { min: 0 }),
   recordAs: stringField(
     'When script recording is armed, send text to the live app but publish it as ${VAR}. Use an uppercase replay variable name such as PASSWORD.',
