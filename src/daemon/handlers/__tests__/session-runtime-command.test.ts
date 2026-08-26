@@ -14,6 +14,11 @@ import {
   mockInspectDeviceRuntimeFacts,
 } from './session-command-harness.ts';
 import { lifecycleRuntimeFacts } from './application-lifecycle-runtime-harness.ts';
+import {
+  gestureBindDevice,
+  gestureInspectFacts,
+  gestureRuntimeSpies,
+} from '../../__tests__/test-device-runtime-gateway.ts';
 
 test('runtime set/show/clear manages session-scoped runtime hints before open', async () => {
   const sessionStore = makeSessionStore();
@@ -231,4 +236,48 @@ test('runtime clear rejects a false runtime-hints fact before its one implementa
     metroHost: '10.0.0.10',
     metroPort: 8081,
   });
+});
+
+test('runtime gesture-viewport admits and binds the exact viewport operation once', async () => {
+  const sessionStore = makeSessionStore();
+  const sessionName = 'runtime-gesture-viewport';
+  sessionStore.set(
+    sessionName,
+    makeSession(sessionName, {
+      platform: 'android',
+      id: 'emulator-5554',
+      name: 'Pixel',
+      kind: 'emulator',
+      booted: true,
+    }),
+  );
+  gestureRuntimeSpies.gestureViewport.mockClear();
+
+  const response = await handleSessionCommands({
+    req: {
+      token: 't',
+      session: sessionName,
+      command: 'runtime',
+      positionals: ['gesture-viewport'],
+      flags: {},
+      meta: { requestId: 'viewport-request' },
+    },
+    sessionName,
+    logPath: path.join(os.tmpdir(), 'daemon.log'),
+    sessionStore,
+    invoke: noopInvoke,
+    inspectFacts: gestureInspectFacts,
+    bindDevice: gestureBindDevice,
+  });
+
+  expect(response).toEqual({
+    ok: true,
+    data: { viewport: { x: 0, y: 0, width: 390, height: 844 } },
+  });
+  expect(gestureRuntimeSpies.gestureViewport).toHaveBeenCalledOnce();
+  expect(gestureRuntimeSpies.gestureViewport).toHaveBeenCalledWith(
+    expect.objectContaining({
+      execution: expect.objectContaining({ requestId: 'viewport-request' }),
+    }),
+  );
 });

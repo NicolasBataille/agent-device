@@ -16,10 +16,8 @@
 //
 // These tests document today's behavior; they do not propose behavior.
 
-// Maestro replay resolves a target device and reads a gesture viewport through core/dispatch.
-// These fixtures model no runner, so both are stubbed: the device resolves to a fixed Android
-// emulator, and captures return an empty hierarchy (which is what makes `assertNotVisible` pass
-// deterministically without a screen).
+// Maestro replay resolves a target device through core/dispatch. Gesture viewport reads re-enter
+// the admitted internal runtime command; the invoke fixture below returns its typed viewport.
 import { expect, test, vi } from 'vitest';
 import { mkdtempForTestSync } from '../../../__tests__/test-utils/tmp-dir.ts';
 
@@ -34,7 +32,6 @@ vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
       kind: 'emulator',
       booted: true,
     })),
-    dispatchGestureViewport: vi.fn(async () => ({ x: 0, y: 0, width: 400, height: 800 })),
   };
 });
 
@@ -141,9 +138,11 @@ async function runMaestroSuiteThroughReporter(params: {
 
 /** `snapshot` returns an empty hierarchy; every other command succeeds. */
 function maestroInvoke(req: DaemonRequest): DaemonResponse {
-  return req.command === 'snapshot'
-    ? { ok: true, data: { createdAt: 0, nodes: [] } }
-    : { ok: true, data: {} };
+  if (req.command === 'snapshot') return { ok: true, data: { createdAt: 0, nodes: [] } };
+  if (req.command === 'runtime') {
+    return { ok: true, data: { viewport: { x: 0, y: 0, width: 400, height: 800 } } };
+  }
+  return { ok: true, data: {} };
 }
 
 test('a Maestro suite reaches the reporter with step payloads and attempt-scoped identity', async () => {

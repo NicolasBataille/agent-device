@@ -97,6 +97,7 @@ const CONTRACT_EXPORTS = [
   '@agent-device/contracts/gesture-runtime',
   '@agent-device/contracts/home-runtime',
   '@agent-device/contracts/host-diagnostics',
+  '@agent-device/contracts/host-platform-services',
   '@agent-device/contracts/interaction',
   '@agent-device/contracts/interaction-error',
   '@agent-device/contracts/interaction-guarantees',

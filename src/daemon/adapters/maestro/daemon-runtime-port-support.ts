@@ -152,7 +152,7 @@ export function stringifyEnvironment(
   return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, String(value)]));
 }
 
-function daemonResponseError(response: Extract<DaemonResponse, { ok: false }>): AppError {
+export function daemonResponseError(response: Extract<DaemonResponse, { ok: false }>): AppError {
   const error = response.error;
   const details = stripUndefined({
     ...(error.details ?? {}),

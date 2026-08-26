@@ -20,6 +20,11 @@ checkpoint outcome and re-authorizes nothing by itself: command units still migr
 under sections 2–6, but subsequent units follow the move-dominated size discipline, the evidence
 tiers, the binding ergonomics, and the process-lifetime rules added below.
 
+Amended 2026-08-26 while closing the Wave 6 residue: `host` covers host-scoped platform work through
+a narrow neutral typed service, not diagnostics alone. Host diagnostics, daemon-owner resource
+cleanup, and managed host tooling share the execution category because none binds a request-scoped
+device runtime; their domain services remain separate rather than forming a generic host grab bag.
+
 During the `devices` unit, doctor discovery, replay-test sharding, Apple simulator hints, and Android
 emulator lifecycle keep their existing command execution owners while consuming the same injected,
 neutral inventory capability. That coexistence moves discovery mechanics once; it does not migrate
@@ -60,9 +65,9 @@ those descriptors or authorize a second local/provider chooser.
   platform-execution shape at every committed state — `none`, legacy, host-diagnostic, inventory-backed,
   or device-runtime-backed — and a migrated command has no legacy execution fallback. `none` declares
   the absence of platform execution and is never a migration target or source. `host` declares
-  host-scoped diagnostics: platform families contribute host toolchain and environment probes through
-  the neutral host-diagnostics surface, the command binds no device runtime as its own execution
-  shape, and any device-runtime leg rides an already migrated command's declared use.
+  host-scoped platform work through a neutral typed domain service: diagnostics, owner cleanup, or
+  managed tooling. The command binds no device runtime as its own execution shape, and any
+  device-runtime leg rides an already migrated command's declared use.
 - Broader adoption pauses after the first real slices. Evidence records one decision: continue,
   revise the seam and rerun the checkpoint, or stop with every landed command still coherent.
 - Post-checkpoint units are move-dominated: platform mechanics leave root `src/` for platform

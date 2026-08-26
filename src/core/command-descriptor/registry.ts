@@ -37,6 +37,7 @@ import {
   findRuntimePlanUses,
   focusRuntimeUse,
   gestureRuntimePlanUses,
+  gestureViewportRuntimeUse,
   homeRuntimeUse,
   hoverRuntimeUses,
   appEventRuntimeUse,
@@ -254,16 +255,15 @@ function readOnlySubactionRecordingEffect(
 //              use. Outside the migration denominator.
 //   `legacy` — unmigrated platform execution. This is the denominator: the
 //              tracker closes when no descriptor declares it.
-//   `host`   — host-scoped diagnostics: platform families contribute host
-//              probes through the neutral host-diagnostics surface; the
-//              descriptor binds no device runtime of its own.
+//   `host`   — host-scoped platform work behind a neutral typed service (diagnostics,
+//              owner cleanup, or managed tooling); the descriptor binds no device runtime.
 // The migrated modes (`inventory`, `device-runtime`) are declared inline with
 // the use they name.
 // ---------------------------------------------------------------------------
 const NO_PLATFORM_EXECUTION = { kind: 'none' } as const;
 const LEGACY_PLATFORM_EXECUTION = { kind: 'legacy' } as const;
-// Host-scoped diagnostics (ADR 0019): platform families contribute host probes through the
-// neutral host-diagnostics surface; the descriptor binds no device runtime of its own.
+// Host-scoped platform work (ADR 0019): the descriptor consumes a neutral typed host service and
+// binds no device runtime of its own.
 const HOST_PLATFORM_EXECUTION = { kind: 'host' } as const;
 
 /**
@@ -712,7 +712,10 @@ export const RAW_COMMAND_DESCRIPTORS = [
     // Replay durations are script-dependent; --timeout bounds the envelope.
     timeoutPolicy: { ...DEFAULT_TIMEOUT_POLICY, budget: { source: 'flag' } },
     batchable: false,
-    platformExecution: LEGACY_PLATFORM_EXECUTION,
+    // Every native and Maestro action re-enters the daemon request pipeline under the delegated
+    // command descriptor. Maestro viewport reads do the same through `runtime gesture-viewport`,
+    // so replay owns orchestration but no platform execution of its own.
+    platformExecution: NO_PLATFORM_EXECUTION,
   },
   {
     name: 'test',
@@ -731,7 +734,9 @@ export const RAW_COMMAND_DESCRIPTORS = [
     // client envelope at all.
     timeoutPolicy: { ...DEFAULT_TIMEOUT_POLICY, envelopeMs: 'unbounded' },
     batchable: true,
-    platformExecution: LEGACY_PLATFORM_EXECUTION,
+    // Test is suite orchestration over replay attempts; each attempt delegates its admitted
+    // operations, including Maestro viewport acquisition, to their own descriptors.
+    platformExecution: NO_PLATFORM_EXECUTION,
   },
   {
     name: 'runtime',
@@ -749,7 +754,10 @@ export const RAW_COMMAND_DESCRIPTORS = [
     daemon: { route: 'session', refFrameEffect: 'preserve' },
     timeoutPolicy: DEFAULT_TIMEOUT_POLICY,
     batchable: false,
-    platformExecution: { kind: 'device-runtime', uses: runtimeCommandRuntimePlanUses },
+    platformExecution: {
+      kind: 'device-runtime',
+      uses: [...runtimeCommandRuntimePlanUses, gestureViewportRuntimeUse],
+    },
   },
   {
     name: 'clipboard',
@@ -1432,7 +1440,9 @@ export const RAW_COMMAND_DESCRIPTORS = [
     timeoutPolicy: DEFAULT_TIMEOUT_POLICY,
     batchable: false,
     mcpExposed: false,
-    platformExecution: LEGACY_PLATFORM_EXECUTION,
+    // `stop --clean` reconciles owner-scoped Apple runner resources through the neutral
+    // daemon-owner cleanup service. It is host execution, not a request-bound device operation.
+    platformExecution: HOST_PLATFORM_EXECUTION,
   },
   {
     name: 'device',
@@ -1569,7 +1579,9 @@ export const RAW_COMMAND_DESCRIPTORS = [
     timeoutPolicy: DEFAULT_TIMEOUT_POLICY,
     batchable: false,
     mcpExposed: false,
-    platformExecution: LEGACY_PLATFORM_EXECUTION,
+    // setup/doctor mutate and inspect the managed browser installed on this host through the
+    // neutral managed-web-backend service. Live web sessions remain device-runtime owned.
+    platformExecution: HOST_PLATFORM_EXECUTION,
   },
 ] as const satisfies readonly RawCommandDescriptor[];
 

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runCmd, type ExecResult } from '../../utils/exec.ts';
 import { AppError, asAppError } from '@agent-device/kernel/errors';
+import type { ManagedWebBackendStatus } from '@agent-device/contracts/host-platform-services';
 import {
   installManagedAgentBrowserPackage,
   writeManagedAgentBrowserManifest,
@@ -22,22 +23,7 @@ const MINIMUM_WEB_NODE_MAJOR = 24;
 const SETUP_TIMEOUT_MS = 5 * 60_000;
 const DOCTOR_TIMEOUT_MS = 60_000;
 
-export type AgentBrowserToolStatus = {
-  version: string;
-  stateDir: string;
-  installDir: string;
-  packageDir: string;
-  /** npm's console shim. Published since #833; informational — never spawned (#2022). */
-  binaryPath: string;
-  /** Backend JS entry, undefined until the managed package is installed. */
-  entryScript: string | undefined;
-  homeDir: string;
-  runtimeHomeDir: string;
-  socketDir: string;
-  installed: boolean;
-  nodeMajor: number;
-  nodeSupported: boolean;
-};
+export type AgentBrowserToolStatus = ManagedWebBackendStatus;
 
 export type ManagedAgentBrowserRunOptions = {
   stateDir?: string;

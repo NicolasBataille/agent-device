@@ -5,7 +5,7 @@ import type { DaemonStopResult } from '../../../daemon/daemon-stop.ts';
 import { mkdtempForTestSync } from '../../../__tests__/test-utils/tmp-dir.ts';
 
 const mocks = vi.hoisted(() => ({
-  cleanupRunnerLeasesForOwner: vi.fn(async () => undefined),
+  cleanupDaemonOwner: vi.fn(async () => undefined),
   readDaemonShutdownReport: vi.fn(),
   readDaemonStopIdentity: vi.fn(),
   stopDaemon: vi.fn(),
@@ -19,9 +19,8 @@ vi.mock('../../../daemon/daemon-stop.ts', () => ({
 vi.mock('../../../daemon/daemon-shutdown-report.ts', () => ({
   readDaemonShutdownReport: mocks.readDaemonShutdownReport,
 }));
-vi.mock('../../../platforms/apple/core/runner-client.ts', () => ({
-  cleanupRunnerLeasesForOwner: mocks.cleanupRunnerLeasesForOwner,
-  runnerLeaseCleanupAdapter: {},
+vi.mock('../../../platform-runtime-daemon-owner-cleanup.ts', () => ({
+  daemonOwnerCleanup: { cleanup: mocks.cleanupDaemonOwner },
 }));
 vi.mock('../shared.ts', () => ({ writeCommandOutput: mocks.writeCommandOutput }));
 
@@ -88,10 +87,10 @@ test('merges a graceful shutdown report and cleans runner leases with the start-
       client: {} as never,
     });
 
-    expect(mocks.cleanupRunnerLeasesForOwner).toHaveBeenCalledWith(
-      { pid: 123, startTime: 'start-time' },
-      {},
-    );
+    expect(mocks.cleanupDaemonOwner).toHaveBeenCalledWith({
+      pid: 123,
+      startTime: 'start-time',
+    });
     expect(mocks.writeCommandOutput).toHaveBeenCalledWith(
       expect.objectContaining({ clean: true, json: false }),
       expect.objectContaining({

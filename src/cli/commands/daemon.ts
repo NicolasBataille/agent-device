@@ -8,6 +8,7 @@ import { readDaemonShutdownReport } from '../../daemon/daemon-shutdown-report.ts
 import { AppError } from '@agent-device/kernel/errors';
 import { writeCommandOutput } from './shared.ts';
 import type { ClientCommandHandler } from './router-types.ts';
+import { daemonOwnerCleanup } from '../../platform-runtime-daemon-owner-cleanup.ts';
 
 export const daemonCommand: ClientCommandHandler = async ({ positionals, flags }) => {
   const subcommand = positionals[0];
@@ -21,12 +22,10 @@ export const daemonCommand: ClientCommandHandler = async ({ positionals, flags }
   const result = mergeShutdownReport(stopped, report);
   const shouldClean = flags.clean === true && identity !== null && result.stopped;
   if (shouldClean) {
-    const { cleanupRunnerLeasesForOwner, runnerLeaseCleanupAdapter } =
-      await import('../../platforms/apple/core/runner-client.ts');
-    await cleanupRunnerLeasesForOwner(
-      { pid: identity.pid, startTime: identity.processStartTime },
-      runnerLeaseCleanupAdapter,
-    );
+    await daemonOwnerCleanup.cleanup({
+      pid: identity.pid,
+      startTime: identity.processStartTime,
+    });
   }
   const data = { ...result, clean: shouldClean };
   writeCommandOutput(flags, data, () => renderDaemonStop(data));

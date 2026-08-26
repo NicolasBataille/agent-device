@@ -241,6 +241,14 @@ const gestureTargetAuthoredDragUse = defineUse({
   preferred: ['gestureViewport'],
 });
 
+/**
+ * Internal replay/test coordinate projection reads the owner's frame before a concrete gesture
+ * tier exists. It is its own exact runtime use: requiring a plan tier here would invent an action
+ * the caller has not selected, while falling back to the legacy interactor dispatcher would hide
+ * device execution behind the replay/test descriptors.
+ */
+export const gestureViewportRuntimeUse = defineUse({ required: ['gestureViewport'] });
+
 /** `scroll <direction>` executes one pass and needs nothing else. */
 const scrollDirectionUse = defineUse({ required: ['scrollDirection'] });
 /**

@@ -265,7 +265,13 @@ test('lifecycle route proofs accept one shared admission per descriptor operatio
   assert.deepEqual(
     runtimeLifecycleRouteBindingViolations(
       lifecycleSources([
-        [RUNTIME_HANDLER_FILE, lifecycleAdmissionSource('admitClearRuntime', 'admitRuntimeUse')],
+        [
+          RUNTIME_HANDLER_FILE,
+          [
+            lifecycleAdmissionSource('admitClearRuntime', 'admitRuntimeUse'),
+            lifecycleAdmissionSource('readGestureViewport', 'admitRuntimeUse'),
+          ].join('\n'),
+        ],
         [
           PORT_REVERSE_HANDLER_FILE,
           lifecycleAdmissionSource('handlePortReverseCommand', 'admitRuntimeUse'),

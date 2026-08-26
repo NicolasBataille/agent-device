@@ -191,6 +191,10 @@
       "types": "./src/host-diagnostics.ts",
       "default": "./src/host-diagnostics.ts"
     },
+    "./host-platform-services": {
+      "types": "./src/host-platform-services.ts",
+      "default": "./src/host-platform-services.ts"
+    },
     "./gesture-plan-types": {
       "types": "./src/gesture-plan-types.ts",
       "default": "./src/gesture-plan-types.ts"

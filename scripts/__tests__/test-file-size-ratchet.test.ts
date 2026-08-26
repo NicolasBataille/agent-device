@@ -36,7 +36,7 @@ const PINNED_TEST_FILE_LINES: Readonly<Record<string, number>> = Object.freeze({
   'src/__tests__/remote-connection.test.ts': 2973,
   'src/daemon/handlers/__tests__/snapshot-handler.test.ts': 2284,
   'src/commands/interaction/runtime/settle.test.ts': 2359,
-  'src/daemon/handlers/__tests__/session-replay-runtime-maestro.test.ts': 2020,
+  'src/daemon/handlers/__tests__/session-replay-runtime-maestro.test.ts': 1963,
   'packages/platform-apple/src/runner/__tests__/runner-session.test.ts': 1957,
   'src/utils/__tests__/daemon-client.test.ts': 1873,
   'src/utils/__tests__/output.test.ts': 1861,

@@ -200,6 +200,10 @@ export const gestureDeviceRuntimeGateway: DeviceRuntimeGateway<PlatformRuntimeOp
     shutdown: async () => {},
   });
 
+export const gestureInspectFacts = gestureDeviceRuntimeGateway.inspectFacts;
+export const gestureBindDevice: BindDeviceRuntime = async (device, use) =>
+  narrowDeviceBinding(await gestureBinding(device), use);
+
 async function gestureBinding(device: DeviceInfo) {
   const base = await unavailableBinding(device);
   return {

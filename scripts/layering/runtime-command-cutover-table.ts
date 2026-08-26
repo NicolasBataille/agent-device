@@ -433,7 +433,7 @@ export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
   {
     rule: 'R31 runtime-runtime-cutover',
     command: 'runtime',
-    subject: 'runtime hints and provider port reverse',
+    subject: 'runtime hints, provider port reverse, and delegated gesture viewport',
     tier: 'durable-resource',
     execution: 'device-runtime',
     legacyRetirement: {
@@ -443,8 +443,10 @@ export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
       ],
       routeNames: ['ProviderPortReverse'],
     },
-    runtimeTypeNames: ['ApplicationLifecycleRuntimeOperations'],
-    operations: { pattern: /^(?:clearRuntimeHints|configureProviderPortReverse)$/ },
+    runtimeTypeNames: ['ApplicationLifecycleRuntimeOperations', 'GestureRuntimeOperations'],
+    operations: {
+      pattern: /^(?:clearRuntimeHints|configureProviderPortReverse|gestureViewport)$/,
+    },
     singularExecution: { routeProof: runtimeLifecycleRouteBindingViolations },
     lifecycleProof: applicationLifecycleDurableResourceViolations,
   },
@@ -987,11 +989,10 @@ export const MIGRATED_COMMAND_CUTOVERS: readonly MigratedCommandCutover[] = [
       // The whole admission and the plan dispatcher. `requireGestureSupported` was the last
       // daemon-owned platform table in this family: its intent-dependent tiers are now owner
       // facts, so the function and its five private helpers go with it.
-      routeNames: ['requireGestureSupported', 'dispatchGesturePlan'],
       // `gesture` also leaves the hand-maintained overlay that granted it a capability bucket on
-      // a family the descriptor never listed. `dispatchGestureViewport` is deliberately NOT
-      // claimed here: the Maestro replay port still consumes it, and ADR 0019 §6 keeps a shared
-      // mechanic in place until its last consumer can move.
+      // a family the descriptor never listed. #2042 closes the final replay/test consumer of the
+      // direct frame helper by delegating to admitted `runtime gesture-viewport`.
+      routeNames: ['requireGestureSupported', 'dispatchGesturePlan', 'dispatchGestureViewport'],
       staticCommandSets: ['HARMONYOS_SUPPORTED_COMMANDS'],
     },
     runtimeTypeNames: ['GestureRuntimeOperations', 'SnapshotRuntimeOperations'],

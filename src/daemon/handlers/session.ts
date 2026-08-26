@@ -191,10 +191,11 @@ const SESSION_COMMAND_HANDLER_IMPLS = {
   appstate: handleSessionStateCommandGroup,
   session_save_script: async ({ req, sessionName, sessionStore }) =>
     handleSessionScriptPublication({ req, sessionName, sessionStore }),
-  runtime: async ({ req, sessionName, sessionStore, inspectFacts, bindDevice }) =>
+  runtime: async ({ req, sessionName, logPath, sessionStore, inspectFacts, bindDevice }) =>
     await handleRuntimeCommand({
       req,
       sessionName,
+      logPath,
       sessionStore,
       inspectFacts,
       bindDevice,

@@ -40,7 +40,6 @@ vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
             booted: true,
           },
     ),
-    dispatchGestureViewport: vi.fn(async () => ({ x: 0, y: 0, width: 400, height: 800 })),
   };
 });
 
@@ -131,9 +130,13 @@ function createFixtureInvoke(params: {
       flags: req.flags,
     });
     if (params.delegate) return await params.delegate(req);
-    return params.isMaestro && req.command === 'snapshot'
-      ? { ok: true, data: { createdAt: 0, nodes: [] } }
-      : { ok: true, data: {} };
+    if (params.isMaestro && req.command === 'snapshot') {
+      return { ok: true, data: { createdAt: 0, nodes: [] } };
+    }
+    if (params.isMaestro && req.command === 'runtime') {
+      return { ok: true, data: { viewport: { x: 0, y: 0, width: 400, height: 800 } } };
+    }
+    return { ok: true, data: {} };
   };
 }
 
@@ -1043,37 +1046,21 @@ test('runReplayScriptSource treats absent Maestro extendedWaitUntil.notVisible t
   assert.equal(calls[0]?.flags?.noRecord, true);
 });
 
-test('runReplayScriptSource resolves Maestro percentage point taps from the direct viewport', async () => {
-  const calls: CapturedInvocation[] = [];
-  const { response } = await runReplayFixture({
+test('runReplayScriptSource resolves Maestro percentage point taps from the admitted runtime viewport', async () => {
+  const { response, calls } = await runReplayFixture({
     label: 'maestro-tap-point-percent',
     script: ['appId: demo.app', '---', '- tapOn:', '    point: 20%,20%', ''].join('\n'),
     flags: { replayBackend: 'maestro' },
     sessionPlatform: 'ios',
-    invoke: async (req) => {
-      calls.push({ command: req.command, positionals: req.positionals, flags: req.flags });
-      if (req.command === 'snapshot') {
-        return {
-          ok: true,
-          data: {
-            nodes: [
-              {
-                index: 0,
-                type: 'application',
-                rect: { x: 0, y: 0, width: 1000, height: 2000 },
-              },
-            ],
-          },
-        };
-      }
-      return { ok: true, data: {} };
-    },
   });
 
   assert.equal(response.ok, true);
   assert.deepEqual(
     calls.map((call) => [call.command, call.positionals]),
-    [['click', ['80', '160']]],
+    [
+      ['runtime', ['gesture-viewport']],
+      ['click', ['80', '160']],
+    ],
   );
   assert.equal(
     calls.some((call) => call.command === 'snapshot'),
@@ -1405,9 +1392,8 @@ test('runReplayScriptSource anchors scalar Maestro swipe.from to the matched ele
   );
 });
 
-test('runReplayScriptSource resolves Maestro screen swipes from the direct viewport', async () => {
-  const calls: CapturedInvocation[] = [];
-  const { response } = await runReplayFixture({
+test('runReplayScriptSource resolves Maestro screen swipes from the admitted runtime viewport', async () => {
+  const { response, calls } = await runReplayFixture({
     label: 'maestro-screen-swipe',
     script: [
       'appId: demo.app',
@@ -1423,35 +1409,13 @@ test('runReplayScriptSource resolves Maestro screen swipes from the direct viewp
     ].join('\n'),
     flags: { replayBackend: 'maestro' },
     sessionPlatform: 'ios',
-    invoke: async (req) => {
-      calls.push({
-        command: req.command,
-        positionals: req.positionals,
-        input: req.input,
-        flags: req.flags,
-      });
-      if (req.command === 'snapshot') {
-        return {
-          ok: true,
-          data: {
-            nodes: [
-              {
-                index: 0,
-                type: 'application',
-                rect: { x: 0, y: 0, width: 400, height: 800 },
-              },
-            ],
-          },
-        };
-      }
-      return { ok: true, data: {} };
-    },
   });
 
   assert.equal(response.ok, true);
   assert.deepEqual(
     calls.map((call) => [call.command, call.input]),
     [
+      ['runtime', undefined],
       [
         'gesture',
         {
@@ -1463,6 +1427,7 @@ test('runReplayScriptSource resolves Maestro screen swipes from the direct viewp
       ],
       ['snapshot', undefined],
       ['snapshot', undefined],
+      ['runtime', undefined],
       [
         'gesture',
         {
@@ -1477,8 +1442,7 @@ test('runReplayScriptSource resolves Maestro screen swipes from the direct viewp
 });
 
 test('runReplayScriptSource delegates Android directional swipes and preserves percentage points', async () => {
-  const calls: CapturedInvocation[] = [];
-  const { response } = await runReplayFixture({
+  const { response, calls } = await runReplayFixture({
     label: 'maestro-screen-swipe-android-midpoint-lane',
     script: [
       'appId: demo.app',
@@ -1494,35 +1458,13 @@ test('runReplayScriptSource delegates Android directional swipes and preserves p
     ].join('\n'),
     flags: { replayBackend: 'maestro', platform: 'android' },
     sessionPlatform: 'android',
-    invoke: async (req) => {
-      calls.push({
-        command: req.command,
-        positionals: req.positionals,
-        input: req.input,
-        flags: req.flags,
-      });
-      if (req.command === 'snapshot') {
-        return {
-          ok: true,
-          data: {
-            nodes: [
-              {
-                index: 0,
-                type: 'application',
-                rect: { x: 0, y: 0, width: 400, height: 800 },
-              },
-            ],
-          },
-        };
-      }
-      return { ok: true, data: {} };
-    },
   });
 
   assert.equal(response.ok, true);
   assert.deepEqual(
     calls.map((call) => [call.command, call.input]),
     [
+      ['runtime', undefined],
       [
         'gesture',
         {
@@ -1534,6 +1476,7 @@ test('runReplayScriptSource delegates Android directional swipes and preserves p
       ],
       ['snapshot', undefined],
       ['snapshot', undefined],
+      ['runtime', undefined],
       [
         'gesture',
         {

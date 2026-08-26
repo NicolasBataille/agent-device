@@ -6,10 +6,9 @@ export type CommandPlatformExecution =
   | Readonly<{ kind: 'none' }>
   | Readonly<{ kind: 'legacy' }>
   /**
-   * Host-scoped diagnostics (ADR 0019): platform families contribute host toolchain and
-   * environment probes through the neutral host-diagnostics surface; the command binds no
-   * device runtime as its own execution shape — any device-runtime leg rides an already
-   * migrated command's declared use.
+   * Host-scoped platform work (ADR 0019): diagnostics, owner cleanup, or managed tooling runs
+   * through a neutral typed host service. The command binds no device runtime as its own
+   * execution shape; any device-runtime leg rides an already migrated command's declared use.
    */
   | Readonly<{ kind: 'host' }>
   | Readonly<{ kind: 'inventory'; use: InventoryUse }>

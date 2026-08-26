@@ -7,7 +7,7 @@ import {
   type MaestroPlatform,
 } from '@agent-device/maestro';
 import { AppError } from '@agent-device/kernel/errors';
-import { dispatchGestureViewport, resolveTargetDevice } from '../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../core/dispatch.ts';
 import { getRequestSignal } from '../../request/cancel.ts';
 import { stripUndefined } from '../../utils/parsing.ts';
 import {
@@ -30,13 +30,14 @@ import {
   buildTypedMaestroSuccessResponse,
 } from './session-replay-maestro-response.ts';
 import { resolveEffectiveOpenRuntimeHints } from './session-runtime.ts';
-import { contextFromFlags } from '../context.ts';
 import { buildMaestroReplayTargetDeviceResolutionOptions } from '../replay-device-selection.ts';
 import {
   readReplayScriptSourceFile,
   REPLAY_SCRIPT_SOURCE_REQUIRED_MESSAGE,
 } from '../../replay/script-source-bundle.ts';
 import type { ReplayScriptSourceBundle } from '@agent-device/contracts/replay';
+import { daemonResponseError } from '../adapters/maestro/daemon-runtime-port-support.ts';
+import { isPositiveFiniteRect } from '@agent-device/kernel/rect';
 
 type TypedMaestroReplayParams = {
   req: DaemonRequest;
@@ -112,9 +113,6 @@ async function executeTypedMaestroReplay(
   const port = createMaestroReplayPort({
     req,
     invoke,
-    logPath: params.logPath,
-    sessionName,
-    sessionStore,
     device: context.device,
     platform: context.platform,
     runtimeHints: context.runtimeHints,
@@ -290,25 +288,12 @@ function buildTypedMaestroEnv(req: DaemonRequest): Record<string, string> {
 function createMaestroReplayPort(params: {
   req: DaemonRequest;
   invoke: DaemonInvokeFn;
-  logPath: string;
-  sessionName: string;
-  sessionStore: SessionStore;
   device: DeviceInfo | undefined;
   platform: Extract<MaestroPlatform, 'android' | 'ios'>;
   runtimeHints: ReturnType<typeof resolveEffectiveOpenRuntimeHints>;
   sourcePath: string;
 }) {
-  const {
-    req,
-    invoke,
-    logPath,
-    sessionName,
-    sessionStore,
-    device,
-    platform,
-    runtimeHints,
-    sourcePath,
-  } = params;
+  const { req, invoke, device, platform, runtimeHints, sourcePath } = params;
   const {
     command: _command,
     positionals: _positionals,
@@ -331,18 +316,36 @@ function createMaestroReplayPort(params: {
       sleep: async (milliseconds, abortSignal) => {
         await sleep(milliseconds, undefined, { signal: abortSignal });
       },
-      resolveGestureViewport: async () => {
-        const session = sessionStore.get(sessionName);
-        if (!session) {
-          throw new AppError('SESSION_NOT_FOUND', 'No active session. Run open first.');
-        }
-        return await dispatchGestureViewport(
-          session.device,
-          contextFromFlags(logPath, req.flags, session.appBundleId, session.trace?.outPath),
-        );
-      },
+      resolveGestureViewport: async () => await invokeRuntimeGestureViewport({ baseReq, invoke }),
     },
   });
+}
+
+async function invokeRuntimeGestureViewport(params: {
+  baseReq: Omit<DaemonRequest, 'command' | 'positionals'>;
+  invoke: DaemonInvokeFn;
+}) {
+  const response = await params.invoke({
+    ...params.baseReq,
+    command: 'runtime',
+    positionals: ['gesture-viewport'],
+  });
+  if (!response.ok) throw daemonResponseError(response);
+  const viewport = response.data?.viewport;
+  if (!isRect(viewport) || !isPositiveFiniteRect(viewport)) {
+    throw new AppError('COMMAND_FAILED', 'runtime gesture-viewport returned no valid viewport.');
+  }
+  return viewport;
+}
+
+function isRect(value: unknown): value is { x: number; y: number; width: number; height: number } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    ['x', 'y', 'width', 'height'].every(
+      (key) => typeof (value as Record<string, unknown>)[key] === 'number',
+    )
+  );
 }
 
 function maestroRuntimeDeviceFlags(

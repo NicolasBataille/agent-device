@@ -1,9 +1,10 @@
-import type { AgentBrowserToolStatus } from '../../platforms/web/agent-browser-tool.ts';
+import type { ManagedWebBackendStatus } from '@agent-device/contracts/host-platform-services';
 import { AppError } from '@agent-device/kernel/errors';
 import type { CliFlags } from '@agent-device/contracts/command';
 import { printJson } from '../../utils/output.ts';
+import { managedWebBackend } from '../../platform-runtime-managed-web-backend.ts';
 
-type PublicAgentBrowserToolStatus = Omit<AgentBrowserToolStatus, 'socketDir'>;
+type PublicAgentBrowserToolStatus = Omit<ManagedWebBackendStatus, 'socketDir'>;
 
 export async function runWebCommand(
   positionals: string[],
@@ -13,18 +14,14 @@ export async function runWebCommand(
   switch (action) {
     case 'setup': {
       printWebSetupStart(options.flags.json);
-      const { setupManagedAgentBrowser } =
-        await import('../../platforms/web/agent-browser-tool.ts');
-      const status = await setupManagedAgentBrowser({
+      const status = await managedWebBackend.setup({
         stateDir: options.stateDir,
       });
       printWebSetupResult(options.flags.json, status);
       return 0;
     }
     case 'doctor': {
-      const { doctorManagedAgentBrowser } =
-        await import('../../platforms/web/agent-browser-tool.ts');
-      const result = await doctorManagedAgentBrowser({
+      const result = await managedWebBackend.doctor({
         stateDir: options.stateDir,
       });
       printWebResult(
@@ -44,7 +41,7 @@ function printWebSetupStart(json: boolean | undefined): void {
   process.stdout.write('Setting up managed agent-browser backend (downloads if needed)...\n');
 }
 
-function printWebSetupResult(json: boolean | undefined, status: AgentBrowserToolStatus): void {
+function printWebSetupResult(json: boolean | undefined, status: ManagedWebBackendStatus): void {
   if (json) {
     printJson({ success: true, data: { status: toPublicAgentBrowserToolStatus(status) } });
     return;
@@ -63,7 +60,7 @@ function printWebResult(json: boolean | undefined, message: string, data: Record
 }
 
 function toPublicAgentBrowserToolStatus(
-  status: AgentBrowserToolStatus,
+  status: ManagedWebBackendStatus,
 ): PublicAgentBrowserToolStatus {
   const { socketDir: _socketDir, ...publicStatus } = status;
   return publicStatus;
@@ -78,7 +75,7 @@ function toPublicWebResult(data: Record<string, unknown>): Record<string, unknow
   };
 }
 
-function isAgentBrowserToolStatus(value: unknown): value is AgentBrowserToolStatus {
+function isAgentBrowserToolStatus(value: unknown): value is ManagedWebBackendStatus {
   return (
     typeof value === 'object' &&
     value !== null &&

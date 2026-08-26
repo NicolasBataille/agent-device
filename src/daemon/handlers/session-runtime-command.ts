@@ -15,6 +15,9 @@ import {
 } from './session-runtime.ts';
 import type { BindDeviceRuntime, InspectDeviceRuntimeFacts } from '../request-runtime-binding.ts';
 import { handlePortReverseCommand } from './session-runtime-port-reverse.ts';
+import { gestureViewportRuntimeUse } from '@agent-device/contracts/platform-runtime-operations';
+import { contextFromFlags } from '../context.ts';
+import { runtimeExecutionFromContext } from '../snapshot-runtime-capture-input.ts';
 
 type RuntimeAction = 'set' | 'show' | 'clear';
 type RuntimeCommandDevice = NonNullable<ReturnType<SessionStore['get']>>['device'];
@@ -38,6 +41,7 @@ async function admitClearRuntime(params: RuntimeCommandAdmission) {
 export async function handleRuntimeCommand(params: {
   req: DaemonRequest;
   sessionName: string;
+  logPath: string;
   sessionStore: SessionStore;
   inspectFacts?: InspectDeviceRuntimeFacts;
   bindDevice?: BindDeviceRuntime;
@@ -52,8 +56,14 @@ export async function handleRuntimeCommand(params: {
       bindDevice: params.bindDevice,
     });
   }
+  if (action === 'gesture-viewport') {
+    return await readGestureViewport({ ...params, session: sessionStore.get(sessionName) });
+  }
   if (!isRuntimeAction(action)) {
-    return errorResponse('INVALID_ARGS', 'runtime requires set, show, clear, or port-reverse');
+    return errorResponse(
+      'INVALID_ARGS',
+      'runtime requires set, show, clear, port-reverse, or gesture-viewport',
+    );
   }
   const session = sessionStore.get(sessionName);
   const current = sessionStore.getRuntimeHints(sessionName);
@@ -72,6 +82,41 @@ export async function handleRuntimeCommand(params: {
   }
 
   return setRuntimeCommand({ req, sessionName, sessionStore, session, current });
+}
+
+async function readGestureViewport(params: {
+  req: DaemonRequest;
+  logPath: string;
+  session: ReturnType<SessionStore['get']>;
+  inspectFacts?: InspectDeviceRuntimeFacts;
+  bindDevice?: BindDeviceRuntime;
+}): Promise<DaemonResponse> {
+  if (!params.session) {
+    return errorResponse('SESSION_NOT_FOUND', 'No active session. Run open first.');
+  }
+  const admission = await admitRuntimeUse({
+    command: 'runtime gesture-viewport',
+    device: params.session.device,
+    use: gestureViewportRuntimeUse,
+    inspectFacts: params.inspectFacts,
+    bindDevice: params.bindDevice,
+  });
+  if (admission.type === 'response') return admission.response;
+  const context = contextFromFlags(
+    params.logPath,
+    params.req.flags,
+    params.session.appBundleId,
+    params.session.trace?.outPath,
+    params.req.meta?.requestId,
+    params.req.meta,
+  );
+  const viewport = await admission.runtime.operations.gestureViewport({
+    ...(params.session.appBundleId === undefined
+      ? {}
+      : { options: { appBundleId: params.session.appBundleId } }),
+    execution: runtimeExecutionFromContext(context),
+  });
+  return { ok: true, data: { viewport } };
 }
 
 function isRuntimeAction(action: string): action is RuntimeAction {
