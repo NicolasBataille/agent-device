@@ -6,6 +6,7 @@ import {
 } from '@agent-device/maestro';
 import { helpBody } from '../commands/command-text.ts';
 import {
+  DEVICE_SELECTION_FLAG_KEYS,
   getCliCommandSchema,
   getCommandSchema,
   getFlagDefinitions,
@@ -1059,6 +1060,10 @@ Full command catalog. Use agent-device help <command> for exact flags and behavi
   });
   const commandLines = renderCommandSection(commands);
 
+  const selectionSection = renderFlagSection(
+    'Device Selection (accepted by every device command):',
+    listHelpFlags(DEVICE_SELECTION_FLAG_KEYS),
+  );
   const helpFlags = listHelpFlags(GLOBAL_FLAG_KEYS);
   const flagsSection = renderFlagSection('Global Flags:', helpFlags);
   const configSection = renderTextSection('Configuration:', CONFIGURATION_LINES);
@@ -1067,6 +1072,8 @@ Full command catalog. Use agent-device help <command> for exact flags and behavi
 
   return `${header}
 ${commandLines}
+
+${selectionSection}
 
 ${flagsSection}
 

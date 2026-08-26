@@ -96,6 +96,22 @@ export const COMMON_COMMAND_SUPPORTED_FLAG_KEYS = flagKeys(
   'noRecord',
 );
 
+/**
+ * The device/session selectors every command accepts (they are part of
+ * {@link COMMON_COMMAND_SUPPORTED_FLAG_KEYS}, not of {@link GLOBAL_FLAG_KEYS}, because they reach
+ * device resolution rather than the CLI envelope). `help commands` renders them as their own
+ * section: `--udid` used to appear only inside `help device`'s usage line, so the one flag that
+ * pins a specific simulator among several with the same name was undiscoverable from the command
+ * catalog (#2064).
+ */
+export const DEVICE_SELECTION_FLAG_KEYS: ReadonlySet<FlagKey> = new Set([
+  'platform',
+  'device',
+  'udid',
+  'serial',
+  'session',
+]);
+
 export const GLOBAL_FLAG_KEYS: ReadonlySet<FlagKey> = new Set([
   'json',
   'config',

@@ -37,6 +37,23 @@ test('gesture help documents selectors and pinned refs for both drag endpoints',
   assert.match(help, /drag <source-selector\|pinned-ref> <destination-selector\|pinned-ref>/);
 });
 
+// `--udid` was reachable only from `help device`'s usage line, so the one flag that pins a
+// specific simulator among several sharing a name was invisible in the command catalog (#2064).
+test('commands topic lists the device selectors accepted by every command', async () => {
+  const usageText = await usageForCommand('commands');
+  if (usageText === null) throw new Error('Expected commands help text');
+  const selectionSection = usageText.slice(
+    usageText.indexOf('Device Selection'),
+    usageText.indexOf('Global Flags:'),
+  );
+  assert.match(selectionSection, /^Device Selection/);
+  assert.match(selectionSection, /--platform /);
+  assert.match(selectionSection, /--device <name>/);
+  assert.match(selectionSection, /--udid <udid>/);
+  assert.match(selectionSection, /--serial <serial>/);
+  assert.match(selectionSection, /--session <name>/);
+});
+
 test('commands topic includes only global flags in its global flags section', async () => {
   const usageText = await usageForCommand('commands');
   if (usageText === null) throw new Error('Expected commands help text');

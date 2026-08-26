@@ -56,6 +56,43 @@ test('an unspecified platform keeps the existing device-not-found behavior', asy
   assert.equal(error.code, 'DEVICE_NOT_FOUND');
 });
 
+// `--device` takes a NAME. Passing a UDID there answered "No device named <udid>" with the generic
+// booted/connected hint (#2064) — true, unactionable, and silent about `--udid` existing at all.
+
+test('a UDID passed to --device names --udid and the device it identifies', async () => {
+  const error = await resolveError([APPLE, ANDROID], { deviceName: 'SIM-001' });
+  assert.equal(error.code, 'DEVICE_NOT_FOUND');
+  assert.match(error.message, /No device named SIM-001/);
+  assert.match(
+    String(error.details?.hint ?? ''),
+    /SIM-001 is the id of "iPhone 16", not its name\. Did you mean --udid SIM-001\?/,
+  );
+});
+
+test('a serial passed to --device names --serial, not --udid', async () => {
+  const error = await resolveError([APPLE, ANDROID], { deviceName: 'emulator-5580' });
+  assert.equal(error.code, 'DEVICE_NOT_FOUND');
+  assert.match(String(error.details?.hint ?? ''), /Did you mean --serial emulator-5580\?/);
+});
+
+test('a UDID-shaped --device value names --udid even when no listed device has that id', async () => {
+  const error = await resolveError([APPLE], {
+    platform: 'ios',
+    deviceName: '204BFFD9-9644-4830-B2C1-1B946597A07C',
+  });
+  assert.equal(error.code, 'DEVICE_NOT_FOUND');
+  assert.match(
+    String(error.details?.hint ?? ''),
+    /--device takes a device name\. Did you mean --udid 204BFFD9-9644-4830-B2C1-1B946597A07C\?/,
+  );
+});
+
+test('an ordinary unknown --device name keeps the generic device-not-found hint', async () => {
+  const error = await resolveError([APPLE], { platform: 'ios', deviceName: 'iPhone 99' });
+  assert.equal(error.code, 'DEVICE_NOT_FOUND');
+  assert.equal(error.details?.hint, undefined);
+});
+
 async function resolveError(
   devices: DeviceInfo[],
   selector: Parameters<typeof resolveDevice>[1],
