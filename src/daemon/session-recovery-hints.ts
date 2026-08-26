@@ -10,22 +10,33 @@ export function describeSessionDevice(session: SessionState): string {
   return `${platform} device "${name}" (${id})`;
 }
 
+/**
+ * `sessionAddress` is the value a caller must pass to `--session` to reach this session, which is
+ * NOT always `session.name`: an implicitly cwd-scoped session is named `default` and stored under
+ * `cwd:<hash>:default`. Building the recovery commands from the name produced
+ * `agent-device close --session default`, and `--session` marks the session explicit, so that
+ * command addressed a different, non-existent session and answered SESSION_NOT_FOUND while the
+ * device stayed held (#2031). Callers that hold the store key pass it; the rest pass the name and
+ * are unchanged.
+ */
 export function buildSessionRecoveryHint(
   session: SessionState,
   context: SessionRecoveryContext,
+  sessionAddress: string,
 ): string {
   // Active recording state controls user recovery text; record-only ownership controls cleanup.
   if (session.screenRecording) {
-    return buildRecordingSessionRecoveryHint(session, context);
+    return buildRecordingSessionRecoveryHint(session, context, sessionAddress);
   }
-  return buildOpenSessionRecoveryHint(session, context);
+  return buildOpenSessionRecoveryHint(context, sessionAddress);
 }
 
 function buildRecordingSessionRecoveryHint(
   session: SessionState,
   context: SessionRecoveryContext,
+  sessionAddress: string,
 ): string {
-  const sessionArg = shellQuoteIfNeeded(session.name);
+  const sessionArg = shellQuoteIfNeeded(sessionAddress);
   const closeCommand = `agent-device close --session ${sessionArg}`;
   const recordStopCommand = `agent-device record stop --session ${sessionArg}`;
   const reuseText =
@@ -42,10 +53,10 @@ function buildRecordingSessionRecoveryHint(
 }
 
 function buildOpenSessionRecoveryHint(
-  session: SessionState,
   context: SessionRecoveryContext,
+  sessionAddress: string,
 ): string {
-  const sessionArg = shellQuoteIfNeeded(session.name);
+  const sessionArg = shellQuoteIfNeeded(sessionAddress);
   const closeCommand = `agent-device close --session ${sessionArg}`;
   if (context === 'selector-conflict') {
     return (
