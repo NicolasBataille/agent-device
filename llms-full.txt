@@ -591,7 +591,7 @@ Notes:
 
 - `input` is required and uses the same fields as the matching MCP/Node command.
 - Unknown top-level step fields are rejected. Supported keys are `command`, `input`, and `runtime`.
-- CLI `--steps` and `--steps-file` still accept the legacy `positionals`/`flags` step shape with a deprecation warning. That compatibility path will be removed in the next major version.
+- The legacy `positionals`/`flags` step shape was removed in 0.21. Migrate each step to structured input, for example `{"command":"open","input":{"app":"settings","platform":"ios"}}`.
 - nested `batch` and `replay` steps are rejected.
 - `--on-error stop` is the supported behavior.
 
@@ -1200,7 +1200,7 @@ The complete domain-client method map is:
 - `client.interactions.click()`, `press()`, `longPress()`, `swipe()`, `pan()`, `drag()`, `fling()`, `swipeGesture()`, `focus()`, `type()`, `fill()`, `scroll()`, `pinch()`, `rotateGesture()`, `transformGesture()`, `get()`, `is()`, `find()`
 - `client.replay.run()` and `client.replay.test()`
 - `client.batch.run()`
-- `client.observability.perf()`, `logs()`, `events()`, `network()`, and `audio()`
+- `client.observability.perf(options)`, `logs()`, `events()`, `network()`, and `audio()`
 - `client.debug.symbols()`
 - `client.recording.record()` and `client.recording.trace()`
 - `client.settings.update()`
@@ -1229,7 +1229,7 @@ await client.observability.audio({ platform: 'web', action: 'probe', probeAction
 
 Web probes sample HTML media elements. Host-system probes use `platform: 'macos'`, `platform: 'ios'` for iOS simulators, or `platform: 'android'` for Android emulators on macOS hosts. They sample host system audio through ScreenCaptureKit and require Screen Recording permission. Physical iOS and Android app audio are not exposed by this command.
 
-Prefer an explicit area with `client.observability.perf()` so each request stays focused. Calling `perf()` without options or using `area: 'metrics'` remains a deprecated compatibility path until the next major release; on Android, that path retains the released `dumpsys cpuinfo` point sample. Pass `{ area: 'frames' }` for a bounded frame/jank-health payload or `{ area: 'memory', action: 'sample' }` for a compact memory-only sample. Use `{ area: 'memory', action: 'snapshot', kind: 'android-hprof', out: 'app.hprof' }` on Android or `{ area: 'memory', action: 'snapshot', kind: 'memgraph', out: 'app.memgraph' }` on supported Apple simulator/macOS app sessions to write large memory artifacts to disk. Android native artifacts use `{ area: 'cpu', subject: 'profile', action: 'start' | 'stop' | 'report', kind: 'simpleperf', out }` and `{ area: 'trace', action: 'start' | 'stop', kind: 'perfetto', out }`; CPU reports return at most ten top functions in data and print five, while trace/profile contents remain on disk. Physical iOS device memgraph capture reports unavailable with a reason/hint. On Android and supported Apple targets, `data.metrics.fps.droppedFramePercent` is the primary frame-smoothness value. Android derives it from the current `adb shell dumpsys gfxinfo <package> framestats` window; connected iOS devices derive it from `xcrun xctrace` Animation Hitches for the active app process. Frame samples include `windowStartedAt`, `windowEndedAt`, and `worstWindows` so agents can correlate dropped-frame clusters with logs, network entries, and their own session actions. A successful Android read resets Android frame stats; `open <app>` resets the Android frame window too, so agents can call `perf({ area: 'frames' })`, perform a transition or gesture, then call it again to inspect that focused window. iOS simulator and macOS app sessions report frame health as unavailable rather than inventing FPS or dropped-frame values.
+Pass an explicit area to `client.observability.perf()` so each request stays focused; options and `area` are required. The removed optionless call and `area: 'metrics'` aggregate shape fail with replacements in 0.21. Pass `{ area: 'frames' }` for a bounded frame/jank-health payload or `{ area: 'memory', action: 'sample' }` for a compact memory-only sample. Use `{ area: 'memory', action: 'snapshot', kind: 'android-hprof', out: 'app.hprof' }` on Android or `{ area: 'memory', action: 'snapshot', kind: 'memgraph', out: 'app.memgraph' }` on supported Apple simulator/macOS app sessions to write large memory artifacts to disk. Android native artifacts use `{ area: 'cpu', subject: 'profile', action: 'start' | 'stop' | 'report', kind: 'simpleperf', out }` and `{ area: 'trace', action: 'start' | 'stop', kind: 'perfetto', out }`; CPU reports return at most ten top functions in data and print five, while trace/profile contents remain on disk. Physical iOS device memgraph capture reports unavailable with a reason/hint. On Android and supported Apple targets, `data.metrics.fps.droppedFramePercent` is the primary frame-smoothness value. Android derives it from the current `adb shell dumpsys gfxinfo <package> framestats` window; connected iOS devices derive it from `xcrun xctrace` Animation Hitches for the active app process. Frame samples include `windowStartedAt`, `windowEndedAt`, and `worstWindows` so agents can correlate dropped-frame clusters with logs, network entries, and their own session actions. A successful Android read resets Android frame stats; `open <app>` resets the Android frame window too, so agents can call `perf({ area: 'frames' })`, perform a transition or gesture, then call it again to inspect that focused window. iOS simulator and macOS app sessions report frame health as unavailable rather than inventing FPS or dropped-frame values.
 
 For Apple native profiling, call `perf({ area: 'cpu', subject: 'profile', action: 'start', kind: 'xctrace', template: 'Time Profiler', out: 'app.trace' })`, then stop with the same trace path and write a compact report with `action: 'report'`. The CPU report includes a bounded weighted top-function summary; the raw trace remains an artifact. `area: 'trace'` supports xctrace templates such as `Animation Hitches`.
 
@@ -1971,7 +1971,7 @@ agent-device batch --steps '[{"command":"open","input":{"app":"settings"}}]'
 - `batch` runs a JSON array of steps in a single daemon request.
 - Each step has `command`, `input`, and optional `runtime`.
 - `input` uses the same fields as the matching MCP/Node command.
-- Legacy CLI step payloads with `positionals`/`flags` still run with a deprecation warning and will be removed in the next major version.
+- Legacy CLI step payloads with `positionals`/`flags` were removed in 0.21. Use structured input such as `{"command":"open","input":{"app":"settings","platform":"ios"}}`.
 - Unknown top-level step fields are rejected.
 - Stop-on-first-error is the supported behavior (`--on-error stop`).
 - Use `--max-steps <n>` to tighten per-request safety limits.
@@ -2189,7 +2189,7 @@ agent-device perf trace start --kind perfetto --out app.perfetto-trace
 agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 ```
 
-- Prefer an explicit `frames`, `memory`, `cpu`, or `trace` area so each request answers one profiling question. Bare `perf`, `perf sample`, `perf metrics`, and the `metrics` alias remain deprecated compatibility forms until the next major release; they return aggregate evidence plus migration guidance. On Android, this compatibility path retains the released `dumpsys cpuinfo` point sample; use `perf cpu profile` for new CPU profiling workflows.
+- Use an explicit `frames`, `memory`, `cpu`, or `trace` area so each request answers one profiling question. In 0.21, bare `perf`, `perf sample`, `perf metrics`, and the `metrics` alias fail with guidance to the focused replacements.
 - `perf frames` returns a focused, bounded frame/jank-health JSON blob.
 - `perf memory sample` returns a compact memory-only JSON blob for agents investigating growth/leaks without collecting a large artifact. It is better than raw memory command output for first-pass diagnosis because arrays and top offenders are bounded.
 - Example sample shape: `{"metrics":{"memory":{"available":true,"totalPssKb":562958,"totalRssKb":570304,"topConsumers":[{"name":"Dalvik Heap","pssKb":213456}]}}}`.
@@ -2203,7 +2203,7 @@ agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 - `perf trace ... --kind perfetto` starts/stops Android Perfetto trace capture for the active session package.
 - Native profile/trace outputs are compact agent evidence: state, artifact path, size, and method. Raw `.perf.data` and `.perfetto-trace` contents stay on disk.
 - Without `--json`, each explicit perf area prints a compact focused summary.
-- App startup duration is measured by `open` and returned in `open`'s `startup` result. Use that result directly instead of the deprecated aggregate perf form.
+- App startup duration is measured by `open` and returned in `open`'s `startup` result. Use that result directly instead of the removed aggregate perf form.
 - Use native perf stop/report results as compact agent evidence, not raw profiler output. A successful Perfetto stop can return `state: "stopped"`, `outPath: "/tmp/app.perfetto-trace"`, `sizeBytes: 5392410`, and `method: "adb-shell-perfetto"` while the 5.3 MB raw trace stays on disk as the artifact.
 - Android app sessions with an active package support:
   - `fps` frame health from `adb shell dumpsys gfxinfo <package> framestats`, with `droppedFramePercent` as the primary value and `worstWindows` for dropped-frame clusters
@@ -2899,7 +2899,7 @@ agent-device perf trace start --kind perfetto --out app.perfetto-trace
 agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 ```
 
-- Prefer an explicit `frames`, `memory`, `cpu`, or `trace` area so the result stays focused and interpretable. Bare `perf`, `perf sample`, `perf metrics`, and `metrics` remain deprecated compatibility forms until the next major release.
+- Use an explicit `frames`, `memory`, `cpu`, or `trace` area so the result stays focused and interpretable. In 0.21, bare `perf`, `perf sample`, `perf metrics`, and `metrics` fail with exact replacement guidance.
 - `perf frames` returns a focused frame/jank-health payload.
 - `perf memory sample` returns a compact memory-only payload. Prefer it over raw `dumpsys`/`leaks` output for first-pass agent diagnosis because it keeps arrays bounded and reports top offenders compactly.
 - Example sample shape: `{"metrics":{"memory":{"available":true,"totalPssKb":562958,"totalRssKb":570304,"topConsumers":[{"name":"Dalvik Heap","pssKb":213456}]}}}`.
@@ -2910,7 +2910,7 @@ agent-device perf trace stop --kind perfetto --out app.perfetto-trace
 - Android native profiling uses `perf cpu profile ... --kind simpleperf`; its report likewise returns at most ten top functions and prints five. Android native trace capture uses `perf trace ... --kind perfetto`. These commands require an active Android app session and return artifact paths/summaries instead of dumping profile or trace contents.
 - Use the compact native perf result as agent evidence. For example, a successful Perfetto stop may return `state: "stopped"`, `outPath: "/tmp/app.perfetto-trace"`, `sizeBytes: 5392410`, and `method: "adb-shell-perfetto"` while the 5.3 MB raw trace remains on disk as the artifact.
 - Memory and Android frame-health availability depend on platform and whether the active session is bound to an app/package. HarmonyOS reports process RSS through HDC; CPU profiling, frame sampling, and memory-snapshot artifacts remain unavailable on the public HDC surface.
-- App startup duration is returned by `open` as `startup`; use that result directly rather than the deprecated aggregate perf response.
+- App startup duration is returned by `open` as `startup`; use that result directly rather than the removed aggregate perf response.
 - On Android and supported Apple targets, use `metrics.fps.droppedFramePercent` for the health check and `metrics.fps.worstWindows` to line up jank clusters with logs, network activity, or recent actions.
 
 ## Where to go deeper
