@@ -104,6 +104,13 @@ export type ParsedFillTarget =
   | { ok: true; target: InteractionTarget; refGeneration?: number; text: string }
   | { ok: false; response: DaemonResponse };
 
+// An empty text argument is the clear-field primitive (#2063): only a MISSING one is an error.
+// Whitespace-only text keeps its per-shape rule below — ref/coordinate fills accept it as payload
+// (Maestro/keyboard-enter newlines), selector fills refuse it.
+function hasFillText(text: string | undefined): text is string {
+  return text !== undefined;
+}
+
 export function parseFillTarget(positionals: string[]): ParsedFillTarget {
   const first = positionals[0] ?? '';
   if (first.startsWith('@')) {
@@ -111,7 +118,7 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
     if (!versioned.ok) return { ok: false, response: versioned.response };
     const parsed = readFillTargetFromPositionals(positionals);
     const text = parsed.text;
-    if (!text)
+    if (!hasFillText(text))
       return { ok: false, response: errorResponse('INVALID_ARGS', 'fill requires text after ref') };
     return {
       ok: true,
@@ -127,8 +134,8 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
 
   const coordinates = parseCoordinateTarget(positionals);
   if (coordinates) {
-    const text = positionals.slice(2).join(' ');
-    if (!text)
+    const text = positionals.length >= 3 ? positionals.slice(2).join(' ') : undefined;
+    if (!hasFillText(text))
       return {
         ok: false,
         response: errorResponse('INVALID_ARGS', 'fill requires text after coordinates'),
@@ -146,9 +153,10 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
       ),
     };
   }
-  // Preserve payload whitespace (for example Maestro/keyboard-enter newlines)
-  // while still rejecting selector fills that contain only whitespace.
-  if (!parsed.text.trim()) {
+  // Preserve payload whitespace (for example Maestro/keyboard-enter newlines) while still
+  // rejecting selector fills that contain only whitespace. `''` is exempt: it is the explicit
+  // clear request (#2063), not an accidentally blank argument.
+  if (!hasFillText(parsed.text) || (parsed.text.length > 0 && !parsed.text.trim())) {
     return {
       ok: false,
       response: errorResponse('INVALID_ARGS', 'fill requires text after selector'),

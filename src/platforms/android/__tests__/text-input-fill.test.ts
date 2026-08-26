@@ -354,6 +354,39 @@ test('verifyAndroidFilledTextInHierarchy accepts Android sentence autocapitaliza
   assert.equal(verification.ok, true);
 });
 
+// `fill <target> ""` is the clear-field primitive (#2063). A cleared EditText carries no `text`
+// attribute at all, so the dump reads back as null while the expectation is "": without an
+// explicit empty rule the clear succeeds on the device and is still reported as text_mismatch.
+test('verifyAndroidFilledTextInHierarchy accepts a cleared field for an empty expectation', () => {
+  const clearedByAttribute = verifyAndroidFilledTextInHierarchy(
+    androidInputXml({ text: '' }),
+    10,
+    10,
+    '',
+  );
+  assert.equal(clearedByAttribute.ok, true);
+
+  const clearedWithoutAttribute = verifyAndroidFilledTextInHierarchy(
+    '<?xml version="1.0" encoding="UTF-8"?><hierarchy><node package="com.example" class="android.widget.EditText" focused="true" bounds="[0,0][200,100]"/></hierarchy>',
+    10,
+    10,
+    '',
+  );
+  assert.equal(clearedWithoutAttribute.ok, true);
+});
+
+test('verifyAndroidFilledTextInHierarchy still refuses a non-empty field for an empty expectation', () => {
+  const verification = verifyAndroidFilledTextInHierarchy(
+    androidInputXml({ text: 'still here' }),
+    10,
+    10,
+    '',
+  );
+
+  assert.equal(verification.ok, false);
+  assert.equal(verification.actual, 'still here');
+});
+
 test('verifyAndroidFilledTextInHierarchy rejects near-complete prefixes', () => {
   const verification = verifyAndroidFilledTextInHierarchy(
     androidInputXml({ text: 'filed the expens' }),

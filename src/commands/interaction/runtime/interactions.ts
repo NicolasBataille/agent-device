@@ -79,7 +79,11 @@ export const fillCommand: RuntimeCommand<FillCommandOptions, FillCommandResult> 
   runtime,
   options,
 ): Promise<FillCommandResult> => {
-  if (!options.text) throw new AppError('INVALID_ARGS', 'fill requires text');
+  // `''` is a VALUE here — `fill <target> ""` is the clear-field primitive (#2063) — so this
+  // runtime guard for untyped callers checks presence, not truthiness.
+  if (typeof options.text !== 'string') {
+    throw new AppError('INVALID_ARGS', 'fill requires text');
+  }
   const observation = planPostActionObservation(options);
   const nativeRefFill = observation.needsPreActionBaseline
     ? null

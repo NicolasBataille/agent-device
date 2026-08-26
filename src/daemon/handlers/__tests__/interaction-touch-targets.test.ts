@@ -156,3 +156,39 @@ test('parseFillTarget rejects a malformed pinned ref before reading text', () =>
     });
   }
 });
+
+// `fill <target> ""` is the clear-field primitive (#2063). Empty text is a VALUE here; only a
+// missing text argument is an error. Whitespace-only text keeps its established per-shape rule:
+// payload on ref/coordinate fills, refused on selector fills.
+
+test('parseFillTarget accepts an empty text after a ref as the clear request', () => {
+  const parsed = parseFillTarget(['@e57', '']);
+  expect(parsed.ok).toBe(true);
+  if (!parsed.ok) return;
+  expect(parsed.text).toBe('');
+});
+
+test('parseFillTarget accepts an empty text after a selector and after coordinates', () => {
+  const selectorParsed = parseFillTarget(['label="Email"', '']);
+  expect(selectorParsed.ok).toBe(true);
+  if (selectorParsed.ok) expect(selectorParsed.text).toBe('');
+
+  const pointParsed = parseFillTarget(['10', '20', '']);
+  expect(pointParsed.ok).toBe(true);
+  if (pointParsed.ok) expect(pointParsed.text).toBe('');
+});
+
+test('parseFillTarget still refuses a missing text argument on every target shape', () => {
+  for (const positionals of [['@e57'], ['label="Email"'], ['10', '20']]) {
+    expect(parseFillTarget(positionals).ok, positionals.join(' ')).toBe(false);
+  }
+});
+
+test('parseFillTarget keeps the established whitespace-only rules', () => {
+  // Payload whitespace on a ref fill (Maestro/keyboard-enter newlines) is preserved …
+  const refParsed = parseFillTarget(['@e57', '   ']);
+  expect(refParsed.ok).toBe(true);
+  if (refParsed.ok) expect(refParsed.text).toBe('   ');
+  // … while a blank selector-fill argument stays a mistake.
+  expect(parseFillTarget(['label="Email"', '   ']).ok).toBe(false);
+});
