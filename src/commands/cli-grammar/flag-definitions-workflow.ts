@@ -135,7 +135,7 @@ export const WORKFLOW_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
     names: ['--steps'],
     type: 'string',
     usageLabel: '--steps <json>',
-    usageDescription: 'Batch: JSON array of steps',
+    usageDescription: 'Batch: JSON array of {"command","input"} steps',
   },
   {
     key: 'stepsFile',

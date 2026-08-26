@@ -550,11 +550,16 @@ export function assertAllowedKeys(
   record: Record<string, unknown>,
   allowedKeys: readonly string[],
   label: string,
+  hint?: string,
 ): void {
   const allowed = new Set(allowedKeys);
   const unknownKeys = Object.keys(record).filter((key) => !allowed.has(key));
   if (unknownKeys.length > 0) {
-    throw new AppError('INVALID_ARGS', `${label} has unknown field(s): ${unknownKeys.join(', ')}.`);
+    throw new AppError(
+      'INVALID_ARGS',
+      `${label} has unknown field(s): ${unknownKeys.join(', ')}.`,
+      hint === undefined ? undefined : { hint },
+    );
   }
 }
 

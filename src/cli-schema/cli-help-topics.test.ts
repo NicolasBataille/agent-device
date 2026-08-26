@@ -54,6 +54,22 @@ test('commands topic lists the device selectors accepted by every command', asyn
   assert.match(selectionSection, /--session <name>/);
 });
 
+// `help batch` documented neither the step shape nor which commands batch accepts, so both were
+// only reachable by trial (#2062). The accepted list is rendered from the registry, so this asserts
+// membership rather than an exact roster.
+test('batch help documents the step shape and the commands batch accepts', async () => {
+  const help = await usageForCommand('batch');
+  if (help === null) throw new Error('Expected batch help text');
+
+  assert.match(help, /\{"command":"<name>","input":\{\.\.\.\}\}/);
+  assert.match(help, /no positional step form/);
+  assert.match(help, /Available through batch:/);
+  for (const command of ['press', 'click', 'fill', 'longpress', 'scroll', 'back']) {
+    assert.match(help, new RegExp(`\\b${command}\\b`), `expected ${command} in batch help`);
+  }
+  assert.match(help, /batch and replay never nest/);
+});
+
 test('commands topic includes only global flags in its global flags section', async () => {
   const usageText = await usageForCommand('commands');
   if (usageText === null) throw new Error('Expected commands help text');

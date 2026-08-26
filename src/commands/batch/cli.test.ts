@@ -120,6 +120,55 @@ test('batch rejects structured replay steps before daemon dispatch', async () =>
   assert.match(result.stderr, /not available through command batch/);
 });
 
+// Every step-shape refusal used to name only what was wrong, never what a step looks like, and
+// `help batch` documented no shape and no exclusions — so the boundary was reachable only by
+// trial (#2062). Each refusal now carries the missing half.
+
+test('a non-object step names the step shape', async () => {
+  const result = await runCliCapture(['batch', '--steps', '["press @e12"]']);
+
+  assert.equal(result.code, 1);
+  assert.equal(result.calls.length, 0);
+  assert.match(result.stderr, /Invalid batch step 1/);
+  assert.match(result.stderr, /\{"command":"<name>","input":\{\.\.\.\}\}/);
+  assert.match(result.stderr, /no positional step form/);
+});
+
+test('an args/target step names the step shape instead of only the unknown field', async () => {
+  const result = await runCliCapture(['batch', '--steps', '[{"command":"press","args":["@e12"]}]']);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /has unknown field\(s\): args/);
+  assert.match(result.stderr, /\{"command":"<name>","input":\{\.\.\.\}\}/);
+});
+
+test('a non-batchable command points at the listing of the ones that are', async () => {
+  const result = await runCliCapture(['batch', '--steps', '[{"command":"session","input":{}}]']);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /not available through command batch: session/);
+  assert.match(result.stderr, /help batch/);
+});
+
+// The reported blocker (#2062) was the step shape, not the verb: press/click/fill were never
+// excluded from batch. Pin that so a future exclusion has to be a deliberate registry change.
+test('mutating UI verbs reach daemon dispatch through batch', async () => {
+  const result = await runCliCapture([
+    'batch',
+    '--steps',
+    '[{"command":"press","input":{"target":{"kind":"ref","ref":"@e12"}}},{"command":"fill","input":{"target":{"kind":"ref","ref":"@e13"},"text":"x"}}]',
+    '--json',
+  ]);
+
+  assert.equal(result.code, null);
+  assert.equal(result.calls.length, 1);
+  const steps = result.calls[0]?.flags?.batchSteps ?? [];
+  assert.deepEqual(
+    steps.map((step) => step.command),
+    ['press', 'fill'],
+  );
+});
+
 test('batch rejects invalid structured runtime', async () => {
   const result = await runCliCapture([
     'batch',
