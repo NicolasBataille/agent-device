@@ -33,7 +33,9 @@ export function assertSessionSelectorMatches(session: SessionState, flags?: Comm
     {
       session: session.name,
       conflicts: mismatches.map(formatSessionSelectorConflict),
-      hint: buildSessionRecoveryHint(session, 'selector-conflict'),
+      // This path has only the session record, whose name is what the caller named on this very
+      // request, so the name IS its address here.
+      hint: buildSessionRecoveryHint(session, 'selector-conflict', session.name),
     },
   );
 }

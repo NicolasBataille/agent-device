@@ -342,8 +342,9 @@ function findNewSessionDeviceConflict(params: {
   sessionStore: SessionStore;
 }): DaemonResponse | undefined {
   const { req, device, sessionStore } = params;
-  const inUse = sessionStore.toArray().find((session) => session.device.id === device.id);
-  if (!inUse) return undefined;
+  const conflict = sessionStore.entries().find(([, session]) => session.device.id === device.id);
+  if (!conflict) return undefined;
+  const [inUseAddress, inUse] = conflict;
   if (isImplicitSessionScopeConflict(req, inUse)) {
     return errorResponse(
       'DEVICE_IN_USE',
@@ -355,7 +356,7 @@ function findNewSessionDeviceConflict(params: {
       },
     );
   }
-  return buildDeviceInUseBySessionError(inUse, device);
+  return buildDeviceInUseBySessionError(inUse, device, inUseAddress);
 }
 
 // Exported as the single by-session DEVICE_IN_USE producer so the help-benchmark sample parity
@@ -364,12 +365,15 @@ function findNewSessionDeviceConflict(params: {
 export function buildDeviceInUseBySessionError(
   inUse: SessionState,
   device: DeviceInfo,
+  // The key the session is stored under — the value `--session` needs. For an implicitly
+  // cwd-scoped session that is `cwd:<hash>:default`, not the `default` it is named (#2031).
+  inUseAddress: string,
 ): DaemonResponse {
-  return errorResponse('DEVICE_IN_USE', `Device is already in use by session "${inUse.name}".`, {
-    session: inUse.name,
+  return errorResponse('DEVICE_IN_USE', `Device is already in use by session "${inUseAddress}".`, {
+    session: inUseAddress,
     deviceId: device.id,
     deviceName: device.name,
-    hint: buildSessionRecoveryHint(inUse, 'device-in-use'),
+    hint: buildSessionRecoveryHint(inUse, 'device-in-use', inUseAddress),
   });
 }
 

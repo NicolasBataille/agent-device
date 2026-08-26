@@ -369,7 +369,8 @@ export const SAMPLE_PRODUCERS: SampleProducer[] = [
       const device = { id: 'SIM-001', name: 'iPhone 17 Pro' } as Parameters<
         typeof buildDeviceInUseBySessionError
       >[1];
-      const response = buildDeviceInUseBySessionError(owningSession, device);
+      // An explicitly named session addresses itself, so the sample text is unchanged.
+      const response = buildDeviceInUseBySessionError(owningSession, device, owningSession.name);
       assertErrorResponse(response, 'the by-session conflict');
       return renderErrorResponse(response);
     },

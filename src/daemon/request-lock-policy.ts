@@ -138,7 +138,7 @@ function buildLockPolicyConflictHint(
   // `buildSessionRecoveryHint` already states the two recoveries (close the bound session, or drop
   // the selectors) and never mentions --session-lock, so a bound session needs no identity branch.
   if (existingSession) {
-    return buildSessionRecoveryHint(existingSession, 'selector-conflict');
+    return buildSessionRecoveryHint(existingSession, 'selector-conflict', existingSession.name);
   }
   const lockPlatform = req.meta?.lockPlatform;
   const sessionText = req.session ? ` --session ${shellQuoteIfNeeded(req.session)}` : '';

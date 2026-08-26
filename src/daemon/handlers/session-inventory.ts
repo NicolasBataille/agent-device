@@ -83,18 +83,27 @@ function sessionListInventoryResponse(
     ok: true,
     data: {
       sessions: sessionStore
-        .toArray()
-        .filter((session) => sessionMatchesScope(session, scope))
-        .map((session) => publicSessionInfo(session, sessionStore)),
+        .entries()
+        .filter(([, session]) => sessionMatchesScope(session, scope))
+        .map(([sessionKey, session]) => publicSessionInfo(sessionKey, session, sessionStore)),
     },
   };
 }
 
+/**
+ * `sessionStateDir`/`runnerLogPath` are resolved from the STORE KEY, not from `session.name`.
+ * An implicitly cwd-scoped session is named `default` and stored under `cwd:<hash>:default`, so
+ * resolving the directory from the name pointed every caller at
+ * `<state>/sessions/default` — a path that does not exist — while the session's real artifacts sat
+ * in `<state>/sessions/cwd_<hash>_default` (#2031/#1394). `open` already answers with the key-derived
+ * path; this is the same directory, from the same source.
+ */
 function publicSessionInfo(
+  sessionKey: string,
   session: ReturnType<SessionStore['toArray']>[number],
   sessionStore: SessionStore,
 ) {
-  const sessionStateDir = sessionStore.resolveSessionDir(session.name);
+  const sessionStateDir = sessionStore.resolveSessionDir(sessionKey);
   return {
     name: session.name,
     sessionStateDir,
