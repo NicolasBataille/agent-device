@@ -1,5 +1,6 @@
 import type { BatchStep } from '@agent-device/contracts/client';
 import {
+  BATCH_STEP_SHAPE_HINT,
   parseBatchStepRuntime,
   readBatchStepInputObject,
   readBatchStepRecord,
@@ -31,7 +32,12 @@ function readCliBatchStep(step: unknown, stepNumber: number): BatchStep {
       `Batch step ${stepNumber} uses removed field(s): ${fields}. Use {"command":"...","input":{...}}. Example: {"command":"open","input":{"app":"settings","platform":"ios"}}.`,
     );
   }
-  assertAllowedKeys(record, ['command', 'input', 'runtime'], `Batch step ${stepNumber}`);
+  assertAllowedKeys(
+    record,
+    ['command', 'input', 'runtime'],
+    `Batch step ${stepNumber}`,
+    BATCH_STEP_SHAPE_HINT,
+  );
   const runtime = parseBatchStepRuntime(record.runtime, stepNumber);
   return {
     command: readStructuredBatchCommandName(record.command, stepNumber),

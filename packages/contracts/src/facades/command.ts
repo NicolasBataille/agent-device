@@ -1,4 +1,5 @@
 export {
+  BATCH_STEP_SHAPE_HINT,
   DEFAULT_BATCH_MAX_STEPS,
   assertBatchStepCount,
   isValidBatchMaxSteps,
