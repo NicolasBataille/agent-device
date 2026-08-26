@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import { noMaestroIncludeSources } from '../../../../__tests__/test-utils/replay-script-source.ts';
 import { executeMaestroFlow, inspectMaestroFlow } from '@agent-device/maestro';
 import type { DaemonInvokeFn, DaemonRequest } from '../../../types.ts';
@@ -132,15 +132,15 @@ test('delegates lifecycle and coordinate gestures through public daemon commands
 test('uses the direct viewport without snapshot and pairs it with the nested gesture request', async () => {
   const requests: DaemonRequest[] = [];
   const viewport = { x: 10, y: 20, width: 400, height: 800 };
-  const resolveGestureViewport = vi.fn(async () => viewport);
   const port = createDaemonMaestroRuntimePort({
     baseReq: makeBaseRequest({ flags: { platform: 'android', replayBackend: 'maestro' } }),
     invoke: async (request) => {
       requests.push(request);
       if (request.command === 'snapshot') throw new Error('gesture viewport must not snapshot');
+      if (request.command === 'runtime') return { ok: true, data: { viewport } };
       return { ok: true, data: {} };
     },
-    dependencies: { ...makeDependencies(), resolveGestureViewport },
+    dependencies: makeDependencies(),
     platform: 'android',
   });
 
@@ -173,8 +173,7 @@ test('uses the direct viewport without snapshot and pairs it with the nested ges
       gestureViewport: viewport,
     },
   });
-  expect(resolveGestureViewport).toHaveBeenCalledOnce();
-  expect(requests.map(({ command }) => command)).toEqual(['gesture']);
+  expect(requests.map(({ command }) => command)).toEqual(['runtime', 'gesture']);
 });
 
 test('uses an observation as the baseline for a later mutation barrier', async () => {
@@ -550,7 +549,6 @@ test('takes one final observation when polling wakes after the deadline', async 
       sleep: async (milliseconds) => {
         now.value += milliseconds + 1;
       },
-      resolveGestureViewport: async () => ({ x: 0, y: 0, width: 402, height: 874 }),
     },
     platform: 'android',
   });

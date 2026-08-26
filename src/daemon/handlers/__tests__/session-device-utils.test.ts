@@ -7,13 +7,13 @@ import {
   selectorTargetsSessionDevice,
 } from '../session-device-utils.ts';
 import { getRunnerSessionSnapshot } from '../../../platforms/apple/core/runner-client.ts';
-import { resolveTargetDevice } from '../../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../../core/dispatch-resolve.ts';
 import { isActiveProviderDevice } from '../../../provider-device-runtime.ts';
 
 vi.mock('../../../platforms/apple/core/runner-client.ts', () => ({
   getRunnerSessionSnapshot: vi.fn(() => null),
 }));
-vi.mock('../../../core/dispatch.ts', () => ({
+vi.mock('../../../core/dispatch-resolve.ts', () => ({
   resolveTargetDevice: vi.fn(),
 }));
 vi.mock('../../../provider-device-runtime.ts', () => ({

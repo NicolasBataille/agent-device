@@ -1,4 +1,3 @@
-import { AppError } from '@agent-device/kernel/errors';
 import {
   createMaestroRuntimePort,
   maestroTestFailure,
@@ -46,7 +45,7 @@ function createDaemonMaestroRuntimeParts(options: CreateDaemonMaestroRuntimeOper
   const snapshots = createDaemonMaestroSnapshotSource(options);
   const metrics = { screenshotCaptures: 0, tapRetries: 0 };
   const platform = options.platform;
-  const invoke = (operation: MaestroPublicOperation) => {
+  const invoke = <Operation extends MaestroPublicOperation>(operation: Operation) => {
     if (operation.kind === 'screenshot') metrics.screenshotCaptures += 1;
     return invokeMaestroPublicOperation(options, operation);
   };
@@ -95,13 +94,7 @@ function createDaemonMaestroRuntimeParts(options: CreateDaemonMaestroRuntimeOper
         dependencies: options.dependencies,
         platform,
       }),
-    resolveGestureViewport: async (context) => {
-      const viewport = await options.dependencies.resolveGestureViewport(context);
-      if (!viewport) {
-        throw new AppError('COMMAND_FAILED', 'Unable to resolve Maestro gesture viewport.');
-      }
-      return viewport;
-    },
+    resolveGestureViewport: async () => await invoke({ kind: 'gestureViewport' }),
 
     launchApp: async (input, context) => {
       const appId = input.appId ?? context.appId;

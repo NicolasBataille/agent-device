@@ -8,7 +8,9 @@ import { readDaemonShutdownReport } from '../../daemon/daemon-shutdown-report.ts
 import { AppError } from '@agent-device/kernel/errors';
 import { writeCommandOutput } from './shared.ts';
 import type { ClientCommandHandler } from './router-types.ts';
-import { daemonOwnerCleanup } from '../../platform-runtime-daemon-owner-cleanup.ts';
+import { createDaemonOwnerCleanup } from '../../platform-runtime-daemon-owner-cleanup.ts';
+
+const daemonOwnerCleanup = createDaemonOwnerCleanup();
 
 export const daemonCommand: ClientCommandHandler = async ({ positionals, flags }) => {
   const subcommand = positionals[0];

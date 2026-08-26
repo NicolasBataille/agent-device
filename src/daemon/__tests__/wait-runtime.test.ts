@@ -60,7 +60,7 @@ type CaptureNode = {
 
 /**
  * Binds the fake at the seam the handler consumes — `inspectFacts` / `bindDevice` — never at
- * `core/dispatch.ts`. `captureSnapshot` is the ONE operation `wait` declares, so this harness is
+ * `core/dispatch-resolve.ts`. `captureSnapshot` is the ONE operation `wait` declares, so this harness is
  * also the proof that no sibling snapshot operation is reachable from wait's narrowed binding.
  */
 function waitRuntimeHarness(

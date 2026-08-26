@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runCmd, type ExecResult } from '../../utils/exec.ts';
 import { AppError, asAppError } from '@agent-device/kernel/errors';
-import type { ManagedWebBackendStatus } from '@agent-device/contracts/host-platform-services';
+import type { ManagedWebBackendStatus } from '@agent-device/contracts/managed-web-backend';
 import {
   installManagedAgentBrowserPackage,
   writeManagedAgentBrowserManifest,

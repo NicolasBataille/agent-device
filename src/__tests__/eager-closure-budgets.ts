@@ -152,6 +152,7 @@ export const FACADE_BUDGETS: Readonly<Record<string, number>> = Object.freeze({
   'packages/contracts/src/click-button.ts': 3,
   'packages/contracts/src/clipboard.ts': 1,
   'packages/contracts/src/command-platform-execution.ts': 2,
+  'packages/contracts/src/daemon-owner-cleanup.ts': 1,
   'packages/contracts/src/device-readiness-runtime.ts': 1,
   'packages/contracts/src/device-shutdown-runtime.ts': 1,
   'packages/contracts/src/durable-resource-envelope.ts': 1,
@@ -183,6 +184,7 @@ export const FACADE_BUDGETS: Readonly<Record<string, number>> = Object.freeze({
   'packages/contracts/src/interactor-types.ts': 1,
   'packages/contracts/src/keyboard.ts': 1,
   'packages/contracts/src/logs-runtime-plan.ts': 5,
+  'packages/contracts/src/managed-web-backend.ts': 1,
   'packages/contracts/src/navigation.ts': 1,
   'packages/contracts/src/network-runtime-plan.ts': 5,
   'packages/contracts/src/network-runtime.ts': 1,
@@ -324,10 +326,11 @@ export const HUB_BUDGETS: Readonly<Record<string, number>> = Object.freeze({
   // neither has a lazy seam to hide behind -- unlike `src/daemon/code-signature-cache.ts`, which
   // the same PR added and only a source checkout reaches, and which therefore loads on demand
   // (`resolveLocalDaemonCodeSignature`) rather than appearing here.
-  'src/cli.ts': 364,
+  // #2054 splits daemon cleanup and managed web backend into separate neutral contract entries;
+  // the CLI already loads both command modules, so the second one-module contract is deliberate.
+  'src/cli.ts': 365,
   'src/platform-runtime.ts': 46,
-  'src/core/dispatch.ts': 15,
-  'src/core/capabilities.ts': 73,
+  'src/core/capabilities.ts': 74,
   'src/core/command-descriptor/registry.ts': 67,
   'src/core/command-descriptor/platform-execution-entry.ts': 3,
   'src/core/interactors/register-builtins.ts': 6,

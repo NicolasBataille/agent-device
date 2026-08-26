@@ -1,4 +1,4 @@
-import { resolveTargetDeviceSelection } from '../../core/dispatch.ts';
+import { resolveTargetDeviceSelection } from '../../core/dispatch-resolve.ts';
 import {
   openApplicationRuntimeUse,
   openApplicationWithRuntimeHintApplyAndClearUse,

@@ -10,12 +10,12 @@ import type {
 import { SessionStore } from '../../session-store.ts';
 import type { DaemonRequest, DaemonResponse, SessionState } from '../../types.ts';
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   return { ...actual, resolveTargetDevice: vi.fn() };
 });
 
-import { resolveTargetDevice } from '../../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../../core/dispatch-resolve.ts';
 import {
   handleSessionCommands,
   mockBindDeviceRuntime,

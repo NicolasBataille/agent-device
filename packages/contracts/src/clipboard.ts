@@ -1,6 +1,6 @@
 /**
- * Closed result of the `clipboard` command. Mirrors the dispatch handler's
- * literal return EXACTLY (src/core/dispatch.ts `handleClipboardCommand`): a
+ * Closed result of the `clipboard` command. Mirrors the session runtime's
+ * literal return exactly (`src/daemon/handlers/session-clipboard.ts`): a
  * discriminated union on `action`. `read` returns the clipboard `text`; `write`
  * reports the written `textLength` plus the `successText` message. The handler
  * spreads nothing else, so each branch is closed.

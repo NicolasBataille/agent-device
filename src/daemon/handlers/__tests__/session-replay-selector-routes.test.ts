@@ -12,8 +12,8 @@ import {
 import { captureSnapshotWithInteractor } from '../snapshot-interactor-capture.ts';
 import { baseReplayRequest, writeReplayFile } from './session-replay-runtime.fixtures.ts';
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   return { ...actual, resolveTargetDevice: vi.fn() };
 });
 

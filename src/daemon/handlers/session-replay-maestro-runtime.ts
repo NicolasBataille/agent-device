@@ -7,7 +7,7 @@ import {
   type MaestroPlatform,
 } from '@agent-device/maestro';
 import { AppError } from '@agent-device/kernel/errors';
-import { resolveTargetDevice } from '../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../core/dispatch-resolve.ts';
 import { getRequestSignal } from '../../request/cancel.ts';
 import { stripUndefined } from '../../utils/parsing.ts';
 import {
@@ -36,8 +36,6 @@ import {
   REPLAY_SCRIPT_SOURCE_REQUIRED_MESSAGE,
 } from '../../replay/script-source-bundle.ts';
 import type { ReplayScriptSourceBundle } from '@agent-device/contracts/replay';
-import { daemonResponseError } from '../adapters/maestro/daemon-runtime-port-support.ts';
-import { isPositiveFiniteRect } from '@agent-device/kernel/rect';
 
 type TypedMaestroReplayParams = {
   req: DaemonRequest;
@@ -316,36 +314,8 @@ function createMaestroReplayPort(params: {
       sleep: async (milliseconds, abortSignal) => {
         await sleep(milliseconds, undefined, { signal: abortSignal });
       },
-      resolveGestureViewport: async () => await invokeRuntimeGestureViewport({ baseReq, invoke }),
     },
   });
-}
-
-async function invokeRuntimeGestureViewport(params: {
-  baseReq: Omit<DaemonRequest, 'command' | 'positionals'>;
-  invoke: DaemonInvokeFn;
-}) {
-  const response = await params.invoke({
-    ...params.baseReq,
-    command: 'runtime',
-    positionals: ['gesture-viewport'],
-  });
-  if (!response.ok) throw daemonResponseError(response);
-  const viewport = response.data?.viewport;
-  if (!isRect(viewport) || !isPositiveFiniteRect(viewport)) {
-    throw new AppError('COMMAND_FAILED', 'runtime gesture-viewport returned no valid viewport.');
-  }
-  return viewport;
-}
-
-function isRect(value: unknown): value is { x: number; y: number; width: number; height: number } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    ['x', 'y', 'width', 'height'].every(
-      (key) => typeof (value as Record<string, unknown>)[key] === 'number',
-    )
-  );
 }
 
 function maestroRuntimeDeviceFlags(

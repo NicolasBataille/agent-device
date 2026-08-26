@@ -20,7 +20,7 @@ vi.mock('../../../daemon/daemon-shutdown-report.ts', () => ({
   readDaemonShutdownReport: mocks.readDaemonShutdownReport,
 }));
 vi.mock('../../../platform-runtime-daemon-owner-cleanup.ts', () => ({
-  daemonOwnerCleanup: { cleanup: mocks.cleanupDaemonOwner },
+  createDaemonOwnerCleanup: () => ({ cleanup: mocks.cleanupDaemonOwner }),
 }));
 vi.mock('../shared.ts', () => ({ writeCommandOutput: mocks.writeCommandOutput }));
 

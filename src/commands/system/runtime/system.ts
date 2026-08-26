@@ -413,8 +413,8 @@ function normalizeKeyboardDismissResult(
   };
 }
 
-// Mirrors the CLI/daemon dispatch message (src/core/dispatch.ts) so both
-// public surfaces disclose the same thing (#1598): only a dismiss-key tap is as
+// Shared by the CLI and daemon runtime projections so both public surfaces
+// disclose the same thing (#1598): only a dismiss-key tap is as
 // trustworthy as tapping a real dismiss key, and callers should be able to
 // tell the two apart from the message alone.
 function keyboardDismissMessage(state: BackendKeyboardResult): string {

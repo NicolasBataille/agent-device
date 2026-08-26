@@ -9,7 +9,7 @@ import { readTextForNode } from '../interaction-read.ts';
 
 /**
  * Bound at the seam the handler consumes (the runtime's `readTextAtPoint` operation), never at
- * `core/dispatch.ts`: `get` is migrated, so the live read reaches this fake through the request
+ * `core/dispatch-resolve.ts`: `get` is migrated, so the live read reaches this fake through the request
  * binding rather than through the legacy dispatcher.
  */
 const readTextAtPoint = vi.fn(

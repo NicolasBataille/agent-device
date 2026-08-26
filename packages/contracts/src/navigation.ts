@@ -4,9 +4,8 @@ import type { SettleObservation } from './interaction.ts';
 import type { TvRemoteButton } from './tv-remote.ts';
 
 /**
- * Closed results of the navigation/global action commands. Each mirrors the
- * dispatch handler's literal return EXACTLY (src/core/dispatch.ts
- * `DISPATCH_HANDLERS`): a fixed `action` discriminant plus the always-present
+ * Closed results of the navigation/global action commands. Each mirrors its
+ * request-scoped runtime's literal return: a fixed `action` discriminant plus the always-present
  * `successText` message (the handlers always pass a non-empty message, so it is
  * required here). The handlers spread nothing else, so the shapes are closed —
  * consistent with the `viewport` contract, the generic-dispatch Android
@@ -22,7 +21,7 @@ export type HomeCommandResult = {
 /**
  * `back` — `{ action: 'back', mode, message: 'Back' }`; `mode` defaults to
  * `'in-app'`. The one field the generic route may add on top of the dispatch
- * handler's literal return: `settle`, the opt-in `--settle` observation
+ * runtime's literal return: `settle`, the opt-in `--settle` observation
  * (#1638), attached after the command by the generic dispatcher.
  */
 export type BackCommandResult = {

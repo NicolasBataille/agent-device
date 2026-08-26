@@ -1,5 +1,5 @@
 import { isIosFamily } from '@agent-device/kernel/device';
-import { resolveTargetDevice } from '../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../core/dispatch-resolve.ts';
 import {
   resolveRunnerAppBundleId,
   stopIosRunnerSession,

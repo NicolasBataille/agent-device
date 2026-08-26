@@ -191,9 +191,13 @@
       "types": "./src/host-diagnostics.ts",
       "default": "./src/host-diagnostics.ts"
     },
-    "./host-platform-services": {
-      "types": "./src/host-platform-services.ts",
-      "default": "./src/host-platform-services.ts"
+    "./daemon-owner-cleanup": {
+      "types": "./src/daemon-owner-cleanup.ts",
+      "default": "./src/daemon-owner-cleanup.ts"
+    },
+    "./managed-web-backend": {
+      "types": "./src/managed-web-backend.ts",
+      "default": "./src/managed-web-backend.ts"
     },
     "./gesture-plan-types": {
       "types": "./src/gesture-plan-types.ts",

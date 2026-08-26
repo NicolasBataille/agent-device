@@ -58,7 +58,7 @@ Each step names its declaration site; read that, not prose.
 - A migrated command with a legacy fallback, a provider/local fallback, or a `dispatchCommand`
   branch left "just in case" — the row's retirement claim rejects it, and so does review.
 - Tests green because they mock the old seam. Grep the command's name across
-  `vi.mock('.../core/dispatch.ts')` users before calling the tail closed.
+  `vi.mock('.../core/dispatch-resolve.ts')` users before calling the tail closed.
 - A per-command policy file in `scripts/layering/`. If the row's generalized columns cannot
   express the invariant, first return to step 3; extensions are the exception and each one names
   what the seam could not make impossible.

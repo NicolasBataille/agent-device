@@ -4,7 +4,6 @@ import type {
   MaestroObservation,
   MaestroPlatform,
   MaestroRuntimeOperationContext,
-  MaestroRuntimeReadContext,
   MaestroTargetMatch,
   MaestroTargetQuery,
 } from '@agent-device/maestro';
@@ -23,26 +22,26 @@ import {
   type MaestroPublicOperation,
 } from './daemon-runtime-public-operation.ts';
 
-type DirectMaestroRuntimeDependencies = DaemonMaestroRuntimeDependencies & {
-  readonly resolveGestureViewport: (
-    context: MaestroRuntimeReadContext,
-  ) => Promise<Rect | undefined>;
-};
-
 export type DaemonMaestroRuntimeBaseRequest = Omit<DaemonRequest, 'command' | 'positionals'>;
 
 export type CreateDaemonMaestroRuntimeOperationsOptions = {
   readonly baseReq: DaemonMaestroRuntimeBaseRequest;
   readonly invoke: DaemonInvokeFn;
-  readonly dependencies: DirectMaestroRuntimeDependencies;
+  readonly dependencies: DaemonMaestroRuntimeDependencies;
   readonly sourcePath?: string;
   readonly platform: Extract<MaestroPlatform, 'ios' | 'android'>;
 };
 
-export async function invokeMaestroPublicOperation(
+type MaestroPublicOperationResult<Operation extends MaestroPublicOperation> = Operation extends {
+  kind: 'gestureViewport';
+}
+  ? Rect
+  : DaemonResponseData | undefined;
+
+export async function invokeMaestroPublicOperation<Operation extends MaestroPublicOperation>(
   options: CreateDaemonMaestroRuntimeOperationsOptions,
-  operation: MaestroPublicOperation,
-): Promise<DaemonResponseData | undefined> {
+  operation: Operation,
+): Promise<MaestroPublicOperationResult<Operation>> {
   const projected = projectMaestroPublicOperation(operation);
   const {
     input: _baseInput,
@@ -67,7 +66,20 @@ export async function invokeMaestroPublicOperation(
     }),
   );
   if (!response.ok) throw daemonResponseError(response);
-  return response.data;
+  if (operation.kind === 'gestureViewport') {
+    const viewport = response.data?.viewport;
+    if (
+      typeof viewport !== 'object' ||
+      viewport === null ||
+      !['x', 'y', 'width', 'height'].every(
+        (key) => typeof (viewport as Record<string, unknown>)[key] === 'number',
+      )
+    ) {
+      throw new AppError('COMMAND_FAILED', 'runtime gesture-viewport returned no valid viewport.');
+    }
+    return viewport as MaestroPublicOperationResult<Operation>;
+  }
+  return response.data as MaestroPublicOperationResult<Operation>;
 }
 
 function flagsWith(
@@ -152,7 +164,7 @@ export function stringifyEnvironment(
   return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, String(value)]));
 }
 
-export function daemonResponseError(response: Extract<DaemonResponse, { ok: false }>): AppError {
+function daemonResponseError(response: Extract<DaemonResponse, { ok: false }>): AppError {
   const error = response.error;
   const details = stripUndefined({
     ...(error.details ?? {}),

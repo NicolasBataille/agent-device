@@ -44,8 +44,8 @@ vi.mock('../../../platform-runtime-runtime-hints.ts', async (importOriginal) => 
     await importOriginal<typeof import('../../../platform-runtime-runtime-hints.ts')>();
   return { ...actual, clearRuntimeHintValues: vi.fn(async () => {}) };
 });
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   return { ...actual, resolveTargetDevice: vi.fn() };
 });
 vi.mock('../snapshot-interactor-capture.ts', () => ({

@@ -13,8 +13,8 @@ vi.mock('node:timers/promises', async (importOriginal) => {
   return { ...actual, setTimeout: vi.fn(async () => undefined) };
 });
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   const { selectionFromResolveTargetDevice } =
     await import('../../__tests__/device-selection-stub.ts');
   const resolveTargetDevice = vi.fn();
@@ -95,7 +95,7 @@ import * as path from 'node:path';
 import { cleanupRetainedMaterializedPathsForSession } from '../../materialized-path-registry.ts';
 import { SessionStore } from '../../session-store.ts';
 import type { DaemonRequest, DaemonResponse, SessionState } from '../../types.ts';
-import { resolveTargetDevice } from '../../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../../core/dispatch-resolve.ts';
 import { ensureDeviceReady } from '../../device-ready.ts';
 import {
   applyRuntimeHintValues,

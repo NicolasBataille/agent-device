@@ -9,8 +9,8 @@ import { snapshotRuntimeFixture } from '../../__tests__/snapshot-runtime-fixture
 import { makeSessionStore } from '../../../__tests__/test-utils/store-factory.ts';
 import { makeAndroidSession } from '../../../__tests__/test-utils/session-factories.ts';
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   return {
     ...actual,
     resolveTargetDevice: vi.fn(actual.resolveTargetDevice),
@@ -26,7 +26,7 @@ vi.mock('../../device-ready.ts', () => ({
   ensureDeviceReady: vi.fn(async () => {}),
 }));
 
-import { resolveTargetDevice } from '../../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../../core/dispatch-resolve.ts';
 import { ANDROID_EMULATOR } from '../../../__tests__/test-utils/device-fixtures.ts';
 import { withSystemSurfaceDisclosure } from '../system-surface-disclosure.ts';
 

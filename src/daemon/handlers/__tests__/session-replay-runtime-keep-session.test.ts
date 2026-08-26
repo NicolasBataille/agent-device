@@ -32,8 +32,8 @@ import { mkdtempForTestSync } from '../../../__tests__/test-utils/tmp-dir.ts';
  * `session-replay-runtime.test.ts`.
  */
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   return { ...actual, resolveTargetDevice: vi.fn() };
 });
 

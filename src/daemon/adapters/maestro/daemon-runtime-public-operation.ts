@@ -33,7 +33,8 @@ export type MaestroPublicOperation =
   | { kind: 'scroll'; direction: string; durationMs?: number }
   | { kind: 'pressKey'; key: 'back' | 'home' | 'enter' | 'return' | 'dismiss' }
   | { kind: 'screenshot'; path: string; stabilize?: boolean; captureBackend?: 'runner' }
-  | { kind: 'snapshot' };
+  | { kind: 'snapshot' }
+  | { kind: 'gestureViewport' };
 
 export type ProjectedMaestroPublicOperation = Pick<DaemonRequest, 'command' | 'positionals'> & {
   input?: Record<string, unknown>;
@@ -112,6 +113,8 @@ type MaestroInputOperation = Exclude<
 
 function projectInputOperation(operation: MaestroInputOperation): ProjectedMaestroPublicOperation {
   switch (operation.kind) {
+    case 'gestureViewport':
+      return { command: 'runtime', positionals: ['gesture-viewport'] };
     case 'typeText':
       return { command: 'type', positionals: [operation.text] };
     case 'clickSelector':

@@ -3,7 +3,7 @@ import { AppError } from '@agent-device/kernel/errors';
 import { isActiveProviderDevice } from '../../provider-device-runtime.ts';
 import { ensureDeviceReady } from '../device-ready.ts';
 import { getRunnerSessionSnapshot } from '../../platforms/apple/core/runner-client.ts';
-import { resolveTargetDevice } from '../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../core/dispatch-resolve.ts';
 import type { DaemonRequest, DaemonResponse, SessionState } from '../types.ts';
 import { hasDeviceSelectionInput, hasExplicitDeviceSelector } from '../device-selector-intent.ts';
 import { listSessionSelectorConflicts } from '../session-selector.ts';

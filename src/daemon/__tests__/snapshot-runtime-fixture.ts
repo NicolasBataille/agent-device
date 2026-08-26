@@ -31,7 +31,7 @@ import {
   type DeviceInfo,
 } from '@agent-device/kernel/device';
 import { actOnAppleAlert, awaitAppleAlert, readAppleAlert } from '../../platforms/apple/alert.ts';
-import { type DispatchContext } from '../../core/dispatch.ts';
+import { type DispatchContext } from '../../core/dispatch-context.ts';
 import { getRequestSignal } from '../../request/cancel.ts';
 import { isActiveProviderDevice } from '../../provider-device-runtime.ts';
 import type { BindDeviceRuntime, InspectDeviceRuntimeFacts } from '../request-runtime-binding.ts';

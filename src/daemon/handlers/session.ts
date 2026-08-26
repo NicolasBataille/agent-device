@@ -155,7 +155,7 @@ const handleSessionReplayCommandGroup: SessionCommandHandler = async ({
 
 /**
  * Descriptor-driven exhaustive dispatch table for the daemon's `session`
- * route (mirrors `DISPATCH_HANDLERS` in src/core/dispatch.ts and
+ * route (mirrors `DISPATCH_HANDLERS` in src/core/dispatch-resolve.ts and
  * `SNAPSHOT_COMMAND_HANDLER_IMPLS` in src/daemon/handlers/snapshot.ts). The
  * `satisfies Record<DescriptorSessionRouteCommandName, …>` check means a
  * session-routed descriptor added to the registry without a matching entry
@@ -191,11 +191,10 @@ const SESSION_COMMAND_HANDLER_IMPLS = {
   appstate: handleSessionStateCommandGroup,
   session_save_script: async ({ req, sessionName, sessionStore }) =>
     handleSessionScriptPublication({ req, sessionName, sessionStore }),
-  runtime: async ({ req, sessionName, logPath, sessionStore, inspectFacts, bindDevice }) =>
+  runtime: async ({ req, sessionName, sessionStore, inspectFacts, bindDevice }) =>
     await handleRuntimeCommand({
       req,
       sessionName,
-      logPath,
       sessionStore,
       inspectFacts,
       bindDevice,

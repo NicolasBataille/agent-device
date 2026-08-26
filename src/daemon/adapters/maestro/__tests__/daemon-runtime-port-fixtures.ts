@@ -29,6 +29,5 @@ export function makeDependencies(
     sleep: async (milliseconds) => {
       now.value += milliseconds;
     },
-    resolveGestureViewport: async () => ({ x: 0, y: 0, width: 402, height: 874 }),
   };
 }

@@ -9,6 +9,7 @@ import type {
   SnapshotResult,
 } from '@agent-device/contracts/snapshot-runtime';
 import {
+  gestureViewportRuntimeUse,
   resolveGestureRuntimePlan,
   type GestureRuntimePlan,
 } from '@agent-device/contracts/platform-runtime-operations';
@@ -17,7 +18,11 @@ import { AppError, normalizeError } from '@agent-device/kernel/errors';
 import type { Rect } from '@agent-device/kernel/snapshot';
 import type { DaemonCommandContext } from './context.ts';
 import type { DaemonFailureResponse } from './handlers/response.ts';
-import { admitRuntimeOperations, type RuntimeAdmissionBindings } from './runtime-admission.ts';
+import {
+  admitRuntimeOperations,
+  admitRuntimeUse,
+  type RuntimeAdmissionBindings,
+} from './runtime-admission.ts';
 import { runtimeExecutionFromContext } from './snapshot-runtime-capture-input.ts';
 
 /**
@@ -43,6 +48,28 @@ export type BoundGestureExecutor = Readonly<{
 export type ResolvedGestureRuntime =
   | Readonly<{ ok: false; response: DaemonFailureResponse }>
   | Readonly<{ ok: true; gestures: BoundGestureExecutor }>;
+
+export type ResolvedGestureViewportRuntime =
+  | Readonly<{ ok: false; response: DaemonFailureResponse }>
+  | Readonly<{
+      ok: true;
+      read: (context: DaemonCommandContext) => Promise<Rect>;
+    }>;
+
+/** Admits and binds the internal Maestro viewport read at the gesture family's owner seam. */
+export async function resolveBoundGestureViewportRuntime(
+  params: { device: DeviceInfo } & RuntimeAdmissionBindings,
+): Promise<ResolvedGestureViewportRuntime> {
+  const admission = await admitRuntimeUse({
+    command: 'runtime gesture-viewport',
+    device: params.device,
+    use: gestureViewportRuntimeUse,
+    inspectFacts: params.inspectFacts,
+    bindDevice: params.bindDevice,
+  });
+  if (admission.type === 'response') return { ok: false, response: admission.response };
+  return { ok: true, read: selectGestureFrame(admission.runtime).gestureViewport };
+}
 
 /**
  * The one place `gesture` and `swipe` reach a device (ADR 0019). The gesture input selects ONE
@@ -148,16 +175,38 @@ async function bindGestureTier(
 function selectGestureFrame(
   runtime: Readonly<{
     operations: Readonly<{
+      gestureViewport: GestureRuntimeOperations['gestureViewport'];
+    }>;
+  }>,
+): Required<Pick<BoundGestureExecutor, 'gestureViewport'>>;
+function selectGestureFrame(
+  runtime: Readonly<{
+    operations: Readonly<{
       captureSnapshot: (input: CaptureSnapshotInput) => Promise<SnapshotResult>;
       gestureViewport?: GestureRuntimeOperations['gestureViewport'];
     }>;
   }>,
-): Pick<BoundGestureExecutor, 'captureSnapshot' | 'gestureViewport'> {
+): Pick<BoundGestureExecutor, 'captureSnapshot' | 'gestureViewport'>;
+function selectGestureFrame(
+  runtime: Readonly<{
+    operations: Readonly<{
+      captureSnapshot?: (input: CaptureSnapshotInput) => Promise<SnapshotResult>;
+      gestureViewport?: GestureRuntimeOperations['gestureViewport'];
+    }>;
+  }>,
+): Partial<Pick<BoundGestureExecutor, 'captureSnapshot' | 'gestureViewport'>> {
   const { gestureViewport } = runtime.operations;
+  const selectedCapture = runtime.operations.captureSnapshot
+    ? { operations: { captureSnapshot: runtime.operations.captureSnapshot } }
+    : undefined;
   const selected = gestureViewport ? { operations: { gestureViewport } } : undefined;
   return Object.freeze({
-    captureSnapshot: async (input: CaptureSnapshotInput) =>
-      await runtime.operations.captureSnapshot(input),
+    ...(selectedCapture
+      ? {
+          captureSnapshot: async (input: CaptureSnapshotInput) =>
+            await selectedCapture.operations.captureSnapshot(input),
+        }
+      : {}),
     ...(selected
       ? {
           gestureViewport: async (context: DaemonCommandContext) =>

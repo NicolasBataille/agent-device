@@ -59,6 +59,45 @@ test('marks Maestro hierarchy captures as daemon-private observations', async ()
   );
 });
 
+test('decodes gesture viewport data without imposing a new positive-size policy', async () => {
+  const viewport = { x: 0, y: 0, width: 0, height: 0 };
+  const invoke = vi.fn(async () => ({ ok: true as const, data: { viewport } }));
+
+  await expect(
+    invokeMaestroPublicOperation(
+      {
+        baseReq: makeBaseRequest(),
+        invoke,
+        dependencies: makeDependencies(),
+        platform: 'ios',
+      },
+      { kind: 'gestureViewport' },
+    ),
+  ).resolves.toEqual(viewport);
+});
+
+test('rejects malformed gesture viewport data at the public-operation seam', async () => {
+  const invoke = vi.fn(async () => ({
+    ok: true as const,
+    data: { viewport: { x: 0, y: 0, width: 'invalid', height: 800 } },
+  }));
+
+  await expect(
+    invokeMaestroPublicOperation(
+      {
+        baseReq: makeBaseRequest(),
+        invoke,
+        dependencies: makeDependencies(),
+        platform: 'ios',
+      },
+      { kind: 'gestureViewport' },
+    ),
+  ).rejects.toMatchObject({
+    code: 'COMMAND_FAILED',
+    message: 'runtime gesture-viewport returned no valid viewport.',
+  });
+});
+
 test('preserves diagnostic metadata carried inside daemon error details', async () => {
   const invoke = vi.fn(async () => ({
     ok: false as const,

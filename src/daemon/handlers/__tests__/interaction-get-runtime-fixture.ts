@@ -36,7 +36,7 @@ import { captureSnapshotWithInteractor } from '../snapshot-interactor-capture.ts
 
 /**
  * The request-bound runtime seam `get` consumes, faked at `inspectFacts` / `bindDevice` — never
- * at `core/dispatch.ts`. The bound capture still runs the interactor capture the surrounding
+ * at `core/dispatch-resolve.ts`. The bound capture still runs the interactor capture the surrounding
  * interaction tests already mock, so only the two `get` operations are fixture-owned here.
  */
 export const mockReadTextAtPoint = vi.fn(

@@ -1,8 +1,10 @@
-import type { ManagedWebBackendStatus } from '@agent-device/contracts/host-platform-services';
+import type { ManagedWebBackendStatus } from '@agent-device/contracts/managed-web-backend';
 import { AppError } from '@agent-device/kernel/errors';
 import type { CliFlags } from '@agent-device/contracts/command';
 import { printJson } from '../../utils/output.ts';
-import { managedWebBackend } from '../../platform-runtime-managed-web-backend.ts';
+import { createManagedWebBackend } from '../../platform-runtime-managed-web-backend.ts';
+
+const managedWebBackend = createManagedWebBackend();
 
 type PublicAgentBrowserToolStatus = Omit<ManagedWebBackendStatus, 'socketDir'>;
 

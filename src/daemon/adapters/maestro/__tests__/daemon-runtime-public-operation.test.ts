@@ -70,6 +70,10 @@ describe('Maestro public operation projection', () => {
       expected: { command: 'type', positionals: ['hello'] },
     },
     {
+      operation: { kind: 'gestureViewport' },
+      expected: { command: 'runtime', positionals: ['gesture-viewport'] },
+    },
+    {
       operation: {
         kind: 'clickSelector',
         selector: { key: 'id', value: 'submit' },

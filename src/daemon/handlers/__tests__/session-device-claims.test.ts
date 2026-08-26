@@ -4,8 +4,8 @@ import path from 'node:path';
 import { afterEach, test, vi } from 'vitest';
 import { mkdtempForTestSync } from '../../../__tests__/test-utils/tmp-dir.ts';
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   const { selectionFromResolveTargetDevice } =
     await import('../../__tests__/device-selection-stub.ts');
   const resolveTargetDevice = vi.fn();
@@ -35,7 +35,7 @@ vi.mock('../../../utils/host-process.ts', async (importOriginal) =>
   ),
 );
 
-import { resolveTargetDevice } from '../../../core/dispatch.ts';
+import { resolveTargetDevice } from '../../../core/dispatch-resolve.ts';
 import { ensureDeviceReady } from '../../device-ready.ts';
 import { applyRuntimeHintValues } from '../../../platform-runtime-runtime-hints.ts';
 import { resolveAndroidPackageForOpen } from '../../../platform-runtime-open-target.ts';

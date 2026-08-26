@@ -15,11 +15,11 @@ import { mkdtempForTestSync } from '../../../__tests__/test-utils/tmp-dir.ts';
 // runReplayScriptSource tests that happen to share the same runReplayFixture
 // helper and mock configuration below. It is a sibling of
 // session-replay-runtime.test.ts rather than a merge into it because that file
-// mocks '../../../core/dispatch.ts' with its own device resolution — vitest
+// mocks '../../../core/dispatch-resolve.ts' with its own device resolution — vitest
 // allows only one vi.mock per module per file, so reconciling the two
 // configurations was out of scope for a pure test-file split (see #1460).
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   return {
     ...actual,
     resolveTargetDevice: vi.fn(async (flags) =>

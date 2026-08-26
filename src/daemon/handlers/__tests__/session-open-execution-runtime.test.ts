@@ -6,8 +6,8 @@ import { AppError } from '@agent-device/kernel/errors';
 
 const mockResolveTargetDevice = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../core/dispatch.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../core/dispatch.ts')>();
+vi.mock('../../../core/dispatch-resolve.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../core/dispatch-resolve.ts')>();
   const { selectionFromResolveTargetDevice } =
     await import('../../__tests__/device-selection-stub.ts');
   return {

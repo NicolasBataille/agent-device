@@ -15,9 +15,8 @@ import {
 } from './session-runtime.ts';
 import type { BindDeviceRuntime, InspectDeviceRuntimeFacts } from '../request-runtime-binding.ts';
 import { handlePortReverseCommand } from './session-runtime-port-reverse.ts';
-import { gestureViewportRuntimeUse } from '@agent-device/contracts/platform-runtime-operations';
 import { contextFromFlags } from '../context.ts';
-import { runtimeExecutionFromContext } from '../snapshot-runtime-capture-input.ts';
+import { resolveBoundGestureViewportRuntime } from '../gesture-runtime.ts';
 
 type RuntimeAction = 'set' | 'show' | 'clear';
 type RuntimeCommandDevice = NonNullable<ReturnType<SessionStore['get']>>['device'];
@@ -41,7 +40,6 @@ async function admitClearRuntime(params: RuntimeCommandAdmission) {
 export async function handleRuntimeCommand(params: {
   req: DaemonRequest;
   sessionName: string;
-  logPath: string;
   sessionStore: SessionStore;
   inspectFacts?: InspectDeviceRuntimeFacts;
   bindDevice?: BindDeviceRuntime;
@@ -86,7 +84,6 @@ export async function handleRuntimeCommand(params: {
 
 async function readGestureViewport(params: {
   req: DaemonRequest;
-  logPath: string;
   session: ReturnType<SessionStore['get']>;
   inspectFacts?: InspectDeviceRuntimeFacts;
   bindDevice?: BindDeviceRuntime;
@@ -94,28 +91,21 @@ async function readGestureViewport(params: {
   if (!params.session) {
     return errorResponse('SESSION_NOT_FOUND', 'No active session. Run open first.');
   }
-  const admission = await admitRuntimeUse({
-    command: 'runtime gesture-viewport',
+  const runtime = await resolveBoundGestureViewportRuntime({
     device: params.session.device,
-    use: gestureViewportRuntimeUse,
     inspectFacts: params.inspectFacts,
     bindDevice: params.bindDevice,
   });
-  if (admission.type === 'response') return admission.response;
+  if (!runtime.ok) return runtime.response;
   const context = contextFromFlags(
-    params.logPath,
+    '',
     params.req.flags,
     params.session.appBundleId,
     params.session.trace?.outPath,
     params.req.meta?.requestId,
     params.req.meta,
   );
-  const viewport = await admission.runtime.operations.gestureViewport({
-    ...(params.session.appBundleId === undefined
-      ? {}
-      : { options: { appBundleId: params.session.appBundleId } }),
-    execution: runtimeExecutionFromContext(context),
-  });
+  const viewport = await runtime.read(context);
   return { ok: true, data: { viewport } };
 }
 

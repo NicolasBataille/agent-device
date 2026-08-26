@@ -186,8 +186,6 @@ export type TargetIdentityVerification = 'pre-dispatch' | 'post-resolution';
  *                   declares its catalog group explicitly.
  *  - `frameworkTier` — which default tool set a framework adapter includes a
  *                   public command in (see {@link CommandFrameworkTier}).
- *  - `dispatch` — whether src/core/dispatch.ts accepts this command name as a
- *                   platform dispatch target.
  *
  * The registry started dormant (proven byte-equal to the hand tables by the
  * parity tests) and is now the live source: the daemon registry, capability
