@@ -49,6 +49,17 @@ export const INHERITED_PARENT_FLAG_KEYS = [
   'out',
 ] as const;
 
+/**
+ * The refusal above names the rejected command but never named the accepted set, and `help batch`
+ * documented no exclusions either, so the boundary was only discoverable by trial (#2062). Point at
+ * the one derived listing rather than restating it: `help batch` renders
+ * {@link STRUCTURED_BATCH_COMMAND_NAMES} itself, so a registry change cannot leave prose behind.
+ */
+const BATCH_AVAILABLE_COMMANDS_HINT =
+  'Run agent-device help batch for the commands available through batch. Session, daemon, ' +
+  'connection, and host tooling commands are excluded — they own lifecycle a batch cannot ' +
+  'carry — and batch and replay never nest. Run an excluded command on its own.';
+
 const structuredBatchCommandNames = new Set<string>(STRUCTURED_BATCH_COMMAND_NAMES);
 
 function isStructuredBatchCommandName(command: string): command is StructuredBatchCommandName {
@@ -68,6 +79,7 @@ export function readStructuredBatchCommandName(
   throw new AppError(
     'INVALID_ARGS',
     `Batch step ${stepNumber} command is not available through command batch: ${String(command)}`,
+    { hint: BATCH_AVAILABLE_COMMANDS_HINT },
   );
 }
 

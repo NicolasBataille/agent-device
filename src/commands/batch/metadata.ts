@@ -1,4 +1,5 @@
 import {
+  BATCH_STEP_SHAPE_HINT,
   DEFAULT_BATCH_MAX_STEPS,
   assertBatchStepCount,
   isValidBatchMaxSteps,
@@ -49,7 +50,7 @@ export function createBatchCommandMetadata(
   const fields = batchFields(nestedCommands);
   return defineCommandMetadata({
     name: 'batch',
-    description: 'Execute multiple commands in one daemon request',
+    description: 'Execute multiple commands in one daemon request.',
     inputSchema: fieldsInputSchema(fields),
     readInput: (input) => readBatchInput(input, fields),
   });
@@ -128,7 +129,12 @@ function readBatchStep(
   nestedCommands: readonly string[],
 ): BatchCommandStep {
   const record = readBatchStepRecord(step, stepNumber);
-  assertAllowedKeys(record, ['command', 'input', 'runtime'], `Batch step ${stepNumber}`);
+  assertAllowedKeys(
+    record,
+    ['command', 'input', 'runtime'],
+    `Batch step ${stepNumber}`,
+    BATCH_STEP_SHAPE_HINT,
+  );
   return {
     command: readBatchStepCommand(record, stepNumber, nestedCommands),
     input: readBatchStepInputObject(record, stepNumber),
