@@ -330,7 +330,7 @@ export const HUB_BUDGETS: Readonly<Record<string, number>> = Object.freeze({
   // the CLI already loads both command modules, so the second one-module contract is deliberate.
   'src/cli.ts': 365,
   'src/platform-runtime.ts': 46,
-  'src/core/capabilities.ts': 74,
+  'src/core/capabilities.ts': 73,
   'src/core/command-descriptor/registry.ts': 67,
   'src/core/command-descriptor/platform-execution-entry.ts': 3,
   'src/core/interactors/register-builtins.ts': 6,

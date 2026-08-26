@@ -40,6 +40,7 @@ async function admitClearRuntime(params: RuntimeCommandAdmission) {
 export async function handleRuntimeCommand(params: {
   req: DaemonRequest;
   sessionName: string;
+  logPath: string;
   sessionStore: SessionStore;
   inspectFacts?: InspectDeviceRuntimeFacts;
   bindDevice?: BindDeviceRuntime;
@@ -84,6 +85,7 @@ export async function handleRuntimeCommand(params: {
 
 async function readGestureViewport(params: {
   req: DaemonRequest;
+  logPath: string;
   session: ReturnType<SessionStore['get']>;
   inspectFacts?: InspectDeviceRuntimeFacts;
   bindDevice?: BindDeviceRuntime;
@@ -98,7 +100,7 @@ async function readGestureViewport(params: {
   });
   if (!runtime.ok) return runtime.response;
   const context = contextFromFlags(
-    '',
+    params.logPath,
     params.req.flags,
     params.session.appBundleId,
     params.session.trace?.outPath,

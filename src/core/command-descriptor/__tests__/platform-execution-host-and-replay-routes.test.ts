@@ -2,13 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { commandDescriptors } from '../registry.ts';
 
 describe('residue platform execution ownership', () => {
-  test('only perf remains legacy', () => {
+  test('no descriptor remains on legacy platform execution', () => {
     expect(
       commandDescriptors
         .filter(({ platformExecution }) => platformExecution.kind === 'legacy')
         .map(({ name }) => name)
         .sort(),
-    ).toEqual(['perf']);
+    ).toEqual([]);
   });
 
   test('daemon and web declare host execution', () => {

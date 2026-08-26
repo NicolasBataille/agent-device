@@ -261,7 +261,6 @@ function readOnlySubactionRecordingEffect(
 // the use they name.
 // ---------------------------------------------------------------------------
 const NO_PLATFORM_EXECUTION = { kind: 'none' } as const;
-const LEGACY_PLATFORM_EXECUTION = { kind: 'legacy' } as const;
 // Host-scoped platform work (ADR 0019): the descriptor consumes a neutral typed host service and
 // binds no device runtime of its own.
 const HOST_PLATFORM_EXECUTION = { kind: 'host' } as const;

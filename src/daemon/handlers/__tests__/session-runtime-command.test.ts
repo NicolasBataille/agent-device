@@ -241,6 +241,7 @@ test('runtime clear rejects a false runtime-hints fact before its one implementa
 test('runtime gesture-viewport admits and binds the exact viewport operation once', async () => {
   const sessionStore = makeSessionStore();
   const sessionName = 'runtime-gesture-viewport';
+  const logPath = path.join(os.tmpdir(), 'runtime-gesture-viewport.log');
   sessionStore.set(
     sessionName,
     makeSession(sessionName, {
@@ -263,7 +264,7 @@ test('runtime gesture-viewport admits and binds the exact viewport operation onc
       meta: { requestId: 'viewport-request' },
     },
     sessionName,
-    logPath: path.join(os.tmpdir(), 'daemon.log'),
+    logPath,
     sessionStore,
     invoke: noopInvoke,
     inspectFacts: gestureInspectFacts,
@@ -277,7 +278,10 @@ test('runtime gesture-viewport admits and binds the exact viewport operation onc
   expect(gestureRuntimeSpies.gestureViewport).toHaveBeenCalledOnce();
   expect(gestureRuntimeSpies.gestureViewport).toHaveBeenCalledWith(
     expect.objectContaining({
-      execution: expect.objectContaining({ requestId: 'viewport-request' }),
+      execution: expect.objectContaining({
+        requestId: 'viewport-request',
+        logPath,
+      }),
     }),
   );
 });
