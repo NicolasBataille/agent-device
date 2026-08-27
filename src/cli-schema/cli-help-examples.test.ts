@@ -131,14 +131,23 @@ test('every batch step printed by CLI help is accepted by its own command reader
   for (const { line, steps } of examples) {
     for (const step of steps) {
       assert.ok(isCommandName(step.command), `Unknown command in help example: ${line}`);
+      let parsed: unknown;
       try {
-        findCommandMetadata(step.command).readInput(step.input);
+        parsed = findCommandMetadata(step.command).readInput(step.input);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         assert.fail(
           `Help advertises a batch step ${step.command} rejects:\n${line}\n    ${message}`,
         );
       }
+      // readInput IGNORES unknown keys, so acceptance alone cannot pin an optional field: a
+      // renamed `settle` or `interactiveOnly` would parse to a step that silently does less
+      // than the help advertises. Every printed key must survive into the parsed input.
+      assert.deepEqual(
+        Object.keys(parsed as Record<string, unknown>).sort(),
+        Object.keys(step.input).sort(),
+        `Help advertises a batch step ${step.command} key its reader drops:\n${line}`,
+      );
       covered.add(step.command);
     }
   }

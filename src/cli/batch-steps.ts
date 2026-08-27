@@ -37,6 +37,7 @@ function readCliBatchStep(step: unknown, stepNumber: number): BatchStep {
     throw new AppError(
       'INVALID_ARGS',
       `Batch step ${stepNumber} uses removed field(s): ${fields}. Use {"command":"...","input":{...}}. Example: {"command":"open","input":{"app":"settings","platform":"ios"}}.`,
+      { hint: CLI_BATCH_STEP_SHAPE_HINT },
     );
   }
   assertAllowedKeys(
