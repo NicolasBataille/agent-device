@@ -97,12 +97,23 @@ function readFindOptionsFromPositionals(positionals: string[], flags: CliFlags):
     };
   }
   if (action === 'fill' || action === 'type') {
+    // An empty value positional is the clear request (#2063); only a MISSING one is refused,
+    // here, so `value` stays present on the typed options.
+    const valuePositionals = positionals.slice(actionOffset + 1);
+    if (valuePositionals.length === 0) {
+      throw new AppError(
+        'INVALID_ARGS',
+        action === 'fill'
+          ? 'find fill requires text (use "" to clear the field)'
+          : 'find type requires text',
+      );
+    }
     return {
       ...base,
       locator,
       query: readRequiredQuery(query),
       action,
-      value: positionals.slice(actionOffset + 1).join(' '),
+      value: valuePositionals.join(' '),
     };
   }
   if (action === 'click' || action === 'focus' || action === 'exists' || action === 'list') {

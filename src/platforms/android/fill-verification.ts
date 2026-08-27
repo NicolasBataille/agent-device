@@ -154,6 +154,10 @@ export function buildAndroidFillUnconfirmedVerification(
   const afterTarget = verification.targetInput;
   const actualInput = verification.actualInput;
   if (
+    // The unconfirmed soft-success exists for app-owned formatting that prevents raw equality.
+    // Nothing formats the EMPTY value (#2063): residual text after a clear is a failed clear,
+    // and the soft-success would also skip the second, bigger delete burst.
+    requested.length === 0 ||
     verification.reason === 'ime_capture' ||
     !beforeTarget ||
     !afterTarget ||
@@ -293,8 +297,14 @@ function maskedAndroidFillVerification(
   const actual = actualInput.text ?? null;
   const actualLength = Array.from(actual ?? '').length;
   const expectedLength = Array.from(expected).length;
+  // A masked value only ever compares by length. The empty expectation (#2063) accepts an
+  // observed masked node with no dump text: a masked field WITH content dumps its bullet run,
+  // so absence is honest evidence of emptiness — matching iOS, where clearing a secure field
+  // succeeds unverified rather than failing after the clear worked.
   const matched =
-    actual !== null && actualLength > 0 && expectedLength > 0 && actualLength === expectedLength;
+    expectedLength === 0
+      ? actualLength === 0
+      : actual !== null && actualLength > 0 && actualLength === expectedLength;
   return {
     ok: matched,
     actual,

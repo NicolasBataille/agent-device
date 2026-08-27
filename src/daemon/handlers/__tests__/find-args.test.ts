@@ -100,6 +100,18 @@ test('parseFindSelectorExpression only treats bare selector-shaped queries as se
   expect(parseFindSelectorExpression('any', 'a=b')).toBeNull();
 });
 
+// `find <q> fill ""` is the clear request (#2063): an EMPTY value token must survive the parse,
+// while NO value token reads as undefined so the handler's missing-text refusal still fires —
+// the parse used to collapse both to ''.
+test('parseFindArgs distinguishes an empty fill value from a missing one', () => {
+  const cleared = parseFindArgs(['text', 'Save', 'fill', '']);
+  expect(cleared).toMatchObject({ action: 'fill', value: '' });
+
+  const missing = parseFindArgs(['text', 'Save', 'fill']);
+  expect(missing.action).toBe('fill');
+  expect(missing.value).toBeUndefined();
+});
+
 // #1271 stage 2: `--record` is statically scoped to snapshot/get/is via each
 // command schema's `allowedFlags`, but `find`'s observe-vs-mutate split is a
 // POSITIONAL, so it is validated dynamically against this shared predicate.

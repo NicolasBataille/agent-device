@@ -188,7 +188,9 @@ const findFields = {
   locator: enumField(FIND_LOCATORS),
   query: requiredField(stringField()),
   action: enumField(FIND_ACTION_VALUES),
-  value: stringField(),
+  // `find <q> fill ""` is the clear request (#2063); the daemon handler still refuses a MISSING
+  // value, and an empty `type` value.
+  value: stringField(undefined, { allowEmpty: true }),
   timeoutMs: integerField(),
   first: booleanField(),
   last: booleanField(),

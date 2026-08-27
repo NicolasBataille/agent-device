@@ -119,7 +119,13 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
     const parsed = readFillTargetFromPositionals(positionals);
     const text = parsed.text;
     if (!hasFillText(text))
-      return { ok: false, response: errorResponse('INVALID_ARGS', 'fill requires text after ref') };
+      return {
+        ok: false,
+        response: errorResponse(
+          'INVALID_ARGS',
+          'fill requires text after ref (use "" to clear the field)',
+        ),
+      };
     return {
       ok: true,
       target: {
@@ -138,7 +144,10 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
     if (!hasFillText(text))
       return {
         ok: false,
-        response: errorResponse('INVALID_ARGS', 'fill requires text after coordinates'),
+        response: errorResponse(
+          'INVALID_ARGS',
+          'fill requires text after coordinates (use "" to clear the field)',
+        ),
       };
     return { ok: true, target: { kind: 'point', x: coordinates.x, y: coordinates.y }, text };
   }
@@ -159,7 +168,10 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
   if (!hasFillText(parsed.text) || (parsed.text.length > 0 && !parsed.text.trim())) {
     return {
       ok: false,
-      response: errorResponse('INVALID_ARGS', 'fill requires text after selector'),
+      response: errorResponse(
+        'INVALID_ARGS',
+        'fill requires text after selector (use "" to clear the field)',
+      ),
     };
   }
   return {

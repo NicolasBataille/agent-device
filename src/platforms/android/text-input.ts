@@ -122,11 +122,17 @@ export async function fillAndroid(
       );
       return completeAndroidFillVerification(text, beforeTarget, verification);
     }
-    const clearCount = clampCount(
-      textCodePointLength + attempt.clearPadding,
-      attempt.minClear,
-      attempt.maxClear,
-    );
+    // The delete burst must cover the OLD value. Sizing the empty clear (#2063) from the
+    // incoming text would send the minimum burst and leave residue in any longer field, so it
+    // sizes from the pre-mutation read instead — and assumes the attempt's worst case when
+    // that read could not see the field.
+    const clearBase =
+      textCodePointLength > 0
+        ? textCodePointLength + attempt.clearPadding
+        : beforeTarget?.text
+          ? Array.from(beforeTarget.text).length + attempt.clearPadding
+          : attempt.maxClear;
+    const clearCount = clampCount(clearBase, attempt.minClear, attempt.maxClear);
     await clearFocusedText(device, clearCount);
     await typeAndroidShell(device, {
       action: 'fill',

@@ -266,6 +266,20 @@ function convertFillAction(
   }
   const tapTarget = readTapTarget(target, undefined, resolveSelector);
   if (!tapTarget) return { kind: 'unsupported', message: 'fill target is not Maestro-compatible' };
+  if (text.length === 0) {
+    // The clear request (#2063): `inputText: ""` types nothing in Maestro, so the recorded
+    // clear would silently become a no-op. `eraseText` is Maestro's clear verb; without a
+    // count it erases up to its 50-character default, which is a bound this export cannot
+    // recover the real length for.
+    return {
+      kind: 'commands',
+      commands: [{ tapOn: tapTarget }, 'eraseText'],
+      warnings: [
+        ...readLabelSelectorWarnings(target),
+        'fill "" exports as tapOn + eraseText; Maestro erases at most its 50-character default',
+      ],
+    };
+  }
   return {
     kind: 'commands',
     commands: [{ tapOn: tapTarget }, { inputText: text }],

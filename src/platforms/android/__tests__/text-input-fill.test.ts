@@ -506,6 +506,49 @@ test('verifyAndroidFilledTextInHierarchy does not ignore broader case mismatches
   assert.equal(verification.ok, false);
 });
 
+// The delete burst used to be sized from the INCOMING text, so the empty clear (#2063) sent the
+// 12/24-delete minimums and could never empty a field longer than 36 characters — leaving residue
+// after reporting failure. The clear must be sized from the value being removed.
+test('fillAndroid sizes the empty clear from the field content, not the empty text', async () => {
+  let value = 'a'.repeat(70);
+  let deletes = 0;
+  await withFillAdb(
+    async (args) => {
+      if (args[0] === 'shell' && args[1] === 'input' && args[2] === 'keyevent') {
+        const count = args.filter((arg) => arg === 'KEYCODE_DEL').length;
+        deletes += count;
+        value = value.slice(0, Math.max(0, value.length - count));
+      }
+      return adbResult('');
+    },
+    () => androidInputXml({ text: value }),
+    async () => {
+      await fillAndroid(ANDROID_EMULATOR, 10, 10, '');
+    },
+  );
+  assert.equal(value, '');
+  assert.ok(deletes >= 70, `expected the clear to cover the 70-char value, sent ${deletes}`);
+});
+
+// A masked value only ever compares by length, and the empty expectation (#2063) accepts an
+// observed masked node with no dump text: a masked field WITH content dumps its bullet run.
+// Matches iOS, where clearing a secure field succeeds unverified instead of failing after the
+// clear worked.
+test('verifyAndroidFilledTextInHierarchy accepts a cleared masked field for an empty expectation', () => {
+  const cleared = verifyAndroidFilledTextInHierarchy(passwordHierarchy(''), 10, 10, '');
+  assert.equal(cleared.ok, true);
+  assert.equal(cleared.masked, true);
+
+  const residue = verifyAndroidFilledTextInHierarchy(
+    passwordHierarchy(maskBullets('Test@123')),
+    10,
+    10,
+    '',
+  );
+  assert.equal(residue.ok, false);
+  assert.equal(residue.reason, 'masked_unverified');
+});
+
 test('fillAndroid accepts matching-length masked password verification', async () => {
   let typed = '';
   await withFillAdb(

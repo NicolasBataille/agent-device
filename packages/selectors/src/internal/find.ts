@@ -234,7 +234,15 @@ export function parseFindArgs(args: string[]): ParsedFindArgs {
     return { locator, query, action: 'wait', timeoutMs: timeoutMs ?? undefined };
   }
   if (action === 'fill' || action === 'type') {
-    return { locator, query, action, value: actionTokens.slice(1).join(' ') };
+    // `undefined` when NO value token followed, `''` when an empty one did: `find <q> fill ""`
+    // is the clear request (#2063) and must stay distinguishable from a forgotten argument.
+    const valueTokens = actionTokens.slice(1);
+    return {
+      locator,
+      query,
+      action,
+      value: valueTokens.length === 0 ? undefined : valueTokens.join(' '),
+    };
   }
   throw new AppError('INVALID_ARGS', `Unsupported find action: ${actionTokens[0]}`, {
     hint: UNSUPPORTED_FIND_ACTION_HINT,

@@ -267,8 +267,9 @@ async function handleFindFill(
   value: string | undefined,
 ): Promise<DaemonResponse> {
   const { req, sessionName, sessionStore, session, invoke, command, publicFlags } = ctx;
-  if (!value) {
-    return errorResponse('INVALID_ARGS', 'find fill requires text');
+  // `''` is the clear request (#2063); only a MISSING value is an error.
+  if (value === undefined) {
+    return errorResponse('INVALID_ARGS', 'find fill requires text (use "" to clear the field)');
   }
   const response = await invoke({
     token: req.token,

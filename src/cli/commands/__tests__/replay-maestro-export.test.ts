@@ -45,6 +45,26 @@ screenshot "./artifacts/checkout"
     ]);
   });
 
+  test('exports the empty-fill clear as eraseText, never a vacuous inputText', () => {
+    // `fill <target> ""` is the clear-field primitive (#2063); Maestro's `inputText: ""` types
+    // nothing, so the recorded clear must become its clear verb.
+    const result = exportReplayScriptToMaestro(`context platform=ios target=mobile
+open com.example.app
+fill id="email" ""
+`);
+
+    const docs = parseYamlDocs(result.yaml);
+    expect(docs[1]).toEqual(['launchApp', { tapOn: { id: 'email' } }, 'eraseText']);
+    expect(result.warnings).toEqual([
+      {
+        line: 3,
+        action: 'fill id="email"',
+        message:
+          'fill "" exports as tapOn + eraseText; Maestro erases at most its 50-character default',
+      },
+    ]);
+  });
+
   test('exports coordinate gestures and sleep waits with warnings', () => {
     const result = exportReplayScriptToMaestro(`open com.example.app
 click 120 240

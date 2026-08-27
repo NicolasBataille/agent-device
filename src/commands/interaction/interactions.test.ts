@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { interactionCliReaders, interactionDaemonWriters } from './interactions.ts';
+import { selectorCliReaders } from './selectors.ts';
 import { AppError } from '@agent-device/kernel/errors';
 import type { CliFlags } from '@agent-device/contracts/command';
 
@@ -70,4 +71,16 @@ test('fill projects an empty text as its own positional', () => {
   const request = interactionDaemonWriters.fill({ ref: '@e57', text: '' });
 
   expect(request.positionals).toEqual(['@e57', '']);
+});
+
+// `find <q> fill ""` is the same clear request through the find grammar (#2063): the empty
+// value reaches the typed options, while a missing value is refused at the reader so the typed
+// `value: string` contract stays intact.
+test('find fill reads an empty value as the clear request and refuses a missing one', () => {
+  const cleared = selectorCliReaders.find(['text', 'Save', 'fill', ''], BASE_FLAGS);
+  expect(cleared).toMatchObject({ action: 'fill', value: '' });
+
+  expect(() => selectorCliReaders.find(['text', 'Save', 'fill'], BASE_FLAGS)).toThrow(
+    /find fill requires text \(use "" to clear the field\)/,
+  );
 });
