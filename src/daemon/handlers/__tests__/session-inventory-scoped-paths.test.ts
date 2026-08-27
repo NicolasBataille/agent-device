@@ -43,14 +43,17 @@ test('session list resolves a cwd-scoped session directory from its store key', 
   const response = await runSessionList();
 
   expect(response?.ok).toBe(true);
-  const sessions = (response?.ok ? response.data?.sessions : undefined) as
-    | { name: string; sessionStateDir: string; runnerLogPath: string }[]
-    | undefined;
-  const session = sessions?.[0];
-  expect(session).toBeDefined();
+  if (!response?.ok) return;
+  const sessions = response.data?.sessions as {
+    name: string;
+    sessionStateDir: string;
+    runnerLogPath: string;
+  }[];
+  expect(sessions).toHaveLength(1);
+  const session = sessions[0]!;
   // The public name stays what the caller typed …
-  expect(session?.name).toBe('default');
+  expect(session.name).toBe('default');
   // … while the reported paths point at the directory that actually holds the session.
-  expect(path.basename(session?.sessionStateDir ?? '')).toBe('cwd_8bea844ab16aa9b3_default');
-  expect(session?.runnerLogPath.startsWith(`${session?.sessionStateDir}${path.sep}`)).toBe(true);
+  expect(path.basename(session.sessionStateDir)).toBe('cwd_8bea844ab16aa9b3_default');
+  expect(session.runnerLogPath.startsWith(`${session.sessionStateDir}${path.sep}`)).toBe(true);
 });
