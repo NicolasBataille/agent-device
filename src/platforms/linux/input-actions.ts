@@ -305,6 +305,12 @@ export async function fillLinux(x: number, y: number, text: string, delayMs = 0)
   // Select all existing text (Ctrl+A scancodes: Ctrl=29, A=30)
   await sendKey('ctrl+a', ['29:1', '30:1', '30:0', '29:0']);
   await sleep(50);
+  if (text.length === 0) {
+    // The clear-field request (#2063): typing zero characters over the selection would leave
+    // the old value selected but intact, so delete the selection instead (BackSpace=14).
+    await sendKey('BackSpace', ['14:1', '14:0']);
+    return;
+  }
   // Type replacement text
   await typeLinux(text, delayMs);
 }

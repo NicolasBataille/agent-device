@@ -445,6 +445,26 @@ extension RunnerTests {
     XCTAssertEqual(result.failure, .commitNotObserved)
   }
 
+  // `fill <target> ""` is the clear-field primitive (#2063). When no clear target resolves —
+  // Springboard's home screen has no focused text input — the empty-text replacement path must
+  // fail closed: it used to fall through to the vacuous-typing early return and report
+  // `verified: true` for a clear that never ran.
+  func testEmptyReplacementWithoutResolvableTargetFailsClosed() {
+    let result = typeTextReliably(
+      app: springboard,
+      target: TextEntryTarget(element: nil, refreshPoint: nil, prefersFocusedElement: false),
+      text: "",
+      delaySeconds: 0,
+      repairMode: .replacement,
+      xCTestChannelPenalized: false,
+      synthesizer: RecordingTextEntrySynthesizer()
+    )
+
+    XCTAssertEqual(result.failure, .notFocused)
+    XCTAssertNil(result.verified)
+    XCTAssertNil(result.observedText)
+  }
+
   // Companion to the above: text carrying a submit key must skip the wait entirely, same as the
   // append route (`awaitSynthesizedFirstResponderCommit`) — the app may clear or rewrite the field
   // on submit, so there is nothing meaningful to poll toward.

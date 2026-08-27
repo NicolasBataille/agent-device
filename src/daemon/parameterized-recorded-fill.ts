@@ -258,6 +258,9 @@ export function parameterizeRecordedFillTargetEvidence(
   placeholder: string,
 ): TargetAnnotationV1 | undefined {
   if (!evidence) return evidence;
+  // An empty literal (#2063) would equate every EMPTY label with the fill value; an empty
+  // label is not an echo of anything, so the evidence stays untouched.
+  if (!literal) return evidence;
   return {
     ...evidence,
     ...(evidence.label === literal ? { label: placeholder } : {}),
@@ -360,7 +363,10 @@ function filterSensitiveSelectorCandidates(
 }
 
 function parameterizeSensitiveString(value: string, literal: string, placeholder: string): string {
-  if (!literal) return value === literal ? placeholder : value;
+  // The empty literal (`fill <target> "" --record-as VAR`, #2063) matches inside every string:
+  // it reveals nothing if echoed, so it redacts nothing. Only the fill's own semantic `text`
+  // field is force-parameterized, by `parameterizeRecordedFillPayload`, not here.
+  if (!literal) return value;
 
   const unparameterizedSegments = placeholder ? value.split(placeholder) : [value];
   if (unparameterizedSegments.every((segment) => !segment.includes(literal))) return value;

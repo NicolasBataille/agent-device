@@ -153,7 +153,7 @@ Selectors:
 
 Text entry:
   fill replaces; type appends to an already-focused field: fill 'id="field-email"' "qa@example.com"; type "Handle with care" --delay-ms 80
-  Empty replacement is not a clear-field command (do not plan fill <target> ""); use a visible clear/reset control, or report the gap.
+  fill <target> "" clears the field (replace with nothing); the empty argument must be present -- fill <target> alone is a missing argument.
   Plain fill/type first; if an iOS debounced/search-as-you-type field drops characters, retry with --delay-ms before clipboard paste.
   The keyboard usually does not block interactions -- press the next target directly. keyboard dismiss taps its own dismiss key when one exists, else UNSUPPORTED_OPERATION. Android: try dismiss before back. iOS: when both fail, do not tap a static text/heading hoping it is safe; prefer type "\\n" to submit.
   iOS paste-prompt limits and Android IME/handwriting capture quirks: help debugging.

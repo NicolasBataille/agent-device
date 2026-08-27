@@ -307,13 +307,18 @@ function textAndroidFillVerification(
   inspection: AndroidTextAtPointInspection,
   expected: string,
 ): AndroidFillVerification {
-  const actual = inspection.actualInput?.text ?? null;
+  const actualInput = inspection.actualInput;
+  const actual = actualInput?.text ?? null;
   return {
-    ok: isAcceptableAndroidFillMatch(actual, expected),
+    // An observed input node is required before any match: `actual` is also null when the scan
+    // found NO input at all (wrong point, lost focus), and an empty expectation accepts null —
+    // without the gate, three empty samples of nothing would report a clear that never touched
+    // an app field.
+    ok: actualInput !== null && isAcceptableAndroidFillMatch(actual, expected),
     actual,
     reason: 'text_mismatch',
     targetInput: inspection.targetInput,
-    actualInput: inspection.actualInput,
+    actualInput,
   };
 }
 

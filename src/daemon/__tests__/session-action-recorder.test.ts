@@ -238,6 +238,48 @@ test.each(['', '   '])(
   },
 );
 
+test('an empty parameterized clear rewrites only its own text, never other empty fields', () => {
+  // `fill <target> "" --record-as VAR` (#2063): the empty literal matches inside every string,
+  // so it must redact nothing beyond the fill's own semantic text — an unrelated empty field or
+  // empty evidence label is not an echo of the (empty) value.
+  const session = makeIosSession('default');
+  recordActionEntry(session, {
+    command: 'fill',
+    positionals: ['id="search"', ''],
+    flags: { recordAs: 'QUERY' },
+    result: {
+      text: '',
+      message: 'Filled 0 chars',
+      selector: 'id="search"',
+      backend: { detail: '' },
+    },
+    targetEvidence: {
+      role: 'textinput',
+      label: '',
+      ancestry: [{ role: 'form', label: '' }],
+      sibling: 0,
+      viewportOrder: 0,
+      verification: 'verified',
+    },
+  });
+
+  expect(session.actions[0]).toMatchObject({
+    positionals: ['id="search"', '${QUERY}'],
+    result: {
+      text: '${QUERY}',
+      message: 'Filled 0 chars',
+      selector: 'id="search"',
+      backend: { detail: '' },
+    },
+    targetEvidence: {
+      label: '',
+      ancestry: [{ role: 'form', label: '' }],
+    },
+  });
+  // The empty literal is never registered for session-wide echo protection either.
+  expect(session.recordedFillLiterals?.has('') ?? false).toBe(false);
+});
+
 test('whitespace-only fills collapse ambiguous recorder output and keys', () => {
   const session = makeIosSession('default');
   const whitespace = '   ';

@@ -144,6 +144,7 @@ jobs:
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testPenalizedCoordinateTapOnNonTextControlDoesNotAuthorizeBareType \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testBareDelayedTypeFailsWhenTappedInputDisappearsMidCommand \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testSynthesizedTextCommitProgressWalksExpectedPrefixOnly \
+            -only-testing:AgentDeviceRunnerUITests/RunnerTests/testEmptyReplacementWithoutResolvableTargetFailsClosed \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testTextEntryTapWitnessIsBoundToTargetIdentity \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testCoordinateTapTextInputProbeSkipsPenalizedXCTestChannel \
             -only-testing:AgentDeviceRunnerUITests/RunnerTests/testCoordinateTextInputCandidateMustBeEnabledAndContainTheTouchPoint \

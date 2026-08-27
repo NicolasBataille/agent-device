@@ -49,6 +49,7 @@ test('agent-browser provider maps supported operations to session-scoped JSON co
       await provider.hover?.(30.2, 40.7);
       await provider.hoverRef?.('@e5');
       await provider.fill(11, 22, 'Ada');
+      await provider.fill(11, 22, '');
       await provider.fillRef?.('@e2', 'Grace');
       await provider.typeText('hello');
       await provider.scroll('down', { pixels: 400 });
@@ -80,6 +81,13 @@ test('agent-browser provider maps supported operations to session-scoped JSON co
         ['mouse', 'up', '--json', '--session', 'web-session'],
         ['press', expectedSelectAllShortcut(), '--json', '--session', 'web-session'],
         ['keyboard', 'type', 'Ada', '--json', '--session', 'web-session'],
+        // The empty fill (#2063) deletes the select-all selection instead of typing zero
+        // characters over it, which would leave the old value intact.
+        ['mouse', 'move', '11', '22', '--json', '--session', 'web-session'],
+        ['mouse', 'down', '--json', '--session', 'web-session'],
+        ['mouse', 'up', '--json', '--session', 'web-session'],
+        ['press', expectedSelectAllShortcut(), '--json', '--session', 'web-session'],
+        ['press', 'Backspace', '--json', '--session', 'web-session'],
         ['fill', '@e2', 'Grace', '--json', '--session', 'web-session'],
         ['keyboard', 'type', 'hello', '--json', '--session', 'web-session'],
         ['scroll', 'down', '400', '--json', '--session', 'web-session'],

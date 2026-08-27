@@ -90,6 +90,12 @@ export function createAgentBrowserWebProvider(
       // browser input until a future ref-targeted web path can call native fill.
       await clickCoordinates(runJson, x, y);
       await runJson(['press', selectAllShortcut()]);
+      if (text.length === 0) {
+        // The clear-field request (#2063): typing zero characters over the selection would
+        // leave the old value selected but intact, so the selection must be deleted instead.
+        await runJson(['press', 'Backspace']);
+        return;
+      }
       await runJson(['keyboard', 'type', text]);
     },
     async fillRef(ref, text) {

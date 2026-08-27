@@ -159,10 +159,7 @@ test('usageForCommand resolves workflow help topic', async () => {
   assert.match(help, /geometry never chooses a winner/);
   assert.match(help, /iOS AX flags are unreliable on deep RN trees/);
   assert.match(help, /targetHittable: false plus a hint -- verify or re-target, not a failure/);
-  assert.match(
-    help,
-    /Empty replacement is not a clear-field command \(do not plan fill <target> ""\)/,
-  );
+  assert.match(help, /fill <target> "" clears the field \(replace with nothing\)/);
   assert.match(help, /retry with --delay-ms before clipboard paste/);
   assert.match(
     help,

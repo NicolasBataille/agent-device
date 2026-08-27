@@ -375,6 +375,28 @@ test('verifyAndroidFilledTextInHierarchy accepts a cleared field for an empty ex
   assert.equal(clearedWithoutAttribute.ok, true);
 });
 
+test('verifyAndroidFilledTextInHierarchy refuses an empty expectation when no input is observed at all', () => {
+  // `actual` is null both for a cleared field and for NO field: a wrong point or lost focus
+  // must not satisfy the empty expectation, or three such samples become a stable success for
+  // a clear that never touched an app input.
+  const noInputAnywhere = verifyAndroidFilledTextInHierarchy(
+    '<?xml version="1.0" encoding="UTF-8"?><hierarchy><node package="com.example" class="android.widget.FrameLayout" bounds="[0,0][1080,1920]"/></hierarchy>',
+    10,
+    10,
+    '',
+  );
+  assert.equal(noInputAnywhere.ok, false);
+  assert.equal(noInputAnywhere.actualInput, null);
+
+  const inputElsewhere = verifyAndroidFilledTextInHierarchy(
+    '<?xml version="1.0" encoding="UTF-8"?><hierarchy><node package="com.example" class="android.widget.EditText" bounds="[500,500][700,600]"/></hierarchy>',
+    10,
+    10,
+    '',
+  );
+  assert.equal(inputElsewhere.ok, false);
+});
+
 test('verifyAndroidFilledTextInHierarchy still refuses a non-empty field for an empty expectation', () => {
   const verification = verifyAndroidFilledTextInHierarchy(
     androidInputXml({ text: 'still here' }),

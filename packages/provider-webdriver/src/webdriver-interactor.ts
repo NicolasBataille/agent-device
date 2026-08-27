@@ -215,6 +215,18 @@ class WebDriverInteractor implements Interactor {
     _delayMs?: number,
   ): Promise<Record<string, unknown>> {
     this.requireSupport('fill');
+    // This backend's fill is tap + sendKeys: it never clears the existing value, so the
+    // clear-field request (`fill <target> ""`, #2063) has no mechanism here — sending zero keys
+    // and reporting success would claim a clear that never ran.
+    if (text.length === 0) {
+      throw new AppError(
+        'UNSUPPORTED_OPERATION',
+        'fill with empty text (clear field) is not supported on the webdriver backend',
+        {
+          hint: 'Use a visible clear/reset control in the app, or fill the field with the intended replacement text directly.',
+        },
+      );
+    }
     // #1658: both readings are taken BEFORE the tap, because each is only
     // evidence as a change. A keyboard that was already up says nothing about
     // which field owns first responder now, and a focused element is only

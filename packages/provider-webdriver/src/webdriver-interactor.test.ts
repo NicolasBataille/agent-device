@@ -228,6 +228,27 @@ test('fill caps each probe timeout by the readiness budget remaining', async () 
  * past the whole readiness budget is safe for every case — once readiness
  * resolves there are no pending timers left to fire.
  */
+// `fill <target> ""` is the clear-field primitive (#2063). This backend's fill is tap +
+// sendKeys and owns no clear mechanism, so an empty fill must refuse up front — sending zero
+// keys and reporting success would claim a clear that never ran, before even touching the
+// device.
+test('fill refuses empty text as an unsupported clear rather than a vacuous success', async () => {
+  const world = createTextEntryWorld();
+  const interactor = createWebDriverInteractor({
+    client: world.client,
+    backend: 'xctest',
+    capabilities: createCloudWebDriverCapabilities({ provider: 'test', platform: 'ios' }),
+  });
+
+  await assert.rejects(interactor.fill(12, 24, ''), (error: AppError) => {
+    assert.equal(error.code, 'UNSUPPORTED_OPERATION');
+    assert.match(error.message, /clear field/);
+    return true;
+  });
+  // Fail-closed means untouched: no tap, no keys, no probes reached the device.
+  assert.deepEqual(world.transcript, []);
+});
+
 async function runFill(world: ReturnType<typeof createTextEntryWorld>) {
   vi.useFakeTimers();
   try {

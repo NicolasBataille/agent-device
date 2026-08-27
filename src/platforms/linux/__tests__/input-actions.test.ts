@@ -8,7 +8,7 @@ vi.mock('../../../utils/exec.ts', async (importOriginal) => {
 
 import { runCmd, whichCmd } from '../../../utils/exec.ts';
 import { resetInputToolCache } from '../linux-env.ts';
-import { pressLinux, scrollLinux, typeLinux, sendKey } from '../input-actions.ts';
+import { fillLinux, pressLinux, scrollLinux, typeLinux, sendKey } from '../input-actions.ts';
 
 const mockRunCmd = vi.mocked(runCmd);
 const mockWhichCmd = vi.mocked(whichCmd);
@@ -59,6 +59,19 @@ test('typeLinux omits --delay when delayMs is 0', async () => {
   const typeCall = c.find(([cmd, args]) => cmd === 'xdotool' && args.includes('type'));
   assert.ok(typeCall);
   assert.ok(!typeCall[1].includes('--delay'));
+});
+
+// `fill <target> ""` is the clear-field primitive (#2063). Typing zero characters over the
+// Ctrl+A selection leaves the old value selected but intact, so the empty fill must delete
+// the selection instead.
+test('fillLinux deletes the select-all selection for an empty text', async () => {
+  setupXdotool();
+  await fillLinux(10, 20, '');
+  const c = calls();
+  const backspaceCall = c.find(([cmd, args]) => cmd === 'xdotool' && args.includes('BackSpace'));
+  assert.ok(backspaceCall);
+  const typeCall = c.find(([cmd, args]) => cmd === 'xdotool' && args.includes('type'));
+  assert.equal(typeCall, undefined);
 });
 
 test('scrollLinux preserves xdotool repeat count for non-paced scroll', async () => {
