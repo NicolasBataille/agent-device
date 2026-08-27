@@ -656,7 +656,7 @@ For simulator/emulator flows, use help manual-qa for routine QA or help workflow
 Discovery:
   agent-device devices --platform ios
   agent-device devices --platform android
-  Use --device <name-or-udid> only when multiple devices are present.
+  With multiple devices present, select one: --device <name>, or --udid <udid> (iOS) / --serial <serial> (Android) when names collide.
 
 iOS physical-device prerequisites:
   Xcode, xcrun xcdevice, and xcrun xctrace must be available from the selected Xcode.

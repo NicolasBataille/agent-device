@@ -353,35 +353,27 @@ function resolveDeviceByName(
   return match;
 }
 
-// A simulator/device UDID: five hex groups, 8-4-4-4-12. Only used to recognize a UDID the
-// inventory does not currently list (a shut-down or unplugged one), so the answer is still
-// "wrong flag" rather than "no such device".
-const DEVICE_UDID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * `--device` takes a device NAME, and `--udid`/`--serial` take a device IDENTITY. Passing an
  * identity to `--device` reached name resolution and answered "No device named
  * 204BFFD9-9644-4830-B2C1-1B946597A07C" (#2064) — literally true, and unactionable: it names
  * neither the flag that does take that value nor the fact that one exists. It is the same class of
  * mistake `assertSelectorFlagMatchesPlatform` already answers for a mismatched identity flag, so
- * answer it the same way: name the flag the value belongs to.
+ * answer it the same way: name the flag the value belongs to. Only an observed identity earns the
+ * hint — the candidates' own ids, with the flag derived from that device's platform; guessing from
+ * the value's shape would have to reimplement every platform's identity syntax here.
  */
 function deviceIdentityMistakenForNameHint(
   candidates: DeviceInfo[],
   deviceName: string,
 ): string | undefined {
   const identityMatch = candidates.find((device) => device.id === deviceName);
-  if (identityMatch) {
-    const flag = isSerialAddressablePlatform(identityMatch.platform) ? '--serial' : '--udid';
-    return (
-      `${deviceName} is the id of ${JSON.stringify(identityMatch.name)}, not its name. ` +
-      `Did you mean ${flag} ${deviceName}?`
-    );
-  }
-  if (DEVICE_UDID_SHAPE.test(deviceName)) {
-    return `--device takes a device name. Did you mean --udid ${deviceName}?`;
-  }
-  return undefined;
+  if (!identityMatch) return undefined;
+  const flag = isSerialAddressablePlatform(identityMatch.platform) ? '--serial' : '--udid';
+  return (
+    `${deviceName} is the id of ${JSON.stringify(identityMatch.name)}, not its name. ` +
+    `Did you mean ${flag} ${deviceName}?`
+  );
 }
 
 /**

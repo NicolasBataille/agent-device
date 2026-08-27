@@ -75,22 +75,16 @@ test('a serial passed to --device names --serial, not --udid', async () => {
   assert.match(String(error.details?.hint ?? ''), /Did you mean --serial emulator-5580\?/);
 });
 
-test('a UDID-shaped --device value names --udid even when no listed device has that id', async () => {
-  const error = await resolveError([APPLE], {
-    platform: 'ios',
-    deviceName: '204BFFD9-9644-4830-B2C1-1B946597A07C',
-  });
-  assert.equal(error.code, 'DEVICE_NOT_FOUND');
-  assert.match(
-    String(error.details?.hint ?? ''),
-    /--device takes a device name\. Did you mean --udid 204BFFD9-9644-4830-B2C1-1B946597A07C\?/,
-  );
-});
-
-test('an ordinary unknown --device name keeps the generic device-not-found hint', async () => {
-  const error = await resolveError([APPLE], { platform: 'ios', deviceName: 'iPhone 99' });
-  assert.equal(error.code, 'DEVICE_NOT_FOUND');
-  assert.equal(error.details?.hint, undefined);
+test('an unknown --device value gets the generic hint, even when it looks like a UDID', async () => {
+  // The hint is grounded in observed identity: only a candidate's actual id earns the
+  // wrong-flag answer. A UDID-shaped value that no listed device carries stays a plain
+  // unknown name — guessing from shape would misclassify UUID-named devices and miss
+  // every identity syntax the shape guess does not cover.
+  for (const deviceName of ['204BFFD9-9644-4830-B2C1-1B946597A07C', 'iPhone 99']) {
+    const error = await resolveError([APPLE], { platform: 'ios', deviceName });
+    assert.equal(error.code, 'DEVICE_NOT_FOUND');
+    assert.equal(error.details?.hint, undefined);
+  }
 });
 
 async function resolveError(
