@@ -295,16 +295,14 @@ function maskedAndroidFillVerification(
   const actualInput = inspection.actualInput;
   if (!actualInput || !isMaskedAndroidInput(actualInput)) return null;
   const actual = actualInput.text ?? null;
-  const actualLength = Array.from(actual ?? '').length;
+  const valueLength = Array.from(observedAndroidValue(actualInput)).length;
   const expectedLength = Array.from(expected).length;
-  // A masked value only ever compares by length. The empty expectation (#2063) accepts an
-  // observed masked node with no dump text: a masked field WITH content dumps its bullet run,
-  // so absence is honest evidence of emptiness — matching iOS, where clearing a secure field
-  // succeeds unverified rather than failing after the clear worked.
+  // A masked value only ever compares by length. The empty expectation accepts an observed
+  // masked node with an empty VALUE: a masked field WITH content dumps its bullet run, so
+  // emptiness is honest evidence — matching iOS, where clearing a secure field succeeds
+  // unverified rather than failing after the clear worked.
   const matched =
-    expectedLength === 0
-      ? actualLength === 0
-      : actual !== null && actualLength > 0 && actualLength === expectedLength;
+    expectedLength === 0 ? valueLength === 0 : valueLength > 0 && valueLength === expectedLength;
   return {
     ok: matched,
     actual,
@@ -320,51 +318,58 @@ function textAndroidFillVerification(
   expected: string,
 ): AndroidFillVerification {
   const actualInput = inspection.actualInput;
-  const actual = actualInput?.text ?? null;
-  // An empty field's dump text is its HINT on modern Android (the placeholder-as-value trap the
-  // Apple runner solves with treatingPlaceholderAsEmpty): match against the field's VALUE, which
-  // the helper's hint-showing fact says is absent. `actual` keeps the raw text for diagnostics.
-  const valueText = actualInput?.hintShowing === true ? null : actual;
   return {
-    // An observed input node is required before any match: `valueText` is also null when the
-    // scan found NO input at all (wrong point, lost focus), and an empty expectation accepts
-    // null — without the gate, three empty samples of nothing would report a clear that never
-    // touched an app field.
-    ok: actualInput !== null && isAcceptableAndroidFillMatch(valueText, expected),
-    actual,
+    // An observed input node is required before any match: an empty expectation accepts an
+    // empty VALUE, and "no input at all" (wrong point, lost focus) must never read as one —
+    // three empty samples of nothing would report a clear that never touched an app field.
+    ok:
+      actualInput !== null &&
+      isAcceptableAndroidFillMatch(observedAndroidValue(actualInput), expected),
+    // Raw dump text, for diagnostics — the hint-collapsed VALUE is only for matching.
+    actual: actualInput?.text ?? null,
     reason: 'text_mismatch',
     targetInput: inspection.targetInput,
     actualInput,
   };
 }
 
-function isAcceptableAndroidFillMatch(actual: string | null, expected: string): boolean {
-  if (actual === expected) {
+/**
+ * An observed input's VALUE. The dump `text` is not it in two cases the verifiers must agree
+ * on: an absent attribute is the empty value, and hint-only text is too — an empty field's
+ * `getText()` returns its HINT on modern Android (the placeholder-as-value trap the Apple
+ * runner solves with `treatingPlaceholderAsEmpty`); the helper's hint-showing fact is the only
+ * way to tell that apart from a real value equal to the hint string (#2063).
+ */
+function observedAndroidValue(input: AndroidFillVerificationCandidate): string {
+  if (input.hintShowing) return '';
+  return input.text ?? '';
+}
+
+function isAcceptableAndroidFillMatch(value: string, expected: string): boolean {
+  if (value === expected) {
     return true;
   }
-  // `fill <target> ""` is the clear-field primitive (#2063). A cleared input has no text in the
-  // hierarchy dump, which reads back as `null` rather than `''` — without this the clear would
-  // succeed on the device and still be reported as `text_mismatch`. The normalization below
-  // cannot cover it: it treats both sides as empty and refuses on the emptiness check.
   if (expected.length === 0) {
-    return actual === null || actual.length === 0;
-  }
-  const normalizedActual = normalizeFillVerificationText(actual);
-  const normalizedExpected = normalizeFillVerificationText(expected);
-  if (!normalizedActual || !normalizedExpected) {
+    // The clear request (#2063) matched exactly above or not at all; whitespace never
+    // normalizes into emptiness.
     return false;
   }
-  if (normalizedActual === normalizedExpected) {
+  const normalizedValue = normalizeFillVerificationText(value);
+  const normalizedExpected = normalizeFillVerificationText(expected);
+  if (!normalizedValue || !normalizedExpected) {
+    return false;
+  }
+  if (normalizedValue === normalizedExpected) {
     return true;
   }
-  if (isSentenceAutocapitalizeMatch(normalizedActual, normalizedExpected)) {
+  if (isSentenceAutocapitalizeMatch(normalizedValue, normalizedExpected)) {
     return true;
   }
   return false;
 }
 
-function normalizeFillVerificationText(value: string | null): string {
-  return (value ?? '').replace(/\s+/g, ' ').trim();
+function normalizeFillVerificationText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
 }
 
 function isSentenceAutocapitalizeMatch(actual: string, expected: string): boolean {

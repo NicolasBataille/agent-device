@@ -285,6 +285,12 @@ export type Interactor = {
   hoverRef?(ref: string): Promise<Record<string, unknown> | void>;
   focus(x: number, y: number): Promise<Record<string, unknown> | void>;
   type(text: string, delayMs?: number): Promise<TypeTextBackendResult | void>;
+  /**
+   * Replace the target's text with `text`. The empty string is the clear request (#2063), not a
+   * no-op: an implementation must empty the field or fail — never report success over an
+   * untouched value. A backend with no clear mechanism refuses the empty text up front (see the
+   * webdriver interactor).
+   */
   fill(
     x: number,
     y: number,

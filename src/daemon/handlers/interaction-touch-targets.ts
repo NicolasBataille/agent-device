@@ -104,13 +104,6 @@ export type ParsedFillTarget =
   | { ok: true; target: InteractionTarget; refGeneration?: number; text: string }
   | { ok: false; response: DaemonResponse };
 
-// An empty text argument is the clear-field primitive (#2063): only a MISSING one is an error.
-// Whitespace-only text keeps its per-shape rule below — ref/coordinate fills accept it as payload
-// (Maestro/keyboard-enter newlines), selector fills refuse it.
-function hasFillText(text: string | undefined): text is string {
-  return text !== undefined;
-}
-
 function missingFillTextResponse(place: 'ref' | 'coordinates' | 'selector'): ParsedFillTarget {
   return {
     ok: false,
@@ -121,43 +114,15 @@ function missingFillTextResponse(place: 'ref' | 'coordinates' | 'selector'): Par
   };
 }
 
+/**
+ * One decode, then per-shape admission. `readFillTargetFromPositionals` owns shape detection and
+ * the missing-vs-empty text rule (`''` is the clear request, `undefined` a forgotten argument —
+ * see {@link DecodedFillTarget}); this layer adds only what the wire owns: versioned-ref
+ * admission, the selector whitespace rule, and the daemon error responses.
+ */
 export function parseFillTarget(positionals: string[]): ParsedFillTarget {
-  const first = positionals[0] ?? '';
-  if (first.startsWith('@')) return parseRefFillTarget(first, positionals);
-  const coordinates = parseCoordinateTarget(positionals);
-  if (coordinates) return parsePointFillTarget(coordinates, positionals);
-  return parseSelectorFillTarget(positionals);
-}
-
-function parseRefFillTarget(first: string, positionals: string[]): ParsedFillTarget {
-  const versioned = parseVersionedRefPositional(first);
-  if (!versioned.ok) return { ok: false, response: versioned.response };
-  const text = readFillTargetFromPositionals(positionals).text;
-  if (!hasFillText(text)) return missingFillTextResponse('ref');
-  return {
-    ok: true,
-    target: {
-      kind: 'ref',
-      ref: versioned.ref,
-      fallbackLabel: readRefFallbackLabel(positionals),
-    },
-    refGeneration: versioned.generation,
-    text,
-  };
-}
-
-function parsePointFillTarget(
-  coordinates: { x: number; y: number },
-  positionals: string[],
-): ParsedFillTarget {
-  const text = positionals.length >= 3 ? positionals.slice(2).join(' ') : undefined;
-  if (!hasFillText(text)) return missingFillTextResponse('coordinates');
-  return { ok: true, target: { kind: 'point', x: coordinates.x, y: coordinates.y }, text };
-}
-
-function parseSelectorFillTarget(positionals: string[]): ParsedFillTarget {
-  const parsed = tryReadFillSelectorTarget(positionals);
-  if (!parsed || parsed.kind !== 'selector') {
+  const decoded = decodeFillTarget(positionals);
+  if (!decoded) {
     return {
       ok: false,
       response: errorResponse(
@@ -166,22 +131,49 @@ function parseSelectorFillTarget(positionals: string[]): ParsedFillTarget {
       ),
     };
   }
-  // Preserve payload whitespace (for example Maestro/keyboard-enter newlines) while still
-  // rejecting selector fills that contain only whitespace. `''` is exempt: it is the explicit
-  // clear request (#2063), not an accidentally blank argument.
-  if (!hasFillText(parsed.text) || (parsed.text.length > 0 && !parsed.text.trim())) {
-    return missingFillTextResponse('selector');
+  switch (decoded.kind) {
+    case 'ref': {
+      const versioned = parseVersionedRefPositional(positionals[0] ?? '');
+      if (!versioned.ok) return { ok: false, response: versioned.response };
+      if (decoded.text === undefined) return missingFillTextResponse('ref');
+      return {
+        ok: true,
+        target: {
+          kind: 'ref',
+          ref: versioned.ref,
+          fallbackLabel: readRefFallbackLabel(positionals),
+        },
+        refGeneration: versioned.generation,
+        text: decoded.text,
+      };
+    }
+    case 'point': {
+      if (decoded.text === undefined) return missingFillTextResponse('coordinates');
+      return {
+        ok: true,
+        target: { kind: 'point', x: decoded.target.x, y: decoded.target.y },
+        text: decoded.text,
+      };
+    }
+    case 'selector': {
+      // Preserve payload whitespace (for example Maestro/keyboard-enter newlines) while still
+      // rejecting selector fills that contain only whitespace. `''` is exempt: it is the
+      // explicit clear request, not an accidentally blank argument.
+      if (decoded.text === undefined || (decoded.text.length > 0 && !decoded.text.trim())) {
+        return missingFillTextResponse('selector');
+      }
+      return {
+        ok: true,
+        target: { kind: 'selector', selector: decoded.target.selector },
+        text: decoded.text,
+      };
+    }
   }
-  return {
-    ok: true,
-    target: { kind: 'selector', selector: parsed.target.selector },
-    text: parsed.text,
-  };
 }
 
-// Valid points and @refs are handled above, so a parse failure here only means
-// "not a selector either" — fold it into this handler's uniform INVALID_ARGS response.
-function tryReadFillSelectorTarget(positionals: string[]): DecodedFillTarget | null {
+// A decode failure only means "no recognizable target shape" — fold it into this handler's
+// uniform INVALID_ARGS response.
+function decodeFillTarget(positionals: string[]): DecodedFillTarget | null {
   try {
     return readFillTargetFromPositionals(positionals);
   } catch {
