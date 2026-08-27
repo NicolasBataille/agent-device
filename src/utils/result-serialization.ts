@@ -78,6 +78,7 @@ function sessionDeviceSerial(device: AgentDeviceSessionDevice): string | undefin
 export function serializeSessionListEntry(session: AgentDeviceSession): Record<string, unknown> {
   return {
     name: session.name,
+    ...(session.address ? { address: session.address } : {}),
     ...(session.sessionStateDir ? { sessionStateDir: session.sessionStateDir } : {}),
     ...(session.runnerLogPath ? { runnerLogPath: session.runnerLogPath } : {}),
     ...serializeSessionDevice(session.device, { includeSerial: false }),

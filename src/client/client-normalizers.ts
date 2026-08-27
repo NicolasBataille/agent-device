@@ -122,6 +122,7 @@ export function normalizeSession(value: unknown): AgentDeviceSession {
   };
   return {
     name,
+    address: readOptionalString(record, 'address'),
     createdAt: readRequiredNumber(record, 'createdAt'),
     sessionStateDir: readOptionalString(record, 'sessionStateDir'),
     runnerLogPath: readOptionalString(record, 'runnerLogPath'),

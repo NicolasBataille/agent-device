@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { assertSessionSelectorMatches } from '../session-selector.ts';
 import { AppError } from '@agent-device/kernel/errors';
-import type { SessionState } from '../types.ts';
+import type { SessionRef, SessionState } from '../types.ts';
 
 function makeSession(overrides?: Partial<SessionState>): SessionState {
   return {
@@ -21,10 +21,15 @@ function makeSession(overrides?: Partial<SessionState>): SessionState {
   };
 }
 
+/** These sessions are explicitly named, so each is stored under — and addressed by — its name. */
+function ref(session: SessionState): SessionRef {
+  return { address: session.name, session };
+}
+
 test('accepts matching platform and serial selectors', () => {
   const session = makeSession();
   assert.doesNotThrow(() =>
-    assertSessionSelectorMatches(session, {
+    assertSessionSelectorMatches(ref(session), {
       platform: 'android',
       target: 'tv',
       serial: 'emulator-5554',
@@ -44,7 +49,7 @@ test('accepts matching serial selector for a Vega session', () => {
     },
   });
   assert.doesNotThrow(() =>
-    assertSessionSelectorMatches(session, {
+    assertSessionSelectorMatches(ref(session), {
       platform: 'vega',
       target: 'tv',
       serial: 'VirtualDevice',
@@ -55,7 +60,7 @@ test('accepts matching serial selector for a Vega session', () => {
 test('rejects mismatched platform selector', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { platform: 'ios' }),
+    () => assertSessionSelectorMatches(ref(session), { platform: 'ios' }),
     (err: unknown) =>
       err instanceof AppError &&
       err.code === 'INVALID_ARGS' &&
@@ -66,7 +71,7 @@ test('rejects mismatched platform selector', () => {
 test('selector mismatch explains session recovery commands', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { platform: 'ios' }),
+    () => assertSessionSelectorMatches(ref(session), { platform: 'ios' }),
     (err: unknown) => {
       assert.ok(err instanceof AppError);
       assert.equal(err.code, 'INVALID_ARGS');
@@ -92,14 +97,14 @@ test('accepts --platform apple alias for ios sessions', () => {
     },
   });
   assert.doesNotThrow(() =>
-    assertSessionSelectorMatches(session, { platform: 'apple', target: 'tv' }),
+    assertSessionSelectorMatches(ref(session), { platform: 'apple', target: 'tv' }),
   );
 });
 
 test('rejects mismatched serial selector', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { serial: 'emulator-9999' }),
+    () => assertSessionSelectorMatches(ref(session), { serial: 'emulator-9999' }),
     (err: unknown) =>
       err instanceof AppError &&
       err.code === 'INVALID_ARGS' &&
@@ -110,7 +115,7 @@ test('rejects mismatched serial selector', () => {
 test('rejects udid selector for android session', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { udid: 'ABC-123' }),
+    () => assertSessionSelectorMatches(ref(session), { udid: 'ABC-123' }),
     (err: unknown) =>
       err instanceof AppError &&
       err.code === 'INVALID_ARGS' &&
@@ -121,7 +126,7 @@ test('rejects udid selector for android session', () => {
 test('accepts matching device selector (case-insensitive)', () => {
   const session = makeSession();
   assert.doesNotThrow(() =>
-    assertSessionSelectorMatches(session, {
+    assertSessionSelectorMatches(ref(session), {
       device: 'pixel 9',
     }),
   );
@@ -130,7 +135,7 @@ test('accepts matching device selector (case-insensitive)', () => {
 test('rejects mismatched target selector', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { target: 'mobile' }),
+    () => assertSessionSelectorMatches(ref(session), { target: 'mobile' }),
     (err: unknown) =>
       err instanceof AppError &&
       err.code === 'INVALID_ARGS' &&
@@ -141,7 +146,7 @@ test('rejects mismatched target selector', () => {
 test('rejects mismatched device selector', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { device: 'thymikee-iphone' }),
+    () => assertSessionSelectorMatches(ref(session), { device: 'thymikee-iphone' }),
     (err: unknown) =>
       err instanceof AppError &&
       err.code === 'INVALID_ARGS' &&
@@ -162,14 +167,16 @@ test('accepts matching ios simulator set selector for iOS simulator sessions', (
     },
   });
   assert.doesNotThrow(() =>
-    assertSessionSelectorMatches(session, { iosSimulatorDeviceSet: '/tmp/tenant-a/simulator-set' }),
+    assertSessionSelectorMatches(ref(session), {
+      iosSimulatorDeviceSet: '/tmp/tenant-a/simulator-set',
+    }),
   );
 });
 
 test('rejects android allowlist selector when session device is not allowlisted', () => {
   const session = makeSession();
   assert.throws(
-    () => assertSessionSelectorMatches(session, { androidDeviceAllowlist: 'emulator-9999' }),
+    () => assertSessionSelectorMatches(ref(session), { androidDeviceAllowlist: 'emulator-9999' }),
     (err: unknown) =>
       err instanceof AppError &&
       err.code === 'INVALID_ARGS' &&

@@ -1,7 +1,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { applyRequestLockPolicy } from '../request-lock-policy.ts';
-import type { SessionState } from '../types.ts';
+import type { SessionRef, SessionState } from '../types.ts';
 
 const IOS_SESSION: SessionState = {
   name: 'qa-ios',
@@ -31,6 +31,11 @@ const ANDROID_SESSION: SessionState = {
     booted: true,
   },
 };
+
+/** Both fixtures are explicitly named, so each is stored under — and addressed by — its name. */
+function ref(session: SessionState): SessionRef {
+  return { address: session.name, session };
+}
 
 test('allows compatible fresh-session selectors under request lock policy', () => {
   const req = applyRequestLockPolicy({
@@ -135,7 +140,7 @@ test('rejects existing-session selector conflicts under request lock policy', ()
             lockPolicy: 'reject',
           },
         },
-        IOS_SESSION,
+        ref(IOS_SESSION),
       ),
     /--serial=emulator-5554/i,
   );
@@ -194,7 +199,7 @@ test('allows matching redundant selectors for existing sessions', () => {
         lockPolicy: 'reject',
       },
     },
-    IOS_SESSION,
+    ref(IOS_SESSION),
   );
 
   assert.equal(req.flags?.udid, 'SIM-001');
@@ -217,7 +222,7 @@ test('rejects mismatching udid selectors for existing sessions', () => {
             lockPolicy: 'reject',
           },
         },
-        IOS_SESSION,
+        ref(IOS_SESSION),
       ),
     /--udid=SIM-999/i,
   );
@@ -238,7 +243,7 @@ test('allows matching serial selectors for existing android sessions', () => {
         lockPolicy: 'reject',
       },
     },
-    ANDROID_SESSION,
+    ref(ANDROID_SESSION),
   );
 
   assert.equal(req.flags?.serial, 'emulator-5554');
@@ -261,7 +266,7 @@ test('rejects mismatching device selectors for existing android sessions', () =>
             lockPolicy: 'reject',
           },
         },
-        ANDROID_SESSION,
+        ref(ANDROID_SESSION),
       ),
     /--device=Pixel 8/i,
   );
@@ -283,7 +288,7 @@ test('rejects mismatching serial selectors for existing android sessions', () =>
             lockPolicy: 'reject',
           },
         },
-        ANDROID_SESSION,
+        ref(ANDROID_SESSION),
       ),
     /--serial=emulator-9999/i,
   );
@@ -306,7 +311,7 @@ test('strips only conflicting scope selectors for existing sessions, keeping mat
         lockPolicy: 'strip',
       },
     },
-    IOS_SESSION,
+    ref(IOS_SESSION),
   );
 
   assert.equal(req.flags?.platform, 'ios');

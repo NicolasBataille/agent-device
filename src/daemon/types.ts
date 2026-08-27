@@ -225,6 +225,20 @@ export type PendingInteractionOutcome = {
   preSignature: InteractionSurfaceEntry[];
 };
 
+/**
+ * A session together with the store key that addresses it: `address` is the exact string
+ * `--session` must carry to reach `session`, and it is NOT always `session.name`. An implicitly
+ * cwd-scoped session is named `default` and stored under `cwd:<hash>:default`, and `--session`
+ * marks the session explicit, so `--session default` addresses a different session entirely
+ * (#2031/#1394). Anything that turns a session into a path, a `--session` argument, or a `close`
+ * target takes this pair rather than a bare record, so it cannot be handed a session whose address
+ * was never resolved.
+ */
+export type SessionRef = {
+  address: string;
+  session: SessionState;
+};
+
 export type SessionState = {
   name: string;
   sessionScope?: {

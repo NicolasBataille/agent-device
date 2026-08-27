@@ -4,13 +4,13 @@ import { applyRequestLockPolicy } from './request-lock-policy.ts';
 import { buildOpenTargetDeviceResolutionOptions } from './open-device-selection.ts';
 import { buildReplayTargetDeviceResolution } from './replay-device-selection.ts';
 import type { SessionStore } from './session-store.ts';
-import type { DaemonRequest, SessionState } from './types.ts';
+import type { DaemonRequest, SessionRef } from './types.ts';
 
 export type RequestExecutionLockKey = `session:${string}` | `device:${string}`;
 
 export type LockedRequestBinding = {
   req: DaemonRequest;
-  existingSession: SessionState | undefined;
+  existingRef: SessionRef | undefined;
 };
 
 export async function resolveRequestExecutionLockKeys(params: {
@@ -48,10 +48,10 @@ export function prepareLockedRequestBinding(params: {
   sessionName: string;
   sessionStore: SessionStore;
 }): LockedRequestBinding {
-  const existingSession = params.sessionStore.get(params.sessionName);
+  const existingRef = params.sessionStore.lookup(params.sessionName);
   return {
-    req: applyRequestLockPolicy(params.req, existingSession),
-    existingSession,
+    req: applyRequestLockPolicy(params.req, existingRef),
+    existingRef,
   };
 }
 

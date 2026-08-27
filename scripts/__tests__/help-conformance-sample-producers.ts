@@ -365,12 +365,12 @@ export const SAMPLE_PRODUCERS: SampleProducer[] = [
     producer: 'the real session-open by-session conflict producer',
     sample: DEVICE_IN_USE_SAMPLE,
     render: () => {
-      const owningSession = { name: 'checkout' } as SessionState;
+      // An explicitly named session is stored under its own name, so address === name here.
+      const owningSession = { address: 'checkout', session: { name: 'checkout' } as SessionState };
       const device = { id: 'SIM-001', name: 'iPhone 17 Pro' } as Parameters<
         typeof buildDeviceInUseBySessionError
       >[1];
-      // An explicitly named session addresses itself, so the sample text is unchanged.
-      const response = buildDeviceInUseBySessionError(owningSession, device, owningSession.name);
+      const response = buildDeviceInUseBySessionError(owningSession, device);
       assertErrorResponse(response, 'the by-session conflict');
       return renderErrorResponse(response);
     },

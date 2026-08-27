@@ -162,8 +162,11 @@ async function prepareTypedMaestroReplay(
   const { req, bundle, sessionName, sessionStore } = params;
   const filePath = bundle.entry;
   const flow = inspectMaestroFlow(readReplayScriptSourceFile(bundle, filePath), filePath);
-  const session = sessionStore.get(sessionName);
-  if (session) assertSessionSelectorMatches(session, req.flags);
+  // `sessionName` is the resolved store key, so the lookup carries the address a selector
+  // conflict must tell the caller to close or reuse.
+  const sessionRef = sessionStore.lookup(sessionName);
+  const session = sessionRef?.session;
+  if (sessionRef) assertSessionSelectorMatches(sessionRef, req.flags);
   const binding = await resolveMaestroReplayBinding({
     req,
     sessionStore,

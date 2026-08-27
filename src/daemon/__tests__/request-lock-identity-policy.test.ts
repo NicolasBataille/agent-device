@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { AppError } from '@agent-device/kernel/errors';
 import { applyRequestLockPolicy } from '../request-lock-policy.ts';
-import type { DaemonRequest, SessionState } from '../types.ts';
+import type { DaemonRequest, SessionRef, SessionState } from '../types.ts';
 
 /**
  * One table for the device-identity half of the session lock. A device identity selector
@@ -172,6 +172,11 @@ const ROWS: Row[] = [
   },
 ];
 
+/** Every row's session is explicitly named, so it is stored under — and addressed by — its name. */
+function ref(session: SessionState | undefined): SessionRef | undefined {
+  return session ? { address: session.name, session } : undefined;
+}
+
 for (const row of ROWS) {
   test(`session lock: ${row.name}`, () => {
     const request = {
@@ -187,7 +192,7 @@ for (const row of ROWS) {
     } as DaemonRequest;
 
     if (row.expect.kind === 'refused') {
-      const error = assertThrowsAppError(() => applyRequestLockPolicy(request, row.session));
+      const error = assertThrowsAppError(() => applyRequestLockPolicy(request, ref(row.session)));
       assert.equal(error.code, 'INVALID_ARGS');
       assert.ok(
         error.message.includes(row.expect.namesSelector),
@@ -212,7 +217,7 @@ for (const row of ROWS) {
       return;
     }
 
-    const applied = applyRequestLockPolicy(request, row.session);
+    const applied = applyRequestLockPolicy(request, ref(row.session));
     for (const [key, value] of Object.entries(row.expect.keepsSelectors)) {
       assert.equal(
         (applied.flags as Record<string, unknown>)[key],

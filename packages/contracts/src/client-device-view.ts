@@ -68,6 +68,13 @@ export type AgentDeviceSessionDevice = {
 
 export type AgentDeviceSession = {
   name: string;
+  /**
+   * The exact value `--session` must carry to address this session, which is not always `name`:
+   * a session opened without `--session` is named `default` but stored — and addressed — as
+   * `cwd:<hash>:default` (#2031/#1394). Optional only because a daemon older than the field does
+   * not send it.
+   */
+  address?: string;
   createdAt: number;
   sessionStateDir?: string;
   runnerLogPath?: string;

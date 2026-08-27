@@ -394,11 +394,11 @@ export function prepareLockedRequestScope(params: {
   const { scope, sessionStore, trackDownloadableArtifact } = params;
   const logPath = scope.runnerLogPath;
   scope.throwIfCanceled();
-  let existingSession = sessionStore.get(scope.sessionName);
-  if (existingSession) {
+  const seededSession = sessionStore.get(scope.sessionName);
+  if (seededSession) {
     // Called under runLocked: refreshRecordingHealth may mutate session recording state.
-    refreshRecordingHealth(existingSession);
-    sessionStore.set(scope.sessionName, existingSession);
+    refreshRecordingHealth(seededSession);
+    sessionStore.set(scope.sessionName, seededSession);
   }
   const binding = prepareLockedRequestBinding({
     req: scope.req,
@@ -406,7 +406,10 @@ export function prepareLockedRequestScope(params: {
     sessionStore,
   });
   const lockedReq = binding.req;
-  existingSession = binding.existingSession;
+  // `scope.sessionName` is the resolved store key, so `existingRef` carries the address every
+  // recovery producer below must name — `existingRef.session.name` is only the public name.
+  const existingRef = binding.existingRef;
+  const existingSession = existingRef?.session;
   updateDiagnosticsScope({ traceLogPath: existingSession?.trace?.outPath });
   const finalize = (response: DaemonResponse): DaemonResponse => {
     const finalized = finalizeDaemonResponse(lockedReq, response, trackDownloadableArtifact);
@@ -439,12 +442,8 @@ export function prepareLockedRequestScope(params: {
     };
   }
 
-  if (
-    existingSession &&
-    !lockedReq.meta?.lockPolicy &&
-    shouldValidateSessionSelector(scope.command)
-  ) {
-    assertSessionSelectorMatches(existingSession, lockedReq.flags);
+  if (existingRef && !lockedReq.meta?.lockPolicy && shouldValidateSessionSelector(scope.command)) {
+    assertSessionSelectorMatches(existingRef, lockedReq.flags);
   }
 
   const contextFromFlags = (

@@ -1,6 +1,6 @@
 import type { CommandFlags } from '@agent-device/contracts/command';
 import { AppError } from '@agent-device/kernel/errors';
-import type { SessionState } from './types.ts';
+import type { SessionRef, SessionState } from './types.ts';
 import {
   isIosFamily,
   isSerialAddressablePlatform,
@@ -23,19 +23,18 @@ export type SessionSelectorConflict = {
   value: string;
 };
 
-export function assertSessionSelectorMatches(session: SessionState, flags?: CommandFlags): void {
+export function assertSessionSelectorMatches(ref: SessionRef, flags?: CommandFlags): void {
+  const { address, session } = ref;
   const mismatches = listSessionSelectorConflicts(session, flags);
   if (mismatches.length === 0) return;
 
   throw new AppError(
     'INVALID_ARGS',
-    `Session "${session.name}" is already bound to ${describeSessionDevice(session)}, but this request selected ${mismatches.map(formatSessionSelectorConflict).join(', ')}.`,
+    `Session "${address}" is already bound to ${describeSessionDevice(session)}, but this request selected ${mismatches.map(formatSessionSelectorConflict).join(', ')}.`,
     {
-      session: session.name,
+      session: address,
       conflicts: mismatches.map(formatSessionSelectorConflict),
-      // This path has only the session record, whose name is what the caller named on this very
-      // request, so the name IS its address here.
-      hint: buildSessionRecoveryHint(session, 'selector-conflict', session.name),
+      hint: buildSessionRecoveryHint(ref, 'selector-conflict'),
     },
   );
 }

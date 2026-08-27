@@ -1,6 +1,6 @@
 import { test, expect } from 'vitest';
 import { buildDeviceInUseBySessionError } from '../session-open-execution.ts';
-import type { SessionState } from '../../types.ts';
+import type { SessionRef } from '../../types.ts';
 import { IOS_SIMULATOR } from '../../../__tests__/test-utils/device-fixtures.ts';
 
 // DEVICE_IN_USE named `SessionState.name`, and for an implicitly cwd-scoped session that is
@@ -10,16 +10,19 @@ import { IOS_SIMULATOR } from '../../../__tests__/test-utils/device-fixtures.ts'
 
 const SCOPED_ADDRESS = 'cwd:8bea844ab16aa9b3:default';
 
-const scopedSession: SessionState = {
-  name: 'default',
-  sessionScope: { kind: 'cwd', id: '8bea844ab16aa9b3' },
-  device: IOS_SIMULATOR,
-  createdAt: 0,
-  actions: [],
+const scopedRef: SessionRef = {
+  address: SCOPED_ADDRESS,
+  session: {
+    name: 'default',
+    sessionScope: { kind: 'cwd', id: '8bea844ab16aa9b3' },
+    device: IOS_SIMULATOR,
+    createdAt: 0,
+    actions: [],
+  },
 };
 
 test('the by-session conflict reports the address, in the message, details and hint', () => {
-  const response = buildDeviceInUseBySessionError(scopedSession, IOS_SIMULATOR, SCOPED_ADDRESS);
+  const response = buildDeviceInUseBySessionError(scopedRef, IOS_SIMULATOR);
 
   expect(response.ok).toBe(false);
   if (response.ok) return;
