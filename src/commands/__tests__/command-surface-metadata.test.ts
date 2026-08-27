@@ -257,7 +257,7 @@ test('every emitted input schema carries the aligned device-selector description
     ).properties;
     if (!properties) continue;
     for (const [key, description] of Object.entries(expected)) {
-      const property = properties[key];
+      const property: { description?: string } | undefined = properties[key];
       if (!property) continue;
       assert.equal(property.description, description, `${metadata.name}.${key}`);
       pinned += 1;
