@@ -6,7 +6,10 @@ import {
   readBatchStepRecord,
 } from '@agent-device/contracts/command';
 import { AppError } from '@agent-device/kernel/errors';
-import { readStructuredBatchCommandName } from '../core/batch-policy.ts';
+import {
+  BATCH_AVAILABLE_COMMANDS_HINT,
+  readStructuredBatchCommandName,
+} from '../core/batch-policy.ts';
 import { assertAllowedKeys } from '../commands/command-input.ts';
 
 /**
@@ -15,6 +18,8 @@ import { assertAllowedKeys } from '../commands/command-input.ts';
  * recovery step is attached here rather than in the shared contract (#2062).
  */
 const CLI_BATCH_STEP_SHAPE_HINT = `${BATCH_STEP_SHAPE_HINT} Run agent-device help batch for the commands batch accepts and for runnable step examples.`;
+
+const CLI_BATCH_AVAILABLE_COMMANDS_HINT = `${BATCH_AVAILABLE_COMMANDS_HINT} Run agent-device help batch for the commands batch accepts and for runnable step examples.`;
 
 export function readCliBatchStepsJson(raw: string): BatchStep[] {
   let parsed: unknown;
@@ -48,7 +53,11 @@ function readCliBatchStep(step: unknown, stepNumber: number): BatchStep {
   );
   const runtime = parseBatchStepRuntime(record.runtime, stepNumber);
   return {
-    command: readStructuredBatchCommandName(record.command, stepNumber),
+    command: readStructuredBatchCommandName(
+      record.command,
+      stepNumber,
+      CLI_BATCH_AVAILABLE_COMMANDS_HINT,
+    ),
     input: readBatchStepInputObject(record, stepNumber, CLI_BATCH_STEP_SHAPE_HINT),
     ...(runtime === undefined ? {} : { runtime }),
   };

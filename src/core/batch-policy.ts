@@ -50,15 +50,17 @@ export const INHERITED_PARENT_FLAG_KEYS = [
 ] as const;
 
 /**
- * The refusal above names the rejected command but never named the accepted set, and `help batch`
- * documented no exclusions either, so the boundary was only discoverable by trial (#2062). Point at
- * the one derived listing rather than restating it: `help batch` renders
- * {@link STRUCTURED_BATCH_COMMAND_NAMES} itself, so a registry change cannot leave prose behind.
+ * The refusal below names the rejected command but never stated the boundary, so it was only
+ * discoverable by trial (#2062). Surface-neutral by design — this default reaches the MCP and
+ * Node readers, whose batch step schema already enumerates the accepted commands in its
+ * `command` enum; the CLI attaches its terminal recovery via the `hint` parameter at its own
+ * admission. NOT the place for the roster itself: hint strings are redaction-capped at 400
+ * characters, and the enumerated roster truncates.
  */
-const BATCH_AVAILABLE_COMMANDS_HINT =
-  'Run agent-device help batch for the commands available through batch. Session, daemon, ' +
-  'connection, and host tooling commands are excluded — they own lifecycle a batch cannot ' +
-  'carry — and batch and replay never nest. Run an excluded command on its own.';
+export const BATCH_AVAILABLE_COMMANDS_HINT =
+  'Session, daemon, connection, and host tooling commands are excluded from batch — they own ' +
+  'lifecycle a batch cannot carry — and batch and replay never nest. Run an excluded command on ' +
+  'its own; every other device command is available as a step.';
 
 const structuredBatchCommandNames = new Set<string>(STRUCTURED_BATCH_COMMAND_NAMES);
 
@@ -73,13 +75,14 @@ export function normalizeBatchCommandName(command: unknown): string {
 export function readStructuredBatchCommandName(
   command: unknown,
   stepNumber: number,
+  hint: string = BATCH_AVAILABLE_COMMANDS_HINT,
 ): StructuredBatchCommandName {
   const normalized = normalizeBatchCommandName(command);
   if (isStructuredBatchCommandName(normalized)) return normalized;
   throw new AppError(
     'INVALID_ARGS',
     `Batch step ${stepNumber} command is not available through command batch: ${String(command)}`,
-    { hint: BATCH_AVAILABLE_COMMANDS_HINT },
+    { hint },
   );
 }
 

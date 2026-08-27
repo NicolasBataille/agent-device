@@ -10,6 +10,8 @@ import {
   type CliCaptureOptions,
 } from '../../__tests__/cli-capture.ts';
 import { mkdtempForTestSync } from '../../__tests__/test-utils/tmp-dir.ts';
+import { AppError } from '@agent-device/kernel/errors';
+import { createBatchCommandMetadata } from './metadata.ts';
 
 const batchDefaultResponse: DaemonResponse = {
   ok: true,
@@ -142,12 +144,38 @@ test('an args/target step names the step shape instead of only the unknown field
   assert.match(result.stderr, /\{"command":"<name>","input":\{\.\.\.\}\}/);
 });
 
-test('a non-batchable command points at the listing of the ones that are', async () => {
+test('a non-batchable command states the boundary and, on the CLI, the help recovery', async () => {
   const result = await runCliCapture(['batch', '--steps', '[{"command":"session","input":{}}]']);
 
   assert.equal(result.code, 1);
   assert.match(result.stderr, /not available through command batch: session/);
+  assert.match(result.stderr, /excluded from batch/);
   assert.match(result.stderr, /help batch/);
+});
+
+// The same reader backs the MCP/Node surface through the batch metadata, where a terminal
+// recovery step is unrunnable: the shared hint stays surface-neutral (those surfaces read the
+// accepted commands off the step schema's command enum) and only the CLI admission appends the
+// help pointer (#2062). The hint also has to survive the 400-character redaction cap intact —
+// enumerating the roster inline truncated it, help pointer and all.
+test('the MCP/Node availability refusal is surface-neutral and survives redaction whole', () => {
+  const metadata = createBatchCommandMetadata();
+  try {
+    metadata.readInput({ steps: [{ command: 'session', input: {} }] });
+    assert.fail('expected the nested session command to be refused');
+  } catch (error) {
+    assert.ok(error instanceof AppError);
+    const hint = String(error.details?.hint ?? '');
+    assert.match(hint, /excluded from batch/);
+    assert.doesNotMatch(hint, /agent-device /);
+    assert.doesNotMatch(hint, /--[a-z]/);
+    assert.ok(hint.length <= 400, `hint must survive the redaction cap, got ${hint.length}`);
+  }
+  const stepSchema = metadata.inputSchema.properties?.steps as {
+    items?: { properties?: { command?: { enum?: string[] } } };
+  };
+  const commandEnum = stepSchema.items?.properties?.command?.enum ?? [];
+  assert.ok(commandEnum.includes('press'), 'the step schema enum is the machine-readable roster');
 });
 
 // The reported blocker (#2062) was the step shape, not the verb: press/click/fill were never
