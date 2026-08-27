@@ -81,14 +81,50 @@ export async function fillAndroid(
     const verification = await verifyAndroidFilledText(device, x, y, text, helper);
     return completeAndroidFillVerification(text, beforeTarget, verification);
   }
-  const textCodePointLength = Array.from(text).length;
-  const attempts: Array<{
-    clearPadding: number;
-    minClear: number;
-    maxClear: number;
-    chunkSize: number;
-    inputDelayMs: number;
-  }> = [
+  let lastVerification: AndroidFillVerification | null = null;
+
+  for (const attempt of buildAndroidShellFillAttempts(delayMs)) {
+    await focusAndroid(device, x, y);
+    const channel = await admitAndroidTextChannel(device, 'fill', text);
+    if (channel.backend === 'test-ime') {
+      const verification = await fillAndroidImeHelper(
+        device,
+        channel.packageName,
+        x,
+        y,
+        text,
+        beforeTarget,
+        helper,
+      );
+      return completeAndroidFillVerification(text, beforeTarget, verification);
+    }
+    const verification = await runAndroidShellFillAttempt(
+      device,
+      { x, y, text, beforeTarget, attempt },
+      helper,
+    );
+    lastVerification = verification;
+    if (verification.ok) return;
+    if (verification.reason === 'ime_capture') {
+      return completeAndroidFillVerification(text, beforeTarget, verification);
+    }
+    const unconfirmed = buildAndroidFillUnconfirmedVerification(text, beforeTarget, verification);
+    if (unconfirmed) return unconfirmed;
+  }
+
+  return completeAndroidFillVerification(text, beforeTarget, lastVerification);
+}
+
+type AndroidShellFillAttempt = {
+  clearPadding: number;
+  minClear: number;
+  maxClear: number;
+  chunkSize: number;
+  inputDelayMs: number;
+};
+
+function buildAndroidShellFillAttempts(delayMs: number): AndroidShellFillAttempt[] {
+  return [
     {
       clearPadding: 12,
       minClear: 8,
@@ -104,53 +140,50 @@ export async function fillAndroid(
       inputDelayMs: delayMs > 0 ? delayMs : 15,
     },
   ];
+}
 
-  let lastVerification: AndroidFillVerification | null = null;
+/** One clear-then-type pass on the adb-shell channel, verified against the requested text. */
+async function runAndroidShellFillAttempt(
+  device: DeviceInfo,
+  input: {
+    x: number;
+    y: number;
+    text: string;
+    beforeTarget: AndroidFillVerification['targetInput'];
+    attempt: AndroidShellFillAttempt;
+  },
+  helper: AndroidHelperSessionOptions,
+): Promise<AndroidFillVerification> {
+  const { x, y, text, beforeTarget, attempt } = input;
+  await clearFocusedText(device, androidShellClearCount(text, beforeTarget, attempt));
+  await typeAndroidShell(device, {
+    action: 'fill',
+    text,
+    chunkSize: attempt.chunkSize,
+    delayMs: attempt.inputDelayMs,
+  });
+  return verifyAndroidFilledText(device, x, y, text, helper);
+}
 
-  for (const attempt of attempts) {
-    await focusAndroid(device, x, y);
-    const channel = await admitAndroidTextChannel(device, 'fill', text);
-    if (channel.backend === 'test-ime') {
-      const verification = await fillAndroidImeHelper(
-        device,
-        channel.packageName,
-        x,
-        y,
-        text,
-        beforeTarget,
-        helper,
-      );
-      return completeAndroidFillVerification(text, beforeTarget, verification);
-    }
-    // The delete burst must cover the OLD value. Sizing the empty clear (#2063) from the
-    // incoming text would send the minimum burst and leave residue in any longer field, so it
-    // sizes from the pre-mutation read instead — and assumes the attempt's worst case when
-    // that read could not see the field.
-    const clearBase =
-      textCodePointLength > 0
-        ? textCodePointLength + attempt.clearPadding
-        : beforeTarget?.text
-          ? Array.from(beforeTarget.text).length + attempt.clearPadding
-          : attempt.maxClear;
-    const clearCount = clampCount(clearBase, attempt.minClear, attempt.maxClear);
-    await clearFocusedText(device, clearCount);
-    await typeAndroidShell(device, {
-      action: 'fill',
-      text,
-      chunkSize: attempt.chunkSize,
-      delayMs: attempt.inputDelayMs,
-    });
-    const verification = await verifyAndroidFilledText(device, x, y, text, helper);
-    lastVerification = verification;
-    if (verification.ok) return;
-    if (verification.reason === 'ime_capture') {
-      return completeAndroidFillVerification(text, beforeTarget, verification);
-    }
-    const unconfirmed = buildAndroidFillUnconfirmedVerification(text, beforeTarget, verification);
-    if (unconfirmed) return unconfirmed;
-  }
-
-  return completeAndroidFillVerification(text, beforeTarget, lastVerification);
+/**
+ * The delete burst must cover the OLD value. Sizing the empty clear (#2063) from the incoming
+ * text would send the minimum burst and leave residue in any longer field, so it sizes from the
+ * pre-mutation read instead — and assumes the attempt's worst case when that read could not see
+ * the field.
+ */
+function androidShellClearCount(
+  text: string,
+  beforeTarget: AndroidFillVerification['targetInput'],
+  attempt: AndroidShellFillAttempt,
+): number {
+  const textCodePointLength = Array.from(text).length;
+  const clearBase =
+    textCodePointLength > 0
+      ? textCodePointLength + attempt.clearPadding
+      : beforeTarget?.text
+        ? Array.from(beforeTarget.text).length + attempt.clearPadding
+        : attempt.maxClear;
+  return clampCount(clearBase, attempt.minClear, attempt.maxClear);
 }
 
 /**

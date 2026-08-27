@@ -111,47 +111,51 @@ function hasFillText(text: string | undefined): text is string {
   return text !== undefined;
 }
 
+function missingFillTextResponse(place: 'ref' | 'coordinates' | 'selector'): ParsedFillTarget {
+  return {
+    ok: false,
+    response: errorResponse(
+      'INVALID_ARGS',
+      `fill requires text after ${place} (use "" to clear the field)`,
+    ),
+  };
+}
+
 export function parseFillTarget(positionals: string[]): ParsedFillTarget {
   const first = positionals[0] ?? '';
-  if (first.startsWith('@')) {
-    const versioned = parseVersionedRefPositional(first);
-    if (!versioned.ok) return { ok: false, response: versioned.response };
-    const parsed = readFillTargetFromPositionals(positionals);
-    const text = parsed.text;
-    if (!hasFillText(text))
-      return {
-        ok: false,
-        response: errorResponse(
-          'INVALID_ARGS',
-          'fill requires text after ref (use "" to clear the field)',
-        ),
-      };
-    return {
-      ok: true,
-      target: {
-        kind: 'ref',
-        ref: versioned.ref,
-        fallbackLabel: readRefFallbackLabel(positionals),
-      },
-      refGeneration: versioned.generation,
-      text,
-    };
-  }
-
+  if (first.startsWith('@')) return parseRefFillTarget(first, positionals);
   const coordinates = parseCoordinateTarget(positionals);
-  if (coordinates) {
-    const text = positionals.length >= 3 ? positionals.slice(2).join(' ') : undefined;
-    if (!hasFillText(text))
-      return {
-        ok: false,
-        response: errorResponse(
-          'INVALID_ARGS',
-          'fill requires text after coordinates (use "" to clear the field)',
-        ),
-      };
-    return { ok: true, target: { kind: 'point', x: coordinates.x, y: coordinates.y }, text };
-  }
+  if (coordinates) return parsePointFillTarget(coordinates, positionals);
+  return parseSelectorFillTarget(positionals);
+}
 
+function parseRefFillTarget(first: string, positionals: string[]): ParsedFillTarget {
+  const versioned = parseVersionedRefPositional(first);
+  if (!versioned.ok) return { ok: false, response: versioned.response };
+  const text = readFillTargetFromPositionals(positionals).text;
+  if (!hasFillText(text)) return missingFillTextResponse('ref');
+  return {
+    ok: true,
+    target: {
+      kind: 'ref',
+      ref: versioned.ref,
+      fallbackLabel: readRefFallbackLabel(positionals),
+    },
+    refGeneration: versioned.generation,
+    text,
+  };
+}
+
+function parsePointFillTarget(
+  coordinates: { x: number; y: number },
+  positionals: string[],
+): ParsedFillTarget {
+  const text = positionals.length >= 3 ? positionals.slice(2).join(' ') : undefined;
+  if (!hasFillText(text)) return missingFillTextResponse('coordinates');
+  return { ok: true, target: { kind: 'point', x: coordinates.x, y: coordinates.y }, text };
+}
+
+function parseSelectorFillTarget(positionals: string[]): ParsedFillTarget {
   const parsed = tryReadFillSelectorTarget(positionals);
   if (!parsed || parsed.kind !== 'selector') {
     return {
@@ -166,13 +170,7 @@ export function parseFillTarget(positionals: string[]): ParsedFillTarget {
   // rejecting selector fills that contain only whitespace. `''` is exempt: it is the explicit
   // clear request (#2063), not an accidentally blank argument.
   if (!hasFillText(parsed.text) || (parsed.text.length > 0 && !parsed.text.trim())) {
-    return {
-      ok: false,
-      response: errorResponse(
-        'INVALID_ARGS',
-        'fill requires text after selector (use "" to clear the field)',
-      ),
-    };
+    return missingFillTextResponse('selector');
   }
   return {
     ok: true,
