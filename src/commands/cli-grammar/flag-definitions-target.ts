@@ -40,7 +40,7 @@ export const TARGET_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
     names: ['--serial'],
     type: 'string',
     usageLabel: '--serial <serial>',
-    usageDescription: 'Android device or Vega VVD serial',
+    usageDescription: 'Android, HarmonyOS, or Vega VVD serial',
   },
   {
     key: 'stale',

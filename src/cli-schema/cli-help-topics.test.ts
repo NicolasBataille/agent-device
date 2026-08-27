@@ -39,7 +39,7 @@ test('gesture help documents selectors and pinned refs for both drag endpoints',
 
 // `--udid` was reachable only from `help device`'s usage line, so the one flag that pins a
 // specific simulator among several sharing a name was invisible in the command catalog (#2064).
-test('commands topic lists the device selectors accepted by every command', async () => {
+test('commands topic lists the shared device selectors in their own section', async () => {
   const usageText = await usageForCommand('commands');
   if (usageText === null) throw new Error('Expected commands help text');
   const selectionSection = usageText.slice(

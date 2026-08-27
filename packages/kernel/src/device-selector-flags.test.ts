@@ -75,6 +75,22 @@ test('a serial passed to --device names --serial, not --udid', async () => {
   assert.match(String(error.details?.hint ?? ''), /Did you mean --serial emulator-5580\?/);
 });
 
+test('an id passed to --device on a platform with no identity flag stays hint-free', async () => {
+  // `--udid` resolves only Apple devices and `--serial` only serial-addressable ones; a web or
+  // linux device's id has no flag that could take it, so a hint naming one would be unrunnable.
+  const WEB: DeviceInfo = {
+    platform: 'web',
+    target: 'desktop',
+    id: 'agent-browser-chrome',
+    name: 'Agent Browser Chrome',
+    kind: 'device',
+    booted: true,
+  };
+  const error = await resolveError([WEB], { deviceName: 'agent-browser-chrome' });
+  assert.equal(error.code, 'DEVICE_NOT_FOUND');
+  assert.equal(error.details?.hint, undefined);
+});
+
 test('an unknown --device value gets the generic hint, even when it looks like a UDID', async () => {
   // The hint is grounded in observed identity: only a candidate's actual id earns the
   // wrong-flag answer. A UDID-shaped value that no listed device carries stays a plain

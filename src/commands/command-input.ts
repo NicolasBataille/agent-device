@@ -613,8 +613,15 @@ function commonProperties(): Record<string, JsonSchema> {
       description:
         'Alias for deviceTarget on commands without a UI target field. Interaction commands reserve target for the UI element.',
     },
-    device: { type: 'string', description: 'Device name selector.' },
-    udid: { type: 'string', description: 'iOS device UDID selector.' },
+    device: {
+      type: 'string',
+      description: 'Device name selector (a UDID belongs in udid, a serial in serial).',
+    },
+    udid: {
+      type: 'string',
+      description:
+        'Apple device or simulator UDID; the selector that pins one device when several share a name.',
+    },
     serial: { type: 'string', description: 'Android device or Vega VVD serial selector.' },
     iosSimulatorDeviceSet: {
       type: 'string',

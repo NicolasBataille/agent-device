@@ -97,7 +97,8 @@ export const COMMON_COMMAND_SUPPORTED_FLAG_KEYS = flagKeys(
 );
 
 /**
- * The device/session selectors every command accepts (they are part of
+ * The device/session selectors shared across device commands (a few take a subset:
+ * connect has no --udid/--serial, device has no --session). They are part of
  * {@link COMMON_COMMAND_SUPPORTED_FLAG_KEYS}, not of {@link GLOBAL_FLAG_KEYS}, because they reach
  * device resolution rather than the CLI envelope). `help commands` renders them as their own
  * section: `--udid` used to appear only inside `help device`'s usage line, so the one flag that

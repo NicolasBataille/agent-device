@@ -1061,7 +1061,9 @@ Full command catalog. Use agent-device help <command> for exact flags and behavi
   const commandLines = renderCommandSection(commands);
 
   const selectionSection = renderFlagSection(
-    'Device Selection (accepted by every device command):',
+    // "shared by", not "accepted by every": a few catalog commands take a subset (connect has
+    // no --udid/--serial, device has no --session) — help <command> states each command's own.
+    "Device Selection (shared by device commands; help <command> lists each command's flags):",
     listHelpFlags(DEVICE_SELECTION_FLAG_KEYS),
   );
   const helpFlags = listHelpFlags(GLOBAL_FLAG_KEYS);

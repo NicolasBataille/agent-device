@@ -361,7 +361,9 @@ function resolveDeviceByName(
  * mistake `assertSelectorFlagMatchesPlatform` already answers for a mismatched identity flag, so
  * answer it the same way: name the flag the value belongs to. Only an observed identity earns the
  * hint — the candidates' own ids, with the flag derived from that device's platform; guessing from
- * the value's shape would have to reimplement every platform's identity syntax here.
+ * the value's shape would have to reimplement every platform's identity syntax here. A platform
+ * with no identity flag at all (web, linux) earns no hint either: `--udid` resolves only Apple
+ * devices, so naming it would send the user to a flag that provably cannot work.
  */
 function deviceIdentityMistakenForNameHint(
   candidates: DeviceInfo[],
@@ -369,11 +371,19 @@ function deviceIdentityMistakenForNameHint(
 ): string | undefined {
   const identityMatch = candidates.find((device) => device.id === deviceName);
   if (!identityMatch) return undefined;
-  const flag = isSerialAddressablePlatform(identityMatch.platform) ? '--serial' : '--udid';
+  const flag = deviceIdentityFlag(identityMatch.platform);
+  if (!flag) return undefined;
   return (
     `${deviceName} is the id of ${JSON.stringify(identityMatch.name)}, not its name. ` +
     `Did you mean ${flag} ${deviceName}?`
   );
+}
+
+/** The identity flag that can actually resolve a device on this platform, if one exists. */
+function deviceIdentityFlag(platform: Platform): '--udid' | '--serial' | undefined {
+  if (isApplePlatform(platform)) return '--udid';
+  if (isSerialAddressablePlatform(platform)) return '--serial';
+  return undefined;
 }
 
 /**
