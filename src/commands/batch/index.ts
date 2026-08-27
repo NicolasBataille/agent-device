@@ -6,7 +6,7 @@ import { defineCommandFacet, defineCommandFamilyFromFacets } from '../family/typ
 import { defineExecutableCommand } from '../command-contract.ts';
 import { commonToClientOptions } from '../command-input.ts';
 import { batchCliOutputFormatters } from './output.ts';
-import { createBatchCommandMetadata, type BatchInput } from './metadata.ts';
+import { createBatchCommandMetadata, type BatchCommandStep, type BatchInput } from './metadata.ts';
 import { STRUCTURED_BATCH_COMMAND_NAMES } from '../../core/batch-policy.ts';
 import { createBatchDaemonWriter } from './projection.ts';
 
@@ -31,18 +31,40 @@ const batchCliReader: CliReader = (_positionals, flags) => ({
 });
 
 /**
+ * The step examples `help batch` prints. A step's `input` is keyed by the command's structured
+ * field names, which no CLI help text spells out — `help press` documents the positional and the
+ * flags, not `target: {kind, ref}` — so these lines are the only place the terminal states them.
+ * `cli-help-examples.test.ts` reads them back out of the rendered help and runs each `input`
+ * through its own command's `readInput`, so a renamed field fails there instead of shipping an
+ * example nobody can run (#2062).
+ */
+const BATCH_STEP_EXAMPLES: readonly BatchCommandStep[] = [
+  { command: 'snapshot', input: { interactiveOnly: true } },
+  { command: 'press', input: { target: { kind: 'ref', ref: '@e12' }, settle: true } },
+  {
+    command: 'fill',
+    input: { target: { kind: 'selector', selector: 'id="field-email"' }, text: 'qa@example.com' },
+  },
+];
+
+/**
  * `help batch` documented neither the step shape nor which commands batch accepts, so an agent
  * discovered both by trial: `["press @e12"]` and `{"command":"press","args":[...]}` were refused
  * without either being named (#2062). The accepted set is RENDERED from the command-descriptor
  * registry's `batchable` trait, so it cannot drift from what the runtime allowlist enforces.
  */
 function buildBatchCliDetail(): string {
-  return [
-    'Each step is {"command":"<name>","input":{...}}: the same input object that command takes on its own — run agent-device help <command> for its arguments. There is no positional step form; args, target, and argv are not step fields.',
+  const prose = [
+    'Each step is {"command":"<name>","input":{...}}, and input is that command\'s structured input object rather than its terminal spelling: a CLI positional becomes a named field (target, text, direction) and a CLI flag becomes a camelCase key (--settle -> "settle":true, -i -> "interactiveOnly":true). There is no positional step form; args, argv, positionals, and flags are not step fields. agent-device help <command> lists arguments in CLI spelling only. The examples below carry the structured spelling; over MCP, the command tool schema states it in full.',
     'Steps run serially in one daemon request against the same session, in order. Mutating UI verbs are included (press, click, fill, longpress, scroll, back), which is where the round-trip saving is; --on-error stop halts at the first failing step.',
     `Available through batch: ${[...STRUCTURED_BATCH_COMMAND_NAMES].sort().join(', ')}.`,
     'Every other command is excluded: batch and replay never nest, and session, daemon, connection, and host tooling commands own lifecycle a batch request cannot carry. Run those on their own.',
   ].join(' ');
+  const examples = [
+    `  agent-device batch --steps '${JSON.stringify(BATCH_STEP_EXAMPLES)}'`,
+    '  agent-device batch --steps-file ./steps.json --json',
+  ].join('\n');
+  return `${prose}\n\nExamples:\n${examples}`;
 }
 
 const batchCommandFacet = defineCommandFacet({

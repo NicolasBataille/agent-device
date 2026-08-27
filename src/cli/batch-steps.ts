@@ -9,6 +9,13 @@ import { AppError } from '@agent-device/kernel/errors';
 import { readStructuredBatchCommandName } from '../core/batch-policy.ts';
 import { assertAllowedKeys } from '../commands/command-input.ts';
 
+/**
+ * The terminal half of the step-shape refusal. `@agent-device/contracts` states the shape for
+ * every surface and stops there; only a terminal caller can be told to run a help command, so the
+ * recovery step is attached here rather than in the shared contract (#2062).
+ */
+const CLI_BATCH_STEP_SHAPE_HINT = `${BATCH_STEP_SHAPE_HINT} Run agent-device help batch for the commands batch accepts and for runnable step examples.`;
+
 export function readCliBatchStepsJson(raw: string): BatchStep[] {
   let parsed: unknown;
   try {
@@ -23,7 +30,7 @@ export function readCliBatchStepsJson(raw: string): BatchStep[] {
 }
 
 function readCliBatchStep(step: unknown, stepNumber: number): BatchStep {
-  const record = readBatchStepRecord(step, stepNumber);
+  const record = readBatchStepRecord(step, stepNumber, CLI_BATCH_STEP_SHAPE_HINT);
   const removedFields = ['positionals', 'flags'].filter((field) => field in record);
   if (removedFields.length > 0) {
     const fields = removedFields.map((field) => `"${field}"`).join(', ');
@@ -36,12 +43,12 @@ function readCliBatchStep(step: unknown, stepNumber: number): BatchStep {
     record,
     ['command', 'input', 'runtime'],
     `Batch step ${stepNumber}`,
-    BATCH_STEP_SHAPE_HINT,
+    CLI_BATCH_STEP_SHAPE_HINT,
   );
   const runtime = parseBatchStepRuntime(record.runtime, stepNumber);
   return {
     command: readStructuredBatchCommandName(record.command, stepNumber),
-    input: readBatchStepInputObject(record, stepNumber),
+    input: readBatchStepInputObject(record, stepNumber, CLI_BATCH_STEP_SHAPE_HINT),
     ...(runtime === undefined ? {} : { runtime }),
   };
 }

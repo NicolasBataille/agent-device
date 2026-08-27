@@ -131,7 +131,7 @@ Command shape:
   Command lines only -- no prose, numbering, fences, pipes, or grep/head/tail/jq on agent-device output; raw output carries the refs/hints the next step needs. Subcommand first, then positionals, then flags: agent-device open com.example.app --session checkout --platform android --relaunch
   Chain confident consecutive steps with &&: press 'label="Search"' --settle && fill 'label="Search"' "query" --settle. Fall back to one command at a time when a step is uncertain (ambiguous match, network-backed result, unseen screen).
   Refs look like @e12; use the exact ref from the latest snapshot -i, never a placeholder (@ref, @eN, @Label_Name). Pin with ~s<n> (press @e12~s4); iOS rejects a stale pinned ref -- refresh with snapshot -i or use a selector.
-  close = agent-device close. App back is back; system back is back --system. Taps are press/click. type never takes --settle: run type, then diff snapshot to verify. Known flow: batch ./steps.json (help scripting).
+  close = agent-device close. App back is back; system back is back --system. Taps are press/click. type never takes --settle: run type, then diff snapshot to verify. Known flow: batch --steps-file ./steps.json (help batch).
   Gestures: scroll/swipe for lists/flicks; gesture pan|fling|pinch|rotate|transform|drag for multi-touch. Shapes and platform quirks: help gestures.
 
 Bootstrap:
@@ -225,7 +225,8 @@ Replay divergence and repair:
 
 Batch:
   agent-device batch --steps '[{"command":"open","input":{"app":"settings"}},{"command":"wait","input":{"kind":"duration","durationMs":100}}]'
-  Step keys are command, input, and optional runtime; put command arguments inside input using the same fields as the MCP/Node command. The removed positionals/flags shape fails with an example showing how to migrate it.
+  agent-device batch --steps-file ./steps.json --json
+  Step keys are command, input, and optional runtime -- that is the whole accepted shape. input holds the command's structured fields, not its terminal spelling: a CLI positional becomes a named field (target, text, direction) and a flag becomes a camelCase key (--settle -> "settle":true). Accepted commands, that mapping, and runnable press/fill/snapshot steps: help batch.
   Maestro full-suite validation on connected devices uses one test command with a comma-separated --device list and --shard-all (--shard-split only to split suite entries across devices):
     agent-device test ./e2e/maestro --maestro --device udid1,emulator-5554 --shard-all 2
 

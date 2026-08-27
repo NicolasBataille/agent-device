@@ -68,6 +68,26 @@ test('batch help documents the step shape and the commands batch accepts', async
     assert.match(help, new RegExp(`\\b${command}\\b`), `expected ${command} in batch help`);
   }
   assert.match(help, /batch and replay never nest/);
+  // A step's input is keyed by structured field names no CLI help spells out, so the examples are
+  // this text's only statement of them. `cli-help-examples.test.ts` runs them through the readers.
+  assert.match(help, /\n\nExamples:\n {2}agent-device batch --steps '\[/);
+  assert.match(help, /"command":"press","input":\{"target":\{"kind":"ref"/);
+  assert.match(help, /"command":"fill",.*"text":"qa@example\.com"/);
+  assert.match(help, /"command":"snapshot","input":\{"interactiveOnly":true\}/);
+});
+
+// #2046 removed the positionals/flags step payload and dropped positional step input, but the
+// topics kept describing both: `help scripting` still weighed the removed shape against the
+// accepted one, and `help workflow` still named `batch ./steps.json` as the known flow (#2062).
+test('scripting and workflow topics name only the accepted batch step source', async () => {
+  const scripting = await usageForCommand('scripting');
+  const workflow = await usageForCommand('workflow');
+  if (scripting === null || workflow === null) throw new Error('Expected both help texts');
+
+  assert.match(scripting, /agent-device batch --steps-file \.\/steps\.json/);
+  assert.doesNotMatch(scripting, /positionals\/flags/);
+  assert.match(workflow, /batch --steps-file \.\/steps\.json/);
+  assert.doesNotMatch(workflow, /batch \.\/steps\.json/);
 });
 
 test('commands topic includes only global flags in its global flags section', async () => {
@@ -167,7 +187,7 @@ test('usageForCommand resolves workflow help topic', async () => {
     help,
     /iOS rejects a stale pinned ref -- refresh with snapshot -i or use a selector/,
   );
-  assert.match(help, /Known flow: batch \.\/steps\.json \(help scripting\)/);
+  assert.match(help, /Known flow: batch --steps-file \.\/steps\.json \(help batch\)/);
   assert.match(help, /Shapes and platform quirks: help gestures/);
   assert.match(
     help,
@@ -270,7 +290,7 @@ test('usageForCommand resolves scripting help topic', async () => {
   assert.match(help, /state-repair means the script is correct but app state is not/);
   assert.match(help, /close --save-script\[=<out>\] \(default <stem>\.healed\.ad\)/);
   assert.match(help, /agent-device batch --steps '\[\{"command":"open"/);
-  assert.match(help, /removed positionals\/flags shape fails with an example/);
+  assert.match(help, /Step keys are command, input, and optional runtime -- that is the whole/);
   assert.match(help, /test \.\/e2e\/maestro --maestro --device udid1,emulator-5554 --shard-all 2/);
   assert.match(help, /Android adb screenrecord has a 180s limit/);
   assert.match(help, /--hide-touches skips that for the fastest raw recording/);

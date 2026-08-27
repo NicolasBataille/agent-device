@@ -1,10 +1,12 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import type { BatchStep } from '@agent-device/contracts/client';
 import { parseArgs } from '../cli/parser/args.ts';
+import { readCliBatchStepsJson } from '../cli/batch-steps.ts';
 import { buildCommandUsageText, buildUsageText, helpTopicIds } from './cli-help.ts';
 import { listCliCommandNames } from '../command-catalog.ts';
 import { readInputFromCli } from '../commands/cli-grammar.ts';
-import { isCommandName } from '../commands/command-metadata.ts';
+import { findCommandMetadata, isCommandName } from '../commands/command-metadata.ts';
 import { readVersion } from '../utils/version.ts';
 
 // Help is the agent-facing contract, and agents copy its example lines verbatim, so an example the
@@ -104,6 +106,46 @@ test('every runnable example printed by CLI help is accepted by the CLI schema',
     [],
     `Help advertises commands the CLI rejects:\n${failures.join('\n')}`,
   );
+});
+
+/** The `--steps` payload of every batch example help prints, paired with the line it came from. */
+function collectBatchStepExamples(): Array<{ line: string; steps: BatchStep[] }> {
+  return collectHelpExamples()
+    .filter((example) => example.argv[0] === 'batch' && example.argv.includes('--steps'))
+    .map((example) => {
+      const json = example.argv[example.argv.indexOf('--steps') + 1];
+      assert.ok(json, `Expected a --steps payload in help example: ${example.line}`);
+      return { line: example.line, steps: readCliBatchStepsJson(json) };
+    });
+}
+
+// A step's `input` is keyed by the command's structured field names, and no CLI help text spells
+// those out — `help press` documents the positional and the flags, not `target: {kind, ref}`. So
+// the printed steps ARE the terminal's only statement of them, and the check above cannot see it:
+// the CLI parser validates the step envelope and stops, never reading `input`. Each printed input
+// therefore goes through its own command's `readInput` — the same reader the daemon, the client,
+// and the MCP tool run (#2062).
+test('every batch step printed by CLI help is accepted by its own command reader', () => {
+  const examples = collectBatchStepExamples();
+  const covered = new Set<string>();
+  for (const { line, steps } of examples) {
+    for (const step of steps) {
+      assert.ok(isCommandName(step.command), `Unknown command in help example: ${line}`);
+      try {
+        findCommandMetadata(step.command).readInput(step.input);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert.fail(
+          `Help advertises a batch step ${step.command} rejects:\n${line}\n    ${message}`,
+        );
+      }
+      covered.add(step.command);
+    }
+  }
+  // #2062 was reported against the mutating verbs; a snapshot step is what precedes them.
+  for (const command of ['press', 'fill', 'snapshot']) {
+    assert.ok(covered.has(command), `Expected a ${command} step among help's batch examples`);
+  }
 });
 
 test('help react-native keeps its multi-worktree open example runnable', () => {
