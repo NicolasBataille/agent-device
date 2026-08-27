@@ -622,7 +622,7 @@ function commonProperties(): Record<string, JsonSchema> {
       description:
         'Apple device or simulator UDID; the selector that pins one device when several share a name.',
     },
-    serial: { type: 'string', description: 'Android device or Vega VVD serial selector.' },
+    serial: { type: 'string', description: 'Android, HarmonyOS, or Vega VVD serial selector.' },
     iosSimulatorDeviceSet: {
       type: 'string',
       description: 'iOS simulator device-set path used for device resolution.',

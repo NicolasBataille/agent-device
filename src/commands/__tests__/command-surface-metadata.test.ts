@@ -240,6 +240,32 @@ test('command family facets keep daemon writers as an explicit projection subset
   }
 });
 
+// The device-selector descriptions are a public machine surface (MCP/Node input schemas) and
+// must state the same platform facts as the resolver and the CLI help: a UDID belongs in udid,
+// --serial covers HarmonyOS (#2064). Pinned here so a drift on any command's emitted schema
+// fails instead of shipping a cross-surface mismatch.
+test('every emitted input schema carries the aligned device-selector descriptions', () => {
+  const expected: Record<string, string> = {
+    device: 'Device name selector (a UDID belongs in udid, a serial in serial).',
+    udid: 'Apple device or simulator UDID; the selector that pins one device when several share a name.',
+    serial: 'Android, HarmonyOS, or Vega VVD serial selector.',
+  };
+  let pinned = 0;
+  for (const metadata of listCommandMetadata()) {
+    const properties = (
+      metadata.inputSchema as { properties?: Record<string, { description?: string }> }
+    ).properties;
+    if (!properties) continue;
+    for (const [key, description] of Object.entries(expected)) {
+      const property = properties[key];
+      if (!property) continue;
+      assert.equal(property.description, description, `${metadata.name}.${key}`);
+      pinned += 1;
+    }
+  }
+  assert.ok(pinned > 0, 'expected at least one command schema to carry the device selectors');
+});
+
 const daemonRouteOwnerFiles = getDaemonRouteOwnerFiles();
 
 function describeCommand(name: string): string | undefined {
