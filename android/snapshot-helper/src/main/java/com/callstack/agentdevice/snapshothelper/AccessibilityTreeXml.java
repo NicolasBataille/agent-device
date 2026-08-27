@@ -35,6 +35,13 @@ final class AccessibilityTreeXml {
       appendWindowMetadata(xml, windowMetadata);
     }
     appendNonEmptyAttribute(xml, "text", node.getText());
+    // getText() returns the HINT for an empty field on modern Android, so `text` alone cannot
+    // distinguish a cleared field from one whose value equals its hint; only this flag can
+    // (#2063 empty-fill verification).
+    appendTrueAttribute(
+        xml,
+        "hint-showing",
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && node.isShowingHintText());
     appendNonEmptyAttribute(xml, "resource-id", node.getViewIdResourceName());
     appendAttribute(xml, "class", node.getClassName());
     appendNonEmptyAttribute(xml, "package", node.getPackageName());

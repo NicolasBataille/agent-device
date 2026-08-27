@@ -35,6 +35,11 @@ export type AndroidUiNodeMetadata = {
   focusable?: boolean;
   focused?: boolean;
   password?: boolean;
+  /**
+   * Helper-only: the `text` attribute is the field's HINT, not its value (an empty input's
+   * `getText()` returns the hint on modern Android). Absent in raw uiautomator dumps.
+   */
+  hintShowing?: boolean;
   scrollable?: boolean;
   canScrollForward?: boolean;
   canScrollBackward?: boolean;
@@ -142,6 +147,7 @@ function readNodeAttributes(node: string): Omit<AndroidUiNodeMetadata, 'rect'> {
     focusable: boolAttr('focusable'),
     focused: boolAttr('focused'),
     password: boolAttr('password'),
+    ...optionalBoolAttr('hintShowing', 'hint-showing'),
     ...optionalBoolAttr('visibleToUser', 'visible-to-user'),
     ...optionalNumberAttr('drawingOrder', 'drawing-order'),
     ...optionalBoolAttr('scrollable', 'scrollable'),

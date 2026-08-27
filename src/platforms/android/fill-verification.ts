@@ -24,11 +24,13 @@ export type { AndroidFillVerification } from './fill-diagnostics.ts';
 
 type AndroidFillVerificationCandidate = AndroidFillVerificationNode & {
   editText: boolean;
+  // Helper-only fact: the node's dump text is its HINT, so the field itself is empty.
+  hintShowing: boolean;
 };
 
 type AndroidTextAtPointInspection = {
-  targetInput: AndroidFillVerificationNode | null;
-  actualInput: AndroidFillVerificationNode | null;
+  targetInput: AndroidFillVerificationCandidate | null;
+  actualInput: AndroidFillVerificationCandidate | null;
 };
 
 type AndroidTextAtPointScan = {
@@ -309,12 +311,16 @@ function textAndroidFillVerification(
 ): AndroidFillVerification {
   const actualInput = inspection.actualInput;
   const actual = actualInput?.text ?? null;
+  // An empty field's dump text is its HINT on modern Android (the placeholder-as-value trap the
+  // Apple runner solves with treatingPlaceholderAsEmpty): match against the field's VALUE, which
+  // the helper's hint-showing fact says is absent. `actual` keeps the raw text for diagnostics.
+  const valueText = actualInput?.hintShowing === true ? null : actual;
   return {
-    // An observed input node is required before any match: `actual` is also null when the scan
-    // found NO input at all (wrong point, lost focus), and an empty expectation accepts null —
-    // without the gate, three empty samples of nothing would report a clear that never touched
-    // an app field.
-    ok: actualInput !== null && isAcceptableAndroidFillMatch(actual, expected),
+    // An observed input node is required before any match: `valueText` is also null when the
+    // scan found NO input at all (wrong point, lost focus), and an empty expectation accepts
+    // null — without the gate, three empty samples of nothing would report a clear that never
+    // touched an app field.
+    ok: actualInput !== null && isAcceptableAndroidFillMatch(valueText, expected),
     actual,
     reason: 'text_mismatch',
     targetInput: inspection.targetInput,
@@ -384,6 +390,7 @@ function androidFillCandidateFromNode(
     }),
     area,
     editText: isEditTextClass(node.className ?? ''),
+    hintShowing: node.hintShowing === true,
   };
 }
 

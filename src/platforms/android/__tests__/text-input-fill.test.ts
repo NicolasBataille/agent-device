@@ -397,6 +397,40 @@ test('verifyAndroidFilledTextInHierarchy refuses an empty expectation when no in
   assert.equal(inputElsewhere.ok, false);
 });
 
+// Live Pixel 9 emulator (Settings search, adb-shell channel): a CLEARED EditText dumps its hint
+// as `text` ("Search settings"), because getText() returns the hint for an empty field on
+// modern Android. The helper's hint-showing fact is the only way to tell that apart from a
+// field whose VALUE equals the hint string.
+test('verifyAndroidFilledTextInHierarchy accepts hint-only text for an empty expectation', () => {
+  const hintShowing = verifyAndroidFilledTextInHierarchy(
+    '<?xml version="1.0" encoding="UTF-8"?><hierarchy><node package="com.example" class="android.widget.EditText" text="Search settings" hint-showing="true" focused="true" bounds="[0,0][200,100]"/></hierarchy>',
+    10,
+    10,
+    '',
+  );
+  assert.equal(hintShowing.ok, true);
+
+  // Without the fact, identical text is a real value and the clear must NOT verify.
+  const valueEqualsHint = verifyAndroidFilledTextInHierarchy(
+    androidInputXml({ text: 'Search settings' }),
+    10,
+    10,
+    '',
+  );
+  assert.equal(valueEqualsHint.ok, false);
+});
+
+test('verifyAndroidFilledTextInHierarchy treats hint-only text as an empty value for a non-empty expectation', () => {
+  const verification = verifyAndroidFilledTextInHierarchy(
+    '<?xml version="1.0" encoding="UTF-8"?><hierarchy><node package="com.example" class="android.widget.EditText" text="Search settings" hint-showing="true" focused="true" bounds="[0,0][200,100]"/></hierarchy>',
+    10,
+    10,
+    'battery saver',
+  );
+  assert.equal(verification.ok, false);
+  assert.equal(verification.actual, 'Search settings');
+});
+
 test('verifyAndroidFilledTextInHierarchy still refuses a non-empty field for an empty expectation', () => {
   const verification = verifyAndroidFilledTextInHierarchy(
     androidInputXml({ text: 'still here' }),
